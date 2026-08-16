@@ -20,10 +20,10 @@ export default function BookDetailScreen({ route }) {
             <Text style={styles.noCoverEmoji}>📚</Text>
           </View>
         )}
-        <Text style={styles.title}>{book.title}</Text>
-        <Text style={styles.author}>{book.author}</Text>
-        {book.year && <Text style={styles.meta}>{book.year}</Text>}
-        {book.pages && <Text style={styles.meta}>{book.pages} páginas</Text>}
+        <Text style={styles.title}>{String(book.title)}</Text>
+        <Text style={styles.author}>{String(book.author)}</Text>
+        {!!book.year && <Text style={styles.meta}>{String(book.year)}</Text>}
+        {!!book.pages && <Text style={styles.meta}>{String(book.pages)} páginas</Text>}
       </View>
 
       <View style={styles.section}>
