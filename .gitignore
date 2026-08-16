@@ -1,0 +1,12 @@
+# Mobile
+mobile/node_modules/
+mobile/.expo/
+mobile/.claude/
+
+# API
+api/node_modules/
+api/.env
+
+# General
+*.log
+.DS_Store
