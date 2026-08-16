@@ -4,6 +4,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import HomeScreen from "./src/screens/HomeScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import BookDetailScreen from "./src/screens/BookDetailScreen";
+import ProfileScreen from "./src/screens/ProfileScreen";
+
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -18,6 +20,7 @@ function HomeTabs() {
         tabBarInactiveTintColor: "#666",
       }}
     >
+      <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: "Perfil", tabBarIcon: () => null }} />
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: "Biblioteca", tabBarIcon: () => null }} />
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: "Buscar", tabBarIcon: () => null }} />
     </Tab.Navigator>
@@ -30,6 +33,7 @@ export default function App() {
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         <Stack.Screen name="Main" component={HomeTabs} />
         <Stack.Screen name="BookDetail" component={BookDetailScreen} />
+        <Stack.Screen name="Profile" component={ProfileScreen} />
       </Stack.Navigator>
     </NavigationContainer>
   );

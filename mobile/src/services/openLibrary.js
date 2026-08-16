@@ -1,4 +1,4 @@
-const API_KEY = "AIzaSyBd8x87iBRjUtcOML6ImpLla2U4E9w0RaE";
+const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY;
 const BASE_URL = "https://www.googleapis.com/books/v1";
 
 export const searchBooks = async (query) => {
@@ -19,7 +19,7 @@ export const searchBooks = async (query) => {
         year: info.publishedDate?.split("-")[0] ?? null,
         pages: info.pageCount ?? null,
         cover: info.imageLinks?.thumbnail?.replace("http://", "https://") ?? null,
-        isbn: info.indutryIdentifiers?.[0]?.identifier ?? null,
+        isbn: info.industryIdentifiers?.[0]?.identifier ?? null,
         description: info.description ?? null,
       };
     });

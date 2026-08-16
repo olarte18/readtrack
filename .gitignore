@@ -10,3 +10,5 @@ api/.env
 # General
 *.log
 .DS_Store
+mobile/.env
+mobile/.env
