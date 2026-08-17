@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from "react-native";
-import { addBook, updateBook, checkBook } from "../services/api";
+import { addBook, updateBook, checkBook, deleteBook } from "../services/api";
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "📖 Leyendo" },
@@ -75,7 +75,28 @@ export default function BookDetailScreen({ route, navigation }) {
       Alert.alert("Error", "No se pudo guardar la página");
     }
   };
-
+const handleDelete = () => {
+  Alert.alert(
+    "Eliminar libro",
+    `¿Quitar "${book.title}" de tu biblioteca?`,
+    [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await deleteBook(libraryEntry?.id ?? book.id);
+            onGoBack?.();
+            navigation.goBack();
+          } catch {
+            Alert.alert("Error", "No se pudo eliminar el libro");
+          }
+        }
+      }
+    ]
+  );
+};
   return (
     <ScrollView style={styles.container}>
       <View style={styles.hero}>
@@ -135,6 +156,13 @@ export default function BookDetailScreen({ route, navigation }) {
           </View>
         </View>
       )}
+      {alreadyInLibrary && (
+  <View style={styles.section}>
+    <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+      <Text style={styles.deleteBtnText}>🗑 Quitar de biblioteca</Text>
+    </TouchableOpacity>
+  </View>
+)}
     </ScrollView>
   );
 }
@@ -159,4 +187,6 @@ const styles = StyleSheet.create({
   pageInput: { flex: 1, backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
   pageBtn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   pageBtnText: { color: "#13131f", fontWeight: "bold" },
+deleteBtn: { backgroundColor: "#2a2a3e", borderRadius: 10, paddingVertical: 12, alignItems: "center", marginBottom: 40 },
+deleteBtnText: { color: "#f38ba8", fontWeight: "bold", fontSize: 15 },
 });
