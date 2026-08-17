@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from "react-native";
-import { addBook, updateBook, checkBook, deleteBook } from "../services/api";
+import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote } from "../services/api";
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "📖 Leyendo" },
@@ -21,6 +21,9 @@ export default function BookDetailScreen({ route, navigation }) {
     book.current_page ? String(book.current_page) : ""
   );
   const [rating, setRating] = useState(book.rating ?? 0);
+  const [notes, setNotes] = useState([]);
+const [newNote, setNewNote] = useState("");
+const [notePage, setNotePage] = useState("");
 
   useEffect(() => {
     if (!isInLibrary && book.id) {
@@ -32,6 +35,11 @@ export default function BookDetailScreen({ route, navigation }) {
       });
     }
   }, []);
+useEffect(() => {
+  if (alreadyInLibrary && entryId) {
+    getNotes(entryId).then(setNotes).catch(console.error);
+  }
+}, [alreadyInLibrary]);
 
   const alreadyInLibrary = isInLibrary || !!libraryEntry;
   const entryId = libraryEntry?.id ?? book.id;
@@ -118,7 +126,30 @@ export default function BookDetailScreen({ route, navigation }) {
       ]
     );
   };
+const handleAddNote = async () => {
+  if (!newNote.trim()) return Alert.alert("Error", "Escribe algo en la nota");
+  try {
+    const note = await addNote(entryId, newNote.trim(), notePage ? parseInt(notePage) : null);
+    setNotes((prev) => [note, ...prev]);
+    setNewNote("");
+    setNotePage("");
+  } catch {
+    Alert.alert("Error", "No se pudo guardar la nota");
+  }
+};
 
+const handleDeleteNote = (id) => {
+  Alert.alert("Eliminar nota", "¿Eliminar esta nota?", [
+    { text: "Cancelar", style: "cancel" },
+    {
+      text: "Eliminar", style: "destructive",
+      onPress: async () => {
+        await deleteNote(id);
+        setNotes((prev) => prev.filter((n) => n.id !== id));
+      }
+    }
+  ]);
+};
   return (
     <ScrollView style={styles.container}>
       <View style={styles.hero}>
@@ -192,6 +223,40 @@ export default function BookDetailScreen({ route, navigation }) {
         </View>
       )}
 
+{alreadyInLibrary && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Notas</Text>
+    <View style={styles.noteInputRow}>
+      <TextInput
+        style={styles.noteInput}
+        placeholder="Escribe una nota..."
+        placeholderTextColor="#666"
+        value={newNote}
+        onChangeText={setNewNote}
+        multiline
+      />
+    </View>
+    <View style={styles.pageRow}>
+      <TextInput
+        style={[styles.pageInput, { flex: 1 }]}
+        placeholder="Página (opcional)"
+        placeholderTextColor="#666"
+        keyboardType="numeric"
+        value={notePage}
+        onChangeText={setNotePage}
+      />
+      <TouchableOpacity style={styles.pageBtn} onPress={handleAddNote}>
+        <Text style={styles.pageBtnText}>Agregar</Text>
+      </TouchableOpacity>
+    </View>
+    {notes.map((note) => (
+      <TouchableOpacity key={note.id} style={styles.noteCard} onLongPress={() => handleDeleteNote(note.id)}>
+        {note.page && <Text style={styles.notePage}>Página {note.page}</Text>}
+        <Text style={styles.noteContent}>{note.content}</Text>
+      </TouchableOpacity>
+    ))}
+  </View>
+)}
       {alreadyInLibrary && (
         <View style={styles.section}>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
@@ -227,4 +292,9 @@ const styles = StyleSheet.create({
   star: { fontSize: 32 , color: "#cba6f7" },
   deleteBtn: { backgroundColor: "#20221b", borderRadius: 10, paddingVertical: 12, alignItems: "center", marginBottom: 40 },
   deleteBtnText: { color: "#f38ba8", fontWeight: "bold", fontSize: 15 },
+noteInputRow: { marginBottom: 8 },
+noteInput: { backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 80, textAlignVertical: "top" },
+noteCard: { backgroundColor: "#1e1e2e", borderRadius: 10, padding: 12, marginTop: 8 },
+notePage: { fontSize: 11, color: "#cba6f7", marginBottom: 4 },
+noteContent: { fontSize: 14, color: "#cdd6f4" },
 });
