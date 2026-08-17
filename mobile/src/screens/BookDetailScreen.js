@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
-import { addBook } from "../services/api";
+import { addBook, updateBook } from "../services/api";
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "📖 Leyendo" },
@@ -11,23 +11,39 @@ const STATUS_OPTIONS = [
 
 export default function BookDetailScreen({ route, navigation }) {
   const { book, onGoBack } = route.params;
+  const isInLibrary = !!book.status;
   const [selectedStatus, setSelectedStatus] = useState(book.status ?? null);
   const [loading, setLoading] = useState(false);
 
-const handleAdd = async (status) => {
-  setSelectedStatus(status);
-  setLoading(true);
-  try {
-    await addBook({ ...book, google_id: book.id }, status);
-    Alert.alert("✅ Listo", `"${book.title}" agregado a tu biblioteca`, [
-      { text: "OK", onPress: () => { onGoBack?.(); navigation.goBack(); } }
-    ]);
-  } catch (error) {
-    Alert.alert("Error", "No se pudo agregar el libro");
-  } finally {
-    setLoading(false);
-  }
-};
+  const handleAdd = async (status) => {
+    setSelectedStatus(status);
+    setLoading(true);
+    try {
+      await addBook({ ...book, google_id: book.id }, status);
+      Alert.alert("✅ Listo", `"${book.title}" agregado a tu biblioteca`, [
+        { text: "OK", onPress: () => { onGoBack?.(); navigation.goBack(); } }
+      ]);
+    } catch (error) {
+      Alert.alert("Error", "No se pudo agregar el libro");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdate = async (status) => {
+    setSelectedStatus(status);
+    setLoading(true);
+    try {
+      await updateBook(book.id, { status });
+      Alert.alert("✅ Actualizado", `Estado cambiado a "${STATUS_OPTIONS.find(o => o.key === status)?.label}"`, [
+        { text: "OK", onPress: () => { onGoBack?.(); navigation.goBack(); } }
+      ]);
+    } catch (error) {
+      Alert.alert("Error", "No se pudo actualizar el estado");
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <ScrollView style={styles.container}>
@@ -46,7 +62,9 @@ const handleAdd = async (status) => {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Agregar a biblioteca</Text>
+        <Text style={styles.sectionTitle}>
+          {isInLibrary ? "Cambiar estado" : "Agregar a biblioteca"}
+        </Text>
         {loading ? (
           <ActivityIndicator color="#cba6f7" />
         ) : (
@@ -55,9 +73,11 @@ const handleAdd = async (status) => {
               <TouchableOpacity
                 key={opt.key}
                 style={[styles.statusBtn, selectedStatus === opt.key && styles.statusBtnActive]}
-                onPress={() => handleAdd(opt.key)}
+                onPress={() => isInLibrary ? handleUpdate(opt.key) : handleAdd(opt.key)}
               >
-                <Text style={styles.statusBtnText}>{opt.label}</Text>
+                <Text style={[styles.statusBtnText, selectedStatus === opt.key && styles.statusBtnTextActive]}>
+                  {opt.label}
+                </Text>
               </TouchableOpacity>
             ))}
           </View>
@@ -82,4 +102,5 @@ const styles = StyleSheet.create({
   statusBtn: { backgroundColor: "#1e1e2e", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
   statusBtnActive: { backgroundColor: "#cba6f7" },
   statusBtnText: { color: "#cba6f7", fontSize: 13 },
+  statusBtnTextActive: { color: "#13131f", fontWeight: "bold" },
 });
