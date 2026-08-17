@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+
 import { getLibrary } from "../services/api";
+import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 
 export default function HomeScreen({ navigation }) {
   const [books, setBooks] = useState([]);
@@ -42,9 +43,16 @@ export default function HomeScreen({ navigation }) {
               style={styles.card}
               onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: fetchLibrary })}
             >
-              <View style={styles.noCover}>
-                <Text style={styles.coverEmoji}>📚</Text>
-              </View>
+              
+              {item.cover ? (
+  <Image source={{ uri: item.cover }} style={styles.cover} />
+) : (
+  <View style={styles.noCover}>
+    <Text style={styles.coverEmoji}>📚</Text>
+  </View>
+)}
+              
+              
               <View style={styles.info}>
                 <Text style={styles.bookTitle} numberOfLines={2}>{String(item.title)}</Text>
                 <Text style={styles.author}>{String(item.author)}</Text>
@@ -81,4 +89,5 @@ const styles = StyleSheet.create({
   author: { fontSize: 13, color: "#aaa", marginBottom: 6 },
   status: { fontSize: 12, color: "#cba6f7" },
   empty: { color: "#666", textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
+  cover: { width: 60, height: 90, borderRadius: 6 },
 });

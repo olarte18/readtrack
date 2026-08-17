@@ -20,8 +20,10 @@ router.get("/", async (req, res) => {
 });
 
 // POST /user-books — agregar libro
+
 router.post("/", async (req, res) => {
   const { google_id, title, author, cover, pages, year, genre, isbn, description, status } = req.body;
+  if (!google_id) return res.status(400).json({ error: "google_id es requerido" });
 
   try {
     // 1. Insertar libro si no existe
