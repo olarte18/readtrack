@@ -1,4 +1,6 @@
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView } from "react-native";
+import { useState } from "react";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
+import { addBook } from "../services/api";
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "📖 Leyendo" },
@@ -7,8 +9,25 @@ const STATUS_OPTIONS = [
   { key: "abandoned", label: "❌ Abandonado" },
 ];
 
-export default function BookDetailScreen({ route }) {
-  const { book } = route.params;
+export default function BookDetailScreen({ route, navigation }) {
+  const { book, onGoBack } = route.params;
+  const [selectedStatus, setSelectedStatus] = useState(book.status ?? null);
+  const [loading, setLoading] = useState(false);
+
+const handleAdd = async (status) => {
+  setSelectedStatus(status);
+  setLoading(true);
+  try {
+    await addBook({ ...book, google_id: book.id }, status);
+    Alert.alert("✅ Listo", `"${book.title}" agregado a tu biblioteca`, [
+      { text: "OK", onPress: () => { onGoBack?.(); navigation.goBack(); } }
+    ]);
+  } catch (error) {
+    Alert.alert("Error", "No se pudo agregar el libro");
+  } finally {
+    setLoading(false);
+  }
+};
 
   return (
     <ScrollView style={styles.container}>
@@ -27,14 +46,22 @@ export default function BookDetailScreen({ route }) {
       </View>
 
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Estado</Text>
-        <View style={styles.statusRow}>
-          {STATUS_OPTIONS.map((opt) => (
-            <TouchableOpacity key={opt.key} style={styles.statusBtn}>
-              <Text style={styles.statusBtnText}>{opt.label}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
+        <Text style={styles.sectionTitle}>Agregar a biblioteca</Text>
+        {loading ? (
+          <ActivityIndicator color="#cba6f7" />
+        ) : (
+          <View style={styles.statusRow}>
+            {STATUS_OPTIONS.map((opt) => (
+              <TouchableOpacity
+                key={opt.key}
+                style={[styles.statusBtn, selectedStatus === opt.key && styles.statusBtnActive]}
+                onPress={() => handleAdd(opt.key)}
+              >
+                <Text style={styles.statusBtnText}>{opt.label}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
       </View>
     </ScrollView>
   );
@@ -53,5 +80,6 @@ const styles = StyleSheet.create({
   sectionTitle: { fontSize: 16, fontWeight: "bold", color: "#fff", marginBottom: 12 },
   statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
   statusBtn: { backgroundColor: "#1e1e2e", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  statusBtnActive: { backgroundColor: "#cba6f7" },
   statusBtnText: { color: "#cba6f7", fontSize: 13 },
 });

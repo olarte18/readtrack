@@ -1,12 +1,27 @@
-import { View, Text, FlatList, StyleSheet, TouchableOpacity } from "react-native";
-
-const mockBooks = [
-  { id: "1", title: "El Imperio Final", author: "Brandon Sanderson", status: "completed", cover: null, pages: 647 },
-  { id: "2", title: "The Way of Kings", author: "Brandon Sanderson", status: "reading", cover: null, pages: 1007, current_page: 340 },
-  { id: "3", title: "El Pozo de la Ascensión", author: "Brandon Sanderson", status: "pending", cover: null },
-];
+import { useEffect, useState } from "react";
+import { View, Text, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { getLibrary } from "../services/api";
 
 export default function HomeScreen({ navigation }) {
+  const [books, setBooks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchLibrary = async () => {
+    setLoading(true);
+    try {
+      const data = await getLibrary();
+      setBooks(data);
+    } catch (error) {
+      console.error("Error cargando biblioteca:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchLibrary();
+  }, []);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -15,30 +30,40 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.addBtn}>+ Agregar</Text>
         </TouchableOpacity>
       </View>
-      <FlatList
-        data={mockBooks}
-        keyExtractor={(item) => item.id}
-        renderItem={({ item }) => (
-          <TouchableOpacity
-            style={styles.card}
-            onPress={() => navigation.navigate("BookDetail", { book: item })}
-          >
-            <View style={styles.noCover}>
-              <Text style={styles.coverEmoji}>📚</Text>
-            </View>
-            <View style={styles.info}>
-              <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-              <Text style={styles.author}>{item.author}</Text>
-              <Text style={styles.status}>
-                {item.status === "completed" && "✅ Completado"}
-                {item.status === "reading" && `📖 Página ${item.current_page ?? 0} de ${item.pages}`}
-                {item.status === "pending" && "🕐 Pendiente"}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        )}
-        ListEmptyComponent={<Text style={styles.empty}>No tienes libros aún</Text>}
-      />
+
+      {loading ? (
+        <ActivityIndicator color="#cba6f7" style={{ marginTop: 60 }} />
+      ) : (
+        <FlatList
+          data={books}
+          keyExtractor={(item) => String(item.id)}
+          renderItem={({ item }) => (
+            <TouchableOpacity
+              style={styles.card}
+              onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: fetchLibrary })}
+            >
+              <View style={styles.noCover}>
+                <Text style={styles.coverEmoji}>📚</Text>
+              </View>
+              <View style={styles.info}>
+                <Text style={styles.bookTitle} numberOfLines={2}>{String(item.title)}</Text>
+                <Text style={styles.author}>{String(item.author)}</Text>
+                <Text style={styles.status}>
+                  {item.status === "completed" && "✅ Completado"}
+                  {item.status === "reading" && `📖 Página ${item.current_page ?? 0} de ${item.pages ?? "?"}`}
+                  {item.status === "pending" && "🕐 Pendiente"}
+                  {item.status === "abandoned" && "❌ Abandonado"}
+                </Text>
+              </View>
+            </TouchableOpacity>
+          )}
+          ListEmptyComponent={
+            <Text style={styles.empty}>No tienes libros aún{"\n"}Busca uno para empezar</Text>
+          }
+          onRefresh={fetchLibrary}
+          refreshing={loading}
+        />
+      )}
     </View>
   );
 }
@@ -55,5 +80,5 @@ const styles = StyleSheet.create({
   bookTitle: { fontSize: 15, fontWeight: "bold", color: "#fff", marginBottom: 4 },
   author: { fontSize: 13, color: "#aaa", marginBottom: 6 },
   status: { fontSize: 12, color: "#cba6f7" },
-  empty: { color: "#666", textAlign: "center", marginTop: 60, fontSize: 16 },
+  empty: { color: "#666", textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
 });
