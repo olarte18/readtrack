@@ -29,3 +29,7 @@ export const deleteBook = async (id) => {
   });
   return res.json();
 };
+export const checkBook = async (google_id) => {
+  const res = await fetch(`${API_URL}/user-books/check/${google_id}`);
+  return res.json();
+};

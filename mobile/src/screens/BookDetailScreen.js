@@ -1,6 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
-import { addBook, updateBook } from "../services/api";
+import { addBook, updateBook, checkBook } from "../services/api";
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "📖 Leyendo" },
@@ -14,6 +14,22 @@ export default function BookDetailScreen({ route, navigation }) {
   const isInLibrary = !!book.status;
   const [selectedStatus, setSelectedStatus] = useState(book.status ?? null);
   const [loading, setLoading] = useState(false);
+  const [libraryEntry, setLibraryEntry] = useState(
+    isInLibrary ? { id: book.id, status: book.status } : null
+  );
+
+  useEffect(() => {
+    if (!isInLibrary && book.id) {
+      checkBook(book.id).then((data) => {
+        if (data.exists) {
+          setLibraryEntry(data);
+          setSelectedStatus(data.status);
+        }
+      });
+    }
+  }, []);
+
+  const alreadyInLibrary = isInLibrary || !!libraryEntry;
 
   const handleAdd = async (status) => {
     setSelectedStatus(status);
@@ -30,11 +46,11 @@ export default function BookDetailScreen({ route, navigation }) {
     }
   };
 
-  const handleUpdate = async (status) => {
+  const handleUpdate = async (id, status) => {
     setSelectedStatus(status);
     setLoading(true);
     try {
-      await updateBook(book.id, { status });
+      await updateBook(id, { status });
       Alert.alert("✅ Actualizado", `Estado cambiado a "${STATUS_OPTIONS.find(o => o.key === status)?.label}"`, [
         { text: "OK", onPress: () => { onGoBack?.(); navigation.goBack(); } }
       ]);
@@ -63,7 +79,7 @@ export default function BookDetailScreen({ route, navigation }) {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
-          {isInLibrary ? "Cambiar estado" : "Agregar a biblioteca"}
+          {alreadyInLibrary ? "Cambiar estado" : "Agregar a biblioteca"}
         </Text>
         {loading ? (
           <ActivityIndicator color="#cba6f7" />
@@ -73,7 +89,9 @@ export default function BookDetailScreen({ route, navigation }) {
               <TouchableOpacity
                 key={opt.key}
                 style={[styles.statusBtn, selectedStatus === opt.key && styles.statusBtnActive]}
-                onPress={() => isInLibrary ? handleUpdate(opt.key) : handleAdd(opt.key)}
+                onPress={() => alreadyInLibrary
+                  ? handleUpdate(libraryEntry?.id ?? book.id, opt.key)
+                  : handleAdd(opt.key)}
               >
                 <Text style={[styles.statusBtnText, selectedStatus === opt.key && styles.statusBtnTextActive]}>
                   {opt.label}

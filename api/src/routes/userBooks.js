@@ -88,5 +88,20 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ error: "Error al eliminar" });
   }
 });
+router.get("/check/:google_id", async (req, res) => {
+  try {
+    const { rows } = await pool.query(`
+      SELECT ub.id, ub.status FROM user_books ub
+      JOIN books b ON ub.book_id = b.id
+      WHERE b.google_id = $1
+    `, [req.params.google_id]);
 
+    if (rows.length > 0) {
+      return res.json({ exists: true, status: rows[0].status, id: rows[0].id });
+    }
+    res.json({ exists: false });
+  } catch (error) {
+    res.status(500).json({ error: "Error al verificar" });
+  }
+});
 module.exports = router;
