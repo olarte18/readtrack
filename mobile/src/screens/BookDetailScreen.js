@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from "react-native";
 import { addBook, updateBook, checkBook } from "../services/api";
 
 const STATUS_OPTIONS = [
@@ -16,6 +16,9 @@ export default function BookDetailScreen({ route, navigation }) {
   const [loading, setLoading] = useState(false);
   const [libraryEntry, setLibraryEntry] = useState(
     isInLibrary ? { id: book.id, status: book.status } : null
+  );
+  const [currentPage, setCurrentPage] = useState(
+    book.current_page ? String(book.current_page) : ""
   );
 
   useEffect(() => {
@@ -61,6 +64,18 @@ export default function BookDetailScreen({ route, navigation }) {
     }
   };
 
+  const handleSavePage = async () => {
+    const page = parseInt(currentPage);
+    if (isNaN(page) || page < 0) return Alert.alert("Error", "Ingresa una página válida");
+    if (book.pages && page > book.pages) return Alert.alert("Error", `El libro tiene ${book.pages} páginas`);
+    try {
+      await updateBook(libraryEntry?.id ?? book.id, { current_page: page });
+      Alert.alert("✅ Guardado", `Página ${page} guardada`);
+    } catch {
+      Alert.alert("Error", "No se pudo guardar la página");
+    }
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.hero}>
@@ -101,6 +116,25 @@ export default function BookDetailScreen({ route, navigation }) {
           </View>
         )}
       </View>
+
+      {selectedStatus === "reading" && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Página actual</Text>
+          <View style={styles.pageRow}>
+            <TextInput
+              style={styles.pageInput}
+              placeholder="¿En qué página vas?"
+              placeholderTextColor="#666"
+              keyboardType="numeric"
+              value={currentPage}
+              onChangeText={setCurrentPage}
+            />
+            <TouchableOpacity style={styles.pageBtn} onPress={handleSavePage}>
+              <Text style={styles.pageBtnText}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -121,4 +155,8 @@ const styles = StyleSheet.create({
   statusBtnActive: { backgroundColor: "#cba6f7" },
   statusBtnText: { color: "#cba6f7", fontSize: 13 },
   statusBtnTextActive: { color: "#13131f", fontWeight: "bold" },
+  pageRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+  pageInput: { flex: 1, backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
+  pageBtn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  pageBtnText: { color: "#13131f", fontWeight: "bold" },
 });
