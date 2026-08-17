@@ -20,6 +20,7 @@ export default function BookDetailScreen({ route, navigation }) {
   const [currentPage, setCurrentPage] = useState(
     book.current_page ? String(book.current_page) : ""
   );
+  const [rating, setRating] = useState(book.rating ?? 0);
 
   useEffect(() => {
     if (!isInLibrary && book.id) {
@@ -33,15 +34,16 @@ export default function BookDetailScreen({ route, navigation }) {
   }, []);
 
   const alreadyInLibrary = isInLibrary || !!libraryEntry;
+  const entryId = libraryEntry?.id ?? book.id;
 
   const handleAdd = async (status) => {
     setSelectedStatus(status);
     setLoading(true);
     try {
-      await addBook({ ...book, google_id: book.id }, status);
-      Alert.alert("✅ Listo", `"${book.title}" agregado a tu biblioteca`, [
-        { text: "OK", onPress: () => { onGoBack?.(); navigation.goBack(); } }
-      ]);
+      const result = await addBook({ ...book, google_id: book.id }, status);
+      setLibraryEntry({ id: result.id, status });
+      Alert.alert("✅ Listo", `"${book.title}" agregado a tu biblioteca`);
+      onGoBack?.();
     } catch (error) {
       Alert.alert("Error", "No se pudo agregar el libro");
     } finally {
@@ -54,9 +56,8 @@ export default function BookDetailScreen({ route, navigation }) {
     setLoading(true);
     try {
       await updateBook(id, { status });
-      Alert.alert("✅ Actualizado", `Estado cambiado a "${STATUS_OPTIONS.find(o => o.key === status)?.label}"`, [
-        { text: "OK", onPress: () => { onGoBack?.(); navigation.goBack(); } }
-      ]);
+      setLibraryEntry((prev) => ({ ...prev, status }));
+      onGoBack?.();
     } catch (error) {
       Alert.alert("Error", "No se pudo actualizar el estado");
     } finally {
@@ -68,35 +69,56 @@ export default function BookDetailScreen({ route, navigation }) {
     const page = parseInt(currentPage);
     if (isNaN(page) || page < 0) return Alert.alert("Error", "Ingresa una página válida");
     if (book.pages && page > book.pages) return Alert.alert("Error", `El libro tiene ${book.pages} páginas`);
+
     try {
-      await updateBook(libraryEntry?.id ?? book.id, { current_page: page });
-      Alert.alert("✅ Guardado", `Página ${page} guardada`);
+      // Auto-completar si llegó a la última página
+      if (book.pages && page === book.pages) {
+        await updateBook(entryId, { current_page: page, status: "completed" });
+        setSelectedStatus("completed");
+        setLibraryEntry((prev) => ({ ...prev, status: "completed" }));
+        Alert.alert("🎉 ¡Felicidades!", `Terminaste "${book.title}"`);
+      } else {
+        await updateBook(entryId, { current_page: page });
+        Alert.alert("✅ Guardado", `Página ${page} guardada`);
+      }
+      onGoBack?.();
     } catch {
       Alert.alert("Error", "No se pudo guardar la página");
     }
   };
-const handleDelete = () => {
-  Alert.alert(
-    "Eliminar libro",
-    `¿Quitar "${book.title}" de tu biblioteca?`,
-    [
-      { text: "Cancelar", style: "cancel" },
-      {
-        text: "Eliminar",
-        style: "destructive",
-        onPress: async () => {
-          try {
-            await deleteBook(libraryEntry?.id ?? book.id);
-            onGoBack?.();
-            navigation.goBack();
-          } catch {
-            Alert.alert("Error", "No se pudo eliminar el libro");
+
+  const handleRating = async (stars) => {
+    setRating(stars);
+    try {
+      await updateBook(entryId, { rating: stars });
+    } catch {
+      Alert.alert("Error", "No se pudo guardar el rating");
+    }
+  };
+
+  const handleDelete = () => {
+    Alert.alert(
+      "Eliminar libro",
+      `¿Quitar "${book.title}" de tu biblioteca?`,
+      [
+        { text: "Cancelar", style: "cancel" },
+        {
+          text: "Eliminar",
+          style: "destructive",
+          onPress: async () => {
+            try {
+              await deleteBook(entryId);
+              onGoBack?.();
+              navigation.goBack();
+            } catch {
+              Alert.alert("Error", "No se pudo eliminar el libro");
+            }
           }
         }
-      }
-    ]
-  );
-};
+      ]
+    );
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.hero}>
@@ -126,7 +148,7 @@ const handleDelete = () => {
                 key={opt.key}
                 style={[styles.statusBtn, selectedStatus === opt.key && styles.statusBtnActive]}
                 onPress={() => alreadyInLibrary
-                  ? handleUpdate(libraryEntry?.id ?? book.id, opt.key)
+                  ? handleUpdate(entryId, opt.key)
                   : handleAdd(opt.key)}
               >
                 <Text style={[styles.statusBtnText, selectedStatus === opt.key && styles.statusBtnTextActive]}>
@@ -156,13 +178,27 @@ const handleDelete = () => {
           </View>
         </View>
       )}
+
+      {selectedStatus === "completed" && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Tu valoración</Text>
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <TouchableOpacity key={star} onPress={() => handleRating(star)}>
+                <Text style={styles.star}>{star <= rating ? "⭐" : "☆"}</Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      )}
+
       {alreadyInLibrary && (
-  <View style={styles.section}>
-    <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-      <Text style={styles.deleteBtnText}>🗑 Quitar de biblioteca</Text>
-    </TouchableOpacity>
-  </View>
-)}
+        <View style={styles.section}>
+          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
+            <Text style={styles.deleteBtnText}>🗑 Quitar de biblioteca</Text>
+          </TouchableOpacity>
+        </View>
+      )}
     </ScrollView>
   );
 }
@@ -186,7 +222,9 @@ const styles = StyleSheet.create({
   pageRow: { flexDirection: "row", gap: 8, alignItems: "center" },
   pageInput: { flex: 1, backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
   pageBtn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  pageBtnText: { color: "#13131f", fontWeight: "bold" },
-deleteBtn: { backgroundColor: "#2a2a3e", borderRadius: 10, paddingVertical: 12, alignItems: "center", marginBottom: 40 },
-deleteBtnText: { color: "#f38ba8", fontWeight: "bold", fontSize: 15 },
+  pageBtnText: { color: "#1e1e2e", fontWeight: "bold" },
+  starsRow: { flexDirection: "row", gap: 8 },
+  star: { fontSize: 32 , color: "#cba6f7" },
+  deleteBtn: { backgroundColor: "#20221b", borderRadius: 10, paddingVertical: 12, alignItems: "center", marginBottom: 40 },
+  deleteBtnText: { color: "#f38ba8", fontWeight: "bold", fontSize: 15 },
 });
