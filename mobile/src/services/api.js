@@ -76,3 +76,7 @@ export const updateBookPages = async (google_id, pages) => {
   });
   return res.json();
 };
+export const getStats = async () => {
+  const res = await fetch(`${API_URL}/stats`, { headers: await getHeaders() });
+  return res.json();
+};

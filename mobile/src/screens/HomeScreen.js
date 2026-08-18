@@ -3,11 +3,11 @@ import { useEffect, useState } from "react";
 import { getLibrary } from "../services/api";
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 
-export default function HomeScreen({ navigation }) {
+export default function HomeScreen({ navigation ,route}) {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
-const [filter, setFilter] = useState("all");
-  const fetchLibrary = async () => {
+const { filterStatus } = route?.params ?? {};
+const [filter, setFilter] = useState(filterStatus ?? "all");  const fetchLibrary = async () => {
     setLoading(true);
     try {
       const data = await getLibrary();
