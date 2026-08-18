@@ -4,8 +4,10 @@ import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNo
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "📖 Leyendo" },
+  { key: "paused", label: "⏸ Pausado" },
   { key: "completed", label: "✅ Completado" },
   { key: "pending", label: "🕐 Pendiente" },
+  { key: "wishlist", label: "🌟 Deseos" },
   { key: "abandoned", label: "❌ Abandonado" },
 ];
 

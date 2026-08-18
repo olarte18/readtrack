@@ -6,7 +6,7 @@ import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndi
 export default function HomeScreen({ navigation }) {
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
-
+const [filter, setFilter] = useState("all");
   const fetchLibrary = async () => {
     setLoading(true);
     try {
@@ -22,7 +22,7 @@ export default function HomeScreen({ navigation }) {
   useEffect(() => {
     fetchLibrary();
   }, []);
-
+const filteredBooks = filter === "all" ? books : books.filter((b) => b.status === filter);
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -31,12 +31,32 @@ export default function HomeScreen({ navigation }) {
           <Text style={styles.addBtn}>+ Agregar</Text>
         </TouchableOpacity>
       </View>
-
+<View style={styles.filterRow}>
+{[
+  { key: "all", label: "Todos" },
+  { key: "reading", label: "📖 Leyendo" },
+  { key: "paused", label: "⏸ Pausado" },
+  { key: "completed", label: "✅ Leídos" },
+  { key: "pending", label: "🕐 Pendiente" },
+  { key: "wishlist", label: "🌟 Deseos" },
+  { key: "abandoned", label: "❌ Abandonado" },
+].map((f) => (
+    <TouchableOpacity
+      key={f.key}
+      style={[styles.filterBtn, filter === f.key && styles.filterBtnActive]}
+      onPress={() => setFilter(f.key)}
+    >
+      <Text style={[styles.filterText, filter === f.key && styles.filterTextActive]}>
+        {f.label}
+      </Text>
+    </TouchableOpacity>
+  ))}
+</View>
       {loading ? (
         <ActivityIndicator color="#cba6f7" style={{ marginTop: 60 }} />
       ) : (
         <FlatList
-          data={books}
+          data={filteredBooks}
           keyExtractor={(item) => String(item.id)}
 renderItem={({ item }) => (
   <TouchableOpacity
@@ -54,10 +74,12 @@ renderItem={({ item }) => (
       <Text style={styles.bookTitle} numberOfLines={2}>{String(item.title)}</Text>
       <Text style={styles.author} numberOfLines={1}>{String(item.author)}</Text>
       <View style={styles.statusRow}>
-        {item.status === "completed" && <Text style={styles.statusBadge}>✅ Completado</Text>}
-        {item.status === "reading" && <Text style={styles.statusBadge}>📖 Leyendo</Text>}
-        {item.status === "pending" && <Text style={styles.statusBadge}>🕐 Pendiente</Text>}
-        {item.status === "abandoned" && <Text style={styles.statusBadge}>❌ Abandonado</Text>}
+{item.status === "completed" && <Text style={styles.statusBadge}>✅ Completado</Text>}
+{item.status === "reading" && <Text style={styles.statusBadge}>📖 Leyendo</Text>}
+{item.status === "pending" && <Text style={styles.statusBadge}>🕐 Pendiente</Text>}
+{item.status === "abandoned" && <Text style={styles.statusBadge}>❌ Abandonado</Text>}
+{item.status === "wishlist" && <Text style={styles.statusBadge}>🌟 Deseos</Text>}
+{item.status === "paused" && <Text style={styles.statusBadge}>⏸ Pausado</Text>}
       </View>
       {item.status === "reading" && !!item.pages && (
         <View style={styles.progressContainer}>
@@ -105,4 +127,9 @@ const styles = StyleSheet.create({
   pageText: { fontSize: 11, color: "#666" },
   rating: { fontSize: 12, marginTop: 2 },
   empty: { color: "#666", textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
+filterRow: { flexDirection: "row", paddingHorizontal: 16, paddingBottom: 12, gap: 8, flexWrap: "wrap" },
+filterBtn: { backgroundColor: "#1e1e2e", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+filterBtnActive: { backgroundColor: "#cba6f7" },
+filterText: { color: "#666", fontSize: 12 },
+filterTextActive: { color: "#13131f", fontWeight: "bold" },
 });
