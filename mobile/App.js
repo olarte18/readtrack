@@ -9,6 +9,7 @@ import BookDetailScreen from "./src/screens/BookDetailScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
+import { Ionicons } from "@expo/vector-icons";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -16,12 +17,19 @@ const Stack = createNativeStackNavigator();
 function HomeTabs() {
   return (
     <Tab.Navigator
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: { backgroundColor: "#1e1e2e", borderTopColor: "#2a2a3e" },
         tabBarActiveTintColor: "#cba6f7",
         tabBarInactiveTintColor: "#666",
-      }}
+        tabBarIcon: ({ focused, color, size }) => {
+          let iconName;
+          if (route.name === "Home") iconName = focused ? "library" : "library-outline";
+          else if (route.name === "Search") iconName = focused ? "search" : "search-outline";
+          else if (route.name === "Profile") iconName = focused ? "person" : "person-outline";
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+      })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: "Biblioteca" }} />
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: "Buscar" }} />
