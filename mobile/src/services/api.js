@@ -67,3 +67,12 @@ export const deleteNote = async (id) => {
   });
   return res.json();
 };
+
+export const updateBookPages = async (google_id, pages) => {
+  const res = await fetch(`${API_URL}/books/${google_id}/pages`, {
+    method: "PATCH",
+    headers: await getHeaders(),
+    body: JSON.stringify({ pages }),
+  });
+  return res.json();
+};

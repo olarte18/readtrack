@@ -72,4 +72,20 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+// PATCH /books/:google_id/pages
+router.patch("/:google_id/pages", async (req, res) => {
+  const { pages } = req.body;
+  if (!pages || isNaN(pages)) return res.status(400).json({ error: "Páginas inválidas" });
+  try {
+    const { rows } = await pool.query(
+      "UPDATE books SET pages = $1 WHERE google_id = $2 RETURNING *",
+      [parseInt(pages), req.params.google_id]
+    );
+    if (rows.length === 0) return res.status(404).json({ error: "Libro no encontrado" });
+    res.json(rows[0]);
+  } catch (error) {
+    res.status(500).json({ error: "Error al actualizar páginas" });
+  }
+});
+
 module.exports = router;

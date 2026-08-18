@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from "react-native";
-import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote } from "../services/api";
+import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, updateBookPages } from "../services/api";
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "📖 Leyendo" },
@@ -21,6 +21,7 @@ export default function BookDetailScreen({ route, navigation }) {
     book.current_page ? String(book.current_page) : ""
   );
   const [rating, setRating] = useState(book.rating ?? 0);
+ const [totalPages, setTotalPages] = useState(book.pages ? String(book.pages) : "");
   const [notes, setNotes] = useState([]);
 const [newNote, setNewNote] = useState("");
 const [notePage, setNotePage] = useState("");
@@ -152,7 +153,7 @@ const handleDeleteNote = (id) => {
 };
   return (
     <ScrollView style={styles.container}>
-      <View style={styles.hero}>
+<View style={styles.hero}>
         {book.cover ? (
           <Image source={{ uri: book.cover }} style={styles.cover} />
         ) : (
@@ -163,8 +164,44 @@ const handleDeleteNote = (id) => {
         <Text style={styles.title}>{String(book.title)}</Text>
         <Text style={styles.author}>{String(book.author)}</Text>
         {!!book.year && <Text style={styles.meta}>{String(book.year)}</Text>}
-        {!!book.pages && <Text style={styles.meta}>{String(book.pages)} páginas</Text>}
+        {!!(book.pages || totalPages) && (
+          <Text style={styles.meta}>{book.pages || totalPages} páginas</Text>
+        )}
       </View>
+
+      {alreadyInLibrary && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Total de páginas</Text>
+         <Text style={styles.hint}>
+  {book.pages ? `Registradas: ${book.pages} — puedes corregirlas` : "Este libro no tiene páginas registradas"}
+</Text>
+          <View style={styles.pageRow}>
+            <TextInput
+              style={styles.pageInput}
+              placeholder="Ej. 647"
+              placeholderTextColor="#666"
+              keyboardType="numeric"
+              value={totalPages}
+              onChangeText={setTotalPages}
+            />
+            <TouchableOpacity
+              style={styles.pageBtn}
+              onPress={async () => {
+                const p = parseInt(totalPages);
+                if (isNaN(p) || p <= 0) return Alert.alert("Error", "Ingresa un número válido");
+                try {
+                  await updateBookPages(book.google_id ?? book.id, p);
+                  Alert.alert("✅ Guardado", `${p} páginas guardadas`);
+                } catch {
+                  Alert.alert("Error", "No se pudo guardar");
+                }
+              }}
+            >
+              <Text style={styles.pageBtnText}>Guardar</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
@@ -297,4 +334,5 @@ noteInput: { backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddin
 noteCard: { backgroundColor: "#1e1e2e", borderRadius: 10, padding: 12, marginTop: 8 },
 notePage: { fontSize: 11, color: "#cba6f7", marginBottom: 4 },
 noteContent: { fontSize: 14, color: "#cdd6f4" },
+hint: { fontSize: 12, color: "#666", marginBottom: 8 },
 });
