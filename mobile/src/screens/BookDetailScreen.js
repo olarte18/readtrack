@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from "react-native";
 import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, updateBookPages } from "../services/api";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "📖 Leyendo" },
@@ -27,11 +28,15 @@ export default function BookDetailScreen({ route, navigation }) {
   const [notes, setNotes] = useState([]);
 const [newNote, setNewNote] = useState("");
 const [notePage, setNotePage] = useState("");
-
+const [startedAt, setStartedAt] = useState(book.started_at ? new Date(book.started_at) : null);
+const [finishedAt, setFinishedAt] = useState(book.finished_at ? new Date(book.finished_at) : null);
+const [showStartPicker, setShowStartPicker] = useState(false);
+const [showEndPicker, setShowEndPicker] = useState(false);
   useEffect(() => {
     if (!isInLibrary && book.id) {
       checkBook(book.id).then((data) => {
         if (data.exists) {
+          console.log("checkBook data:", JSON.stringify(data));
           setLibraryEntry(data);
           setSelectedStatus(data.status);
         }
@@ -66,7 +71,14 @@ useEffect(() => {
     setSelectedStatus(status);
     setLoading(true);
     try {
-      await updateBook(id, { status });
+      const updates = { status };
+if (status === "reading" && !libraryEntry?.started_at) {
+  updates.started_at = new Date().toISOString().split("T")[0];
+}
+if (status === "completed") {
+  updates.finished_at = new Date().toISOString().split("T")[0];
+}
+await updateBook(id, updates);
       setLibraryEntry((prev) => ({ ...prev, status }));
       onGoBack?.();
     } catch (error) {
@@ -106,7 +118,17 @@ useEffect(() => {
       Alert.alert("Error", "No se pudo guardar el rating");
     }
   };
-
+const handleDateChange = async (field, date) => {
+  if (!date) return;
+  const iso = date.toISOString().split("T")[0];
+  if (field === "started_at") setStartedAt(date);
+  else setFinishedAt(date);
+  try {
+    await updateBook(entryId, { [field]: iso });
+  } catch {
+    Alert.alert("Error", "No se pudo guardar la fecha");
+  }
+};
   const handleDelete = () => {
     Alert.alert(
       "Eliminar libro",
@@ -204,7 +226,33 @@ const handleDeleteNote = (id) => {
           </View>
         </View>
       )}
-
+{alreadyInLibrary && (
+  <View style={styles.section}>
+    <Text style={styles.sectionTitle}>Fechas</Text>
+    <TouchableOpacity style={styles.dateRow} onPress={() => setShowStartPicker(true)}>
+      <Text style={styles.dateLabel}>📅 Inicio</Text>
+      <Text style={styles.dateValue}>
+        {startedAt ? startedAt.toISOString().split("T")[0] : "Toca para agregar"}
+      </Text>
+    </TouchableOpacity>
+    {selectedStatus === "completed" && (
+  <TouchableOpacity style={styles.dateRow} onPress={() => setShowEndPicker(true)}>
+    <Text style={styles.dateLabel}>🏁 Fin</Text>
+    <Text style={styles.dateValue}>
+      {finishedAt ? finishedAt.toISOString().split("T")[0] : "Toca para agregar"}
+    </Text>
+  </TouchableOpacity>
+)}
+{showEndPicker && (
+  <DateTimePicker
+    value={finishedAt ?? new Date()}
+    mode="date"
+    onChange={(e, date) => { setShowEndPicker(false); handleDateChange("finished_at", date); }}
+  />
+)}
+  
+  </View>
+)}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>
           {alreadyInLibrary ? "Cambiar estado" : "Agregar a biblioteca"}
@@ -248,7 +296,13 @@ const handleDeleteNote = (id) => {
           </View>
         </View>
       )}
-
+    {showStartPicker && (
+      <DateTimePicker
+        value={startedAt ?? new Date()}
+        mode="date"
+        onChange={(e, date) => { setShowStartPicker(false); handleDateChange("started_at", date); }}
+      />
+    )}
       {selectedStatus === "completed" && (
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Tu valoración</Text>
@@ -337,4 +391,8 @@ noteCard: { backgroundColor: "#1e1e2e", borderRadius: 10, padding: 12, marginTop
 notePage: { fontSize: 11, color: "#cba6f7", marginBottom: 4 },
 noteContent: { fontSize: 14, color: "#cdd6f4" },
 hint: { fontSize: 12, color: "#666", marginBottom: 8 },
+dateText: { fontSize: 13, color: "#aaa", marginBottom: 4 },
+dateRow: { flexDirection: "row", justifyContent: "space-between", backgroundColor: "#1e1e2e", borderRadius: 10, padding: 12, marginBottom: 8 },
+dateLabel: { color: "#aaa", fontSize: 14 },
+dateValue: { color: "#cba6f7", fontSize: 14 },
 });
