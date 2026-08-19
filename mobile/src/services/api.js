@@ -80,3 +80,18 @@ export const getStats = async () => {
   const res = await fetch(`${API_URL}/stats`, { headers: await getHeaders() });
   return res.json();
 };
+export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read) => {
+  const res = await fetch(`${API_URL}/reading-sessions`, {
+    method: "POST",
+    headers: await getHeaders(),
+    body: JSON.stringify({ user_book_id, page, duration_seconds, pages_read }),
+  });
+  return res.json();
+};
+
+export const getReadingSpeed = async (user_book_id) => {
+  const res = await fetch(`${API_URL}/reading-sessions/${user_book_id}/speed`, {
+    headers: await getHeaders(),
+  });
+  return res.json();
+};

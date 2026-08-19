@@ -11,8 +11,8 @@ import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import { Ionicons } from "@expo/vector-icons";
 import StatsScreen from "./src/screens/StatsScreen";
-
-
+import ReadingScreen from "./src/screens/ReadingScreen";
+import ActiveSessionScreen from "./src/screens/ActiveSessionScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -33,7 +33,14 @@ function HomeTabs() {
           return <Ionicons name={iconName} size={size} color={color} />;
         },
       })}
+      
     >
+      <Tab.Screen name="Reading" component={ReadingScreen} options={{ 
+  tabBarLabel: "Leyendo",
+  tabBarIcon: ({ focused, color, size }) => (
+    <Ionicons name={focused ? "book" : "book-outline"} size={size} color={color} />
+  )
+}} />
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: "Biblioteca" }} />
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: "Buscar" }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: "Perfil" }} />
@@ -56,6 +63,7 @@ function AppStack() {
       <Stack.Screen name="Main" component={HomeTabs} />
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
     <Stack.Screen name="Stats" component={StatsScreen} />
+    <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />
     </Stack.Navigator>
   );
 }
