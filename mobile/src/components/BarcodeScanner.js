@@ -2,8 +2,11 @@ import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function BarcodeScanner({ visible, onScan, onClose }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [permission, requestPermission] = useCameraPermissions();
   const [scanned, setScanned] = useState(false);
 
@@ -23,10 +26,10 @@ const handleScan = ({ data }) => {
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
         {!permission.granted ? (
-          <View style={styles.centered}>
-            <Text style={styles.text}>Se necesita acceso a la cámara</Text>
-            <TouchableOpacity style={styles.btn} onPress={requestPermission}>
-              <Text style={styles.btnText}>Dar permiso</Text>
+          <View style={[styles.centered, { backgroundColor: colors.background }]}>
+            <Text style={[styles.text, { color: colors.text }]}>Se necesita acceso a la cámara</Text>
+            <TouchableOpacity style={[styles.btn, { backgroundColor: colors.accent }]} onPress={requestPermission}>
+              <Text style={[styles.btnText, { color: colors.onAccent }]}>Dar permiso</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -52,16 +55,17 @@ const handleScan = ({ data }) => {
             </View>
           </View>
         )}
-        <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-          <Ionicons name="close" size={20} color="#f38ba8" />
-          <Text style={styles.closeBtnText}>Cancelar</Text>
+        <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.surface }]} onPress={onClose}>
+          <Ionicons name="close" size={20} color={colors.danger} />
+          <Text style={[styles.closeBtnText, { color: colors.danger }]}>Cancelar</Text>
         </TouchableOpacity>
       </View>
     </Modal>
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) =>
+  StyleSheet.create({
   container: { flex: 1, backgroundColor: "#000" },
   centered: { flex: 1, justifyContent: "center", alignItems: "center", gap: 16 },
   cameraContainer: { flex: 1, position: "relative" },
@@ -70,12 +74,12 @@ const styles = StyleSheet.create({
   topOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
   middleRow: { flexDirection: "row", height: 150 },
   sideOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)" },
-  scanArea: { width: 250, borderWidth: 2, borderColor: "#cba6f7", borderRadius: 12 },
+  scanArea: { width: 250, borderWidth: 2, borderColor: colors.accent, borderRadius: 12 },
   bottomOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", paddingTop: 20 },
   hint: { color: "#fff", fontSize: 14 },
-  text: { color: "#fff", fontSize: 16 },
-  btn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
-  btnText: { color: "#13131f", fontWeight: "bold" },
-  closeBtn: { backgroundColor: "#1e1e2e", padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  closeBtnText: { color: "#f38ba8", fontSize: 16, fontWeight: "bold" },
+  text: { fontSize: 16 },
+  btn: { borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
+  btnText: { fontWeight: "bold" },
+  closeBtn: { padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  closeBtnText: { fontSize: 16, fontWeight: "bold" },
 });

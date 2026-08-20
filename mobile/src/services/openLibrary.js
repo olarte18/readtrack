@@ -1,38 +1,33 @@
-const API_KEY = process.env.EXPO_PUBLIC_GOOGLE_BOOKS_API_KEY;
-const BASE_URL = "https://www.googleapis.com/books/v1";
+const OL_BASE = "https://openlibrary.org";
+
+const coverUrl = (coverId, size = "M") =>
+  coverId ? `https://covers.openlibrary.org/b/id/${coverId}-${size}.jpg` : null;
+
+const mapDoc = (d) => {
+  const workKey = d.key ?? null;
+  const isbn = d.isbn?.[0] ?? null;
+  const id = workKey ? workKey.replace("/works/", "") : (isbn || `ol-${d.title}-${d.author_name?.[0] ?? ""}`).replace(/[^a-zA-Z0-9-]/g, "-");
+  return {
+    id,
+    workKey,
+    title: d.title ?? "Sin título",
+    author: d.author_name?.[0] ?? "Autor desconocido",
+    year: d.first_publish_year ?? null,
+    pages: parseInt(String(d.number_of_pages_median ?? ""), 10) || null,
+    cover: coverUrl(d.cover_i),
+    isbn,
+    description: null,
+  };
+};
 
 export const searchBooks = async (query) => {
   try {
     const res = await fetch(
-      `${BASE_URL}/volumes?q=${encodeURIComponent(query)}&maxResults=15&orderBy=relevance&printType=books&key=${API_KEY}`
+      `${OL_BASE}/search.json?q=${encodeURIComponent(query)}&limit=20&fields=key,title,author_name,first_publish_year,number_of_pages_median,cover_i,isbn`
     );
     const data = await res.json();
-    if (!data.items) return [];
-
-    return data.items
-      .filter((item) => !!item.id)
-      .map((item) => {
-        const info = item.volumeInfo;
-        const cover = info.imageLinks?.thumbnail?.replace("http://", "https://") ?? null;
-        const score =
-          (cover ? 2 : 0) +
-          (info.pageCount ? 1 : 0) +
-          (info.description ? 1 : 0) +
-          (info.publishedDate ? 1 : 0) +
-          (info.industryIdentifiers?.length ? 1 : 0);
-        return {
-          id: item.id,
-          title: info.title ?? "Sin título",
-          author: info.authors?.[0] ?? "Autor desconocido",
-          year: info.publishedDate?.split("-")[0] ?? null,
-          pages: info.pageCount ?? null,
-          cover,
-          isbn: info.industryIdentifiers?.[0]?.identifier ?? null,
-          description: info.description ?? null,
-          score,
-        };
-      })
-      .sort((a, b) => b.score - a.score);
+    if (!data.docs) return [];
+    return data.docs.filter((d) => d.title).map(mapDoc);
   } catch (error) {
     console.error("Error buscando libros:", error);
     return [];
@@ -42,24 +37,28 @@ export const searchBooks = async (query) => {
 export const searchByISBN = async (isbn) => {
   try {
     const res = await fetch(
-      `${BASE_URL}/volumes?q=isbn:${isbn}&key=${API_KEY}`
+      `${OL_BASE}/search.json?q=isbn:${encodeURIComponent(isbn)}&limit=1&fields=key,title,author_name,first_publish_year,number_of_pages_median,cover_i,isbn`
     );
     const data = await res.json();
-    if (!data.items) return null;
-    const info = data.items[0].volumeInfo;
-    const cover = info.imageLinks?.thumbnail?.replace("http://", "https://") ?? null;
-    return {
-      id: data.items[0].id,
-      title: info.title ?? "Sin título",
-      author: info.authors?.[0] ?? "Autor desconocido",
-      year: info.publishedDate?.split("-")[0] ?? null,
-      pages: info.pageCount ?? null,
-      cover,
-      isbn,
-      description: info.description ?? null,
-    };
+    const doc = data.docs?.[0];
+    if (!doc) return null;
+    return { ...mapDoc(doc), isbn };
   } catch (error) {
     console.error("Error buscando por ISBN:", error);
+    return null;
+  }
+};
+
+export const getBookDescription = async (workKey) => {
+  if (!workKey) return null;
+  try {
+    const res = await fetch(`${OL_BASE}${workKey}.json`);
+    const data = await res.json();
+    const desc = data?.description;
+    if (!desc) return null;
+    return typeof desc === "string" ? desc : desc?.value ?? null;
+  } catch (error) {
+    console.error("Error obteniendo descripción:", error);
     return null;
   }
 };

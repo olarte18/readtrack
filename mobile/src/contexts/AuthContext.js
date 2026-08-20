@@ -9,6 +9,8 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [setupDone, setSetupDone] = useState(false);
+  const [setupReady, setSetupReady] = useState(false);
 
   useEffect(() => {
     AsyncStorage.multiGet(["user", "token"]).then((values) => {
@@ -21,6 +23,30 @@ export function AuthProvider({ children }) {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    if (!user) {
+      setSetupDone(false);
+      setSetupReady(false);
+      return;
+    }
+    let mounted = true;
+    AsyncStorage.getItem(`onboarding:${user.id}`).then((v) => {
+      if (!mounted) return;
+      setSetupDone(v === "done");
+      setSetupReady(true);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [user]);
+
+  const finishSetup = async () => {
+    if (!user) return;
+    await AsyncStorage.setItem(`onboarding:${user.id}`, "done");
+    setSetupDone(true);
+    setSetupReady(true);
+  };
 
   const login = async (email, password) => {
     const res = await fetch(`${API_URL}/auth/login`, {
@@ -55,7 +81,7 @@ export function AuthProvider({ children }) {
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, token, loading, setupDone, setupReady, finishSetup, login, register, logout }}>
       {children}
     </AuthContext.Provider>
   );

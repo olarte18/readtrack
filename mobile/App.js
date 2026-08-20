@@ -2,7 +2,9 @@ import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { ActivityIndicator, View } from "react-native";
+import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
+import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext";
 import HomeScreen from "./src/screens/HomeScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import BookDetailScreen from "./src/screens/BookDetailScreen";
@@ -13,19 +15,25 @@ import { Ionicons } from "@expo/vector-icons";
 import StatsScreen from "./src/screens/StatsScreen";
 import ReadingScreen from "./src/screens/ReadingScreen";
 import ActiveSessionScreen from "./src/screens/ActiveSessionScreen";
+import ReadingModeScreen from "./src/screens/ReadingModeScreen";
+import SessionSummaryScreen from "./src/screens/SessionSummaryScreen";
 import GoalsScreen from "./src/screens/GoalsScreen";
+import ThemePickerScreen from "./src/screens/ThemePickerScreen";
+import ImportScreen from "./src/screens/ImportScreen";
+import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
 function HomeTabs() {
+  const { colors } = useTheme();
   return (
     <Tab.Navigator
       screenOptions={({ route }) => ({
         headerShown: false,
-        tabBarStyle: { backgroundColor: "#1e1e2e", borderTopColor: "#2a2a3e" },
-        tabBarActiveTintColor: "#cba6f7",
-        tabBarInactiveTintColor: "#666",
+        tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarActiveTintColor: colors.accent,
+        tabBarInactiveTintColor: colors.textDim,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === "Home") iconName = focused ? "library" : "library-outline";
@@ -67,32 +75,48 @@ function AppStack() {
       <Stack.Screen name="Main" component={HomeTabs} />
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
       <Stack.Screen name="Stats" component={StatsScreen} />
+      <Stack.Screen name="ReadingMode" component={ReadingModeScreen} />
       <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />
+      <Stack.Screen name="SessionSummary" component={SessionSummaryScreen} />
+      <Stack.Screen name="Import" component={ImportScreen} />
       <Stack.Screen name="Goals" component={GoalsScreen} />
     </Stack.Navigator>
   );
 }
 
 function RootNavigator() {
-  const { user, loading } = useAuth();
+  const { user, loading, setupDone, setupReady } = useAuth();
+  const { ready, isPicked, colors } = useTheme();
 
-  if (loading) {
+  if (loading || !ready || (user && !setupReady)) {
     return (
-      <View style={{ flex: 1, backgroundColor: "#13131f", justifyContent: "center", alignItems: "center" }}>
-        <ActivityIndicator color="#cba6f7" size="large" />
+      <View style={{ flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" }}>
+        <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
   }
 
+  if (!isPicked) return <ThemePickerScreen />;
+  if (user && !setupDone) return <GoalSetupScreen />;
   return user ? <AppStack /> : <AuthStack />;
+}
+
+function Navigation() {
+  const { navigationTheme, isDark } = useTheme();
+  return (
+    <NavigationContainer theme={navigationTheme}>
+      <StatusBar style={isDark ? "light" : "dark"} />
+      <RootNavigator />
+    </NavigationContainer>
+  );
 }
 
 export default function App() {
   return (
     <AuthProvider>
-      <NavigationContainer>
-        <RootNavigator />
-      </NavigationContainer>
+      <ThemeProvider>
+        <Navigation />
+      </ThemeProvider>
     </AuthProvider>
   );
 }

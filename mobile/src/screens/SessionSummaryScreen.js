@@ -1,0 +1,109 @@
+import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
+
+const formatTime = (s) => {
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+    : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+};
+
+const formatMinutes = (min) => {
+  if (min >= 60) return `${(min / 60).toFixed(1)}h`;
+  return `${Math.round(min)}min`;
+};
+
+export default function SessionSummaryScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+  const { book, pagesRead, readSeconds, endPage, speed } = route.params;
+
+  const pagesLeft = book.pages ? Math.max(0, book.pages - endPage) : null;
+  const minutesLeft = speed > 0 && pagesLeft !== null ? pagesLeft / speed : null;
+  const progress = book.pages ? Math.min((endPage / book.pages) * 100, 100) : 0;
+
+  return (
+    <View style={styles.container}>
+      <View style={styles.header}>
+        <Ionicons name="checkmark-circle" size={64} color={colors.accent} />
+        <Text style={styles.title}>¡Sesión guardada!</Text>
+      </View>
+
+      <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+
+      <View style={styles.card}>
+        <View style={styles.row}>
+          <Ionicons name="book" size={20} color={colors.accent} />
+          <View style={styles.rowInfo}>
+            <Text style={styles.rowLabel}>Estás en</Text>
+            <Text style={styles.rowValue}>Página {endPage}</Text>
+          </View>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.row}>
+          <Ionicons name="time" size={20} color={colors.accent} />
+          <View style={styles.rowInfo}>
+            <Text style={styles.rowLabel}>Leíste</Text>
+            <Text style={styles.rowValue}>{pagesRead} páginas · {formatTime(readSeconds)}</Text>
+          </View>
+        </View>
+        <View style={styles.divider} />
+        <View style={styles.row}>
+          <Ionicons name="speedometer" size={20} color={colors.accent} />
+          <View style={styles.rowInfo}>
+            <Text style={styles.rowLabel}>Velocidad</Text>
+            <Text style={styles.rowValue}>{speed > 0 ? `${speed.toFixed(1)} págs/min` : "—"}</Text>
+          </View>
+        </View>
+      </View>
+
+      {pagesLeft !== null && (
+        <View style={styles.card}>
+          <Text style={styles.leftText}>
+            Te faltan <Text style={styles.leftHighlight}>{pagesLeft} páginas</Text> para terminar
+          </Text>
+          {minutesLeft !== null && minutesLeft > 0 ? (
+            <Text style={styles.leftEstimate}>
+              A este ritmo, cerca de {formatMinutes(minutesLeft)} de lectura
+            </Text>
+          ) : (
+            <Text style={styles.leftEstimate}>A este ritmo, cerca de terminar</Text>
+          )}
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressBar, { width: `${progress}%` }]} />
+          </View>
+          <Text style={styles.progressLabel}>{Math.round(progress)}% del libro</Text>
+        </View>
+      )}
+
+      <TouchableOpacity style={styles.finishBtn} onPress={() => navigation.goBack()}>
+        <Text style={styles.finishBtnText}>Listo</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: { flex: 1, backgroundColor: colors.background, paddingTop: 70, paddingHorizontal: 24 },
+    header: { alignItems: "center", marginBottom: 24 },
+    title: { fontSize: 24, fontWeight: "bold", color: colors.text, marginTop: 10 },
+    bookTitle: { fontSize: 17, fontWeight: "bold", color: colors.textDim, textAlign: "center", marginBottom: 28 },
+    card: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16 },
+    row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
+    rowInfo: { flex: 1 },
+    rowLabel: { fontSize: 12, color: colors.textDim, marginBottom: 2 },
+    rowValue: { fontSize: 15, fontWeight: "bold", color: colors.text },
+    divider: { height: 1, backgroundColor: colors.border, marginVertical: 4 },
+    leftText: { fontSize: 15, color: colors.text, marginBottom: 4 },
+    leftHighlight: { fontWeight: "bold", color: colors.accent },
+    leftEstimate: { fontSize: 13, color: colors.textDim, marginTop: 2, marginBottom: 14 },
+    progressContainer: { height: 8, backgroundColor: colors.surfaceAlt, borderRadius: 4, overflow: "hidden" },
+    progressBar: { height: 8, backgroundColor: colors.accent, borderRadius: 4 },
+    progressLabel: { fontSize: 11, color: colors.textDim, marginTop: 6 },
+    finishBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 8 },
+    finishBtnText: { color: colors.onAccent, fontSize: 16, fontWeight: "bold" },
+  });

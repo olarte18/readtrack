@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
 import { getStats } from "../services/api";
 
 const STAT_ITEMS = [
@@ -13,6 +14,8 @@ const STAT_ITEMS = [
 ];
 
 export default function StatsScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -30,7 +33,7 @@ export default function StatsScreen({ navigation }) {
   if (loading) {
     return (
       <View style={styles.centered}>
-        <ActivityIndicator color="#cba6f7" size="large" />
+        <ActivityIndicator color={colors.accent} size="large" />
       </View>
     );
   }
@@ -46,7 +49,7 @@ export default function StatsScreen({ navigation }) {
             style={styles.statCard}
             onPress={() => handleStatPress(item.key)}
           >
-            <Ionicons name={item.icon} size={24} color="#aaa" style={styles.icon} />
+            <Ionicons name={item.icon} size={24} color={colors.textMuted} style={styles.icon} />
             <Text style={styles.statNumber}>{stats?.[item.key] ?? 0}</Text>
             <Text style={styles.statLabel}>{item.label}</Text>
           </TouchableOpacity>
@@ -60,7 +63,7 @@ export default function StatsScreen({ navigation }) {
         </View>
         <View style={styles.bigStat}>
           <View style={styles.bigStatTop}>
-            <Ionicons name="star" size={18} color="#f5c97b" />
+            <Ionicons name="star" size={18} color={colors.star} />
             <Text style={styles.bigStatNumber}>
               {stats?.avg_rating > 0 ? stats.avg_rating : "—"}
             </Text>
@@ -72,18 +75,19 @@ export default function StatsScreen({ navigation }) {
   );
 }
 
-const styles = StyleSheet.create({
-  centered: { flex: 1, backgroundColor: "#13131f", justifyContent: "center", alignItems: "center" },
-  container: { flexGrow: 1, backgroundColor: "#13131f", paddingTop: 60, paddingHorizontal: 20, paddingBottom: 40 },
-  title: { fontSize: 24, fontWeight: "bold", color: "#fff", marginBottom: 24 },
+const createStyles = (colors) =>
+  StyleSheet.create({
+  centered: { flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" },
+  container: { flexGrow: 1, backgroundColor: colors.background, paddingTop: 60, paddingHorizontal: 20, paddingBottom: 40 },
+  title: { fontSize: 24, fontWeight: "bold", color: colors.text, marginBottom: 24 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
-  statCard: { backgroundColor: "#1e1e2e", borderRadius: 12, padding: 16, alignItems: "center", minWidth: "30%", flexGrow: 1 },
+  statCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, alignItems: "center", minWidth: "30%", flexGrow: 1 },
   icon: { marginBottom: 6 },
-  statNumber: { fontSize: 28, fontWeight: "bold", color: "#cba6f7" },
-  statLabel: { fontSize: 11, color: "#aaa", marginTop: 4, textAlign: "center" },
+  statNumber: { fontSize: 28, fontWeight: "bold", color: colors.accent },
+  statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 4, textAlign: "center" },
   bigStatsRow: { flexDirection: "row", gap: 10 },
-  bigStat: { flex: 1, backgroundColor: "#1e1e2e", borderRadius: 12, padding: 20, alignItems: "center" },
+  bigStat: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, padding: 20, alignItems: "center" },
   bigStatTop: { flexDirection: "row", alignItems: "center", gap: 6 },
-  bigStatNumber: { fontSize: 28, fontWeight: "bold", color: "#cba6f7" },
-  bigStatLabel: { fontSize: 12, color: "#aaa", marginTop: 4 },
+  bigStatNumber: { fontSize: 28, fontWeight: "bold", color: colors.accent },
+  bigStatLabel: { fontSize: 12, color: colors.textMuted, marginTop: 4 },
 });

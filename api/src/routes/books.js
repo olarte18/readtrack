@@ -11,9 +11,10 @@ router.get("/search", async (req, res) => {
   const { q } = req.query;
   if (!q) throw httpError(400, "Query requerida");
 
+  const terms = q.trim().split(/\s+/).map((t) => `%${t}%`);
   const cached = await pool.query(
-    `SELECT * FROM books WHERE title ILIKE $1 OR author ILIKE $1 LIMIT 15`,
-    [`%${q}%`]
+    `SELECT * FROM books WHERE title ILIKE ALL($1) OR author ILIKE ALL($1) LIMIT 15`,
+    [terms]
   );
 
   if (cached.rows.length > 0) {

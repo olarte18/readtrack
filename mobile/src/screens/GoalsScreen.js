@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
 import { getGoals, saveGoal } from "../services/api";
 
 const GOAL_TYPES = [
@@ -13,6 +14,8 @@ const GOAL_TYPES = [
 const METRIC_LABELS = { books: "libros", hours: "horas", minutes: "minutos" };
 
 export default function GoalsScreen() {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
@@ -91,7 +94,7 @@ data.calendar.forEach((d) => {
 
   if (loading) return (
     <View style={styles.centered}>
-      <ActivityIndicator color="#cba6f7" size="large" />
+      <ActivityIndicator color={colors.accent} size="large" />
     </View>
   );
 
@@ -156,7 +159,7 @@ data.calendar.forEach((d) => {
                   <TextInput
                     style={styles.input}
                     placeholder={`Meta en ${METRIC_LABELS[editMetric]}`}
-                    placeholderTextColor="#666"
+                    placeholderTextColor={colors.placeholder}
                     keyboardType="numeric"
                     value={editValue}
                     onChangeText={setEditValue}
@@ -165,7 +168,7 @@ data.calendar.forEach((d) => {
                     <Text style={styles.saveBtnText}>Guardar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setEditing(null)}>
-                    <Ionicons name="close" size={20} color="#666" />
+                    <Ionicons name="close" size={20} color={colors.textDim} />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -177,11 +180,11 @@ data.calendar.forEach((d) => {
       <View style={styles.calendarCard}>
         <Text style={styles.calendarTitle}>Actividad — últimos 90 días</Text>
         <View style={styles.calendarLegendRow}>
-          <View style={[styles.legendSwatch, { backgroundColor: "#2a2a3e" }]} />
+          <View style={[styles.legendSwatch, { backgroundColor: colors.calendarLow }]} />
           <Text style={styles.calendarLegendText}>Sin sesión</Text>
-          <View style={[styles.legendSwatch, { backgroundColor: "#6c5ce7" }]} />
+          <View style={[styles.legendSwatch, { backgroundColor: colors.calendarMid }]} />
           <Text style={styles.calendarLegendText}>Sesión</Text>
-          <View style={[styles.legendSwatch, { backgroundColor: "#cba6f7" }]} />
+          <View style={[styles.legendSwatch, { backgroundColor: colors.calendarHigh }]} />
           <Text style={styles.calendarLegendText}>+30 min</Text>
         </View>
         {renderCalendar()}
@@ -190,37 +193,38 @@ data.calendar.forEach((d) => {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#13131f" },
-  centered: { flex: 1, backgroundColor: "#13131f", justifyContent: "center", alignItems: "center" },
-  title: { fontSize: 24, fontWeight: "bold", color: "#fff", padding: 20, paddingTop: 50 },
-  goalCard: { backgroundColor: "#1e1e2e", borderRadius: 12, marginHorizontal: 16, marginBottom: 12, padding: 16 },
+const createStyles = (colors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
+  centered: { flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" },
+  title: { fontSize: 24, fontWeight: "bold", color: colors.text, padding: 20, paddingTop: 50 },
+  goalCard: { backgroundColor: colors.surface, borderRadius: 12, marginHorizontal: 16, marginBottom: 12, padding: 16 },
   goalCardHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 },
-  goalCardTitle: { fontSize: 16, fontWeight: "bold", color: "#fff" },
-  editBtn: { color: "#cba6f7", fontSize: 13 },
-  goalValue: { color: "#aaa", fontSize: 14, marginBottom: 8 },
-  progressBar: { height: 8, backgroundColor: "#2a2a3e", borderRadius: 4, overflow: "hidden", marginBottom: 6 },
-  progressFill: { height: 8, backgroundColor: "#cba6f7", borderRadius: 4 },
-  goalPercent: { color: "#666", fontSize: 12 },
-  noGoal: { color: "#666", fontSize: 13 },
+  goalCardTitle: { fontSize: 16, fontWeight: "bold", color: colors.text },
+  editBtn: { color: colors.accent, fontSize: 13 },
+  goalValue: { color: colors.textMuted, fontSize: 14, marginBottom: 8 },
+  progressBar: { height: 8, backgroundColor: colors.surfaceAlt, borderRadius: 4, overflow: "hidden", marginBottom: 6 },
+  progressFill: { height: 8, backgroundColor: colors.accent, borderRadius: 4 },
+  goalPercent: { color: colors.textDim, fontSize: 12 },
+  noGoal: { color: colors.textDim, fontSize: 13 },
   editContainer: { marginTop: 12 },
   metricRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
-  metricBtn: { backgroundColor: "#2a2a3e", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
-  metricBtnActive: { backgroundColor: "#cba6f7" },
-  metricBtnText: { color: "#aaa", fontSize: 13 },
-  metricBtnTextActive: { color: "#13131f", fontWeight: "bold" },
+  metricBtn: { backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },
+  metricBtnActive: { backgroundColor: colors.accent },
+  metricBtnText: { color: colors.textMuted, fontSize: 13 },
+  metricBtnTextActive: { color: colors.onAccent, fontWeight: "bold" },
   inputRow: { flexDirection: "row", gap: 8, alignItems: "center" },
-  input: { flex: 1, backgroundColor: "#2a2a3e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  saveBtn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
-  saveBtnText: { color: "#13131f", fontWeight: "bold" },
-  calendarCard: { backgroundColor: "#1e1e2e", borderRadius: 12, marginHorizontal: 16, marginBottom: 12, padding: 16 },
-  calendarTitle: { fontSize: 16, fontWeight: "bold", color: "#fff", marginBottom: 6 },
+  input: { flex: 1, backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  saveBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
+  saveBtnText: { color: colors.onAccent, fontWeight: "bold" },
+  calendarCard: { backgroundColor: colors.surface, borderRadius: 12, marginHorizontal: 16, marginBottom: 12, padding: 16 },
+  calendarTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, marginBottom: 6 },
   calendarLegendRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
   legendSwatch: { width: 10, height: 10, borderRadius: 2 },
-  calendarLegendText: { fontSize: 11, color: "#666", marginRight: 10 },
+  calendarLegendText: { fontSize: 11, color: colors.textDim, marginRight: 10 },
   calendarGrid: { flexDirection: "row", flexWrap: "wrap", gap: 3 },
-  calendarDay: { width: 10, height: 10, borderRadius: 2, backgroundColor: "#2a2a3e" },
-  calendarDayActive: { backgroundColor: "#6c5ce7" },
-  calendarDayHigh: { backgroundColor: "#cba6f7" },
-  calendarEmpty: { color: "#666", fontSize: 13 },
+  calendarDay: { width: 10, height: 10, borderRadius: 2, backgroundColor: colors.calendarLow },
+  calendarDayActive: { backgroundColor: colors.calendarMid },
+  calendarDayHigh: { backgroundColor: colors.calendarHigh },
+  calendarEmpty: { color: colors.textDim, fontSize: 13 },
 });

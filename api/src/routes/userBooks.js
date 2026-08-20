@@ -12,7 +12,7 @@ router.use(authMiddleware);
 // GET /user-books
 router.get("/", async (req, res) => {
   const { rows } = await pool.query(`
-    SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at,
+    SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.review,
            b.title, b.author, b.cover, b.pages, b.year, b.genre, b.google_id
     FROM user_books ub
     JOIN books b ON ub.book_id = b.id

@@ -1,5 +1,6 @@
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
 
 const STATUS_LABEL = {
   reading: "Leyendo",
@@ -9,13 +10,15 @@ const STATUS_LABEL = {
 };
 
 export default function BookCard({ book, onPress }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   return (
     <TouchableOpacity style={styles.card} onPress={onPress}>
       {book.cover ? (
         <Image source={{ uri: book.cover }} style={styles.cover} />
       ) : (
         <View style={styles.noCover}>
-          <Ionicons name="book" size={26} color="#666" />
+          <Ionicons name="book" size={26} color={colors.textDim} />
         </View>
       )}
       <View style={styles.info}>
@@ -32,10 +35,11 @@ export default function BookCard({ book, onPress }) {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (colors) =>
+  StyleSheet.create({
   card: {
     flexDirection: "row",
-    backgroundColor: "#1e1e2e",
+    backgroundColor: colors.surface,
     borderRadius: 12,
     marginHorizontal: 16,
     marginVertical: 6,
@@ -47,19 +51,19 @@ const styles = StyleSheet.create({
     width: 60,
     height: 90,
     borderRadius: 6,
-    backgroundColor: "#2a2a3e",
+    backgroundColor: colors.surfaceAlt,
   },
   noCover: {
     width: 60,
     height: 90,
     borderRadius: 6,
-    backgroundColor: "#2a2a3e",
+    backgroundColor: colors.surfaceAlt,
     justifyContent: "center",
     alignItems: "center",
   },
   info: { flex: 1, marginLeft: 12 },
-  title: { fontSize: 15, fontWeight: "bold", color: "#fff", marginBottom: 4 },
-  author: { fontSize: 13, color: "#aaa", marginBottom: 6 },
-  status: { fontSize: 12, color: "#cba6f7" },
-  pages: { fontSize: 11, color: "#888", marginTop: 2 },
+  title: { fontSize: 15, fontWeight: "bold", color: colors.text, marginBottom: 4 },
+  author: { fontSize: 13, color: colors.textMuted, marginBottom: 6 },
+  status: { fontSize: 12, color: colors.accent },
+  pages: { fontSize: 11, color: colors.textDim, marginTop: 2 },
 });

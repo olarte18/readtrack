@@ -81,3 +81,15 @@ export const saveGoal = async (type, metric, value) =>
     method: "POST",
     body: JSON.stringify({ type, metric, value }),
   });
+
+export const previewImport = async (csv) =>
+  request("/import/preview", {
+    method: "POST",
+    body: JSON.stringify({ csv }),
+  });
+
+export const importBooks = async (csv) =>
+  request("/import", {
+    method: "POST",
+    body: JSON.stringify({ csv }),
+  });

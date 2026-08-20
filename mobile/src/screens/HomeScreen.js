@@ -3,8 +3,11 @@ import { useEffect, useState } from "react";
 import { getLibrary } from "../services/api";
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function HomeScreen({ navigation ,route}) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
 const { filterStatus } = route?.params ?? {};
@@ -54,7 +57,7 @@ const filteredBooks = filter === "all" ? books : books.filter((b) => b.status ==
   ))}
 </View>
       {loading ? (
-        <ActivityIndicator color="#cba6f7" style={{ marginTop: 60 }} />
+        <ActivityIndicator color={colors.accent} style={{ marginTop: 60 }} />
       ) : (
         <FlatList
           data={filteredBooks}
@@ -68,7 +71,7 @@ renderItem={({ item }) => (
       <Image source={{ uri: item.cover }} style={styles.cover} />
     ) : (
       <View style={styles.noCover}>
-        <Ionicons name="book" size={26} color="#666" />
+        <Ionicons name="book" size={26} color={colors.textDim} />
       </View>
     )}
     <View style={styles.info}>
@@ -95,7 +98,7 @@ renderItem={({ item }) => (
       {item.status === "completed" && item.rating > 0 && (
         <View style={styles.ratingRow}>
           {Array.from({ length: item.rating }).map((_, i) => (
-            <Ionicons key={i} name="star" size={12} color="#f5c97b" />
+            <Ionicons key={i} name="star" size={12} color={colors.star} />
           ))}
         </View>
       )}
@@ -113,28 +116,28 @@ renderItem={({ item }) => (
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#13131f" },
+const createStyles = (colors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, paddingTop: 50 },
-  title: { fontSize: 24, fontWeight: "bold", color: "#fff" },
-  addBtn: { color: "#cba6f7", fontSize: 16, fontWeight: "600" },
-  card: { flexDirection: "row", backgroundColor: "#1e1e2e", borderRadius: 12, marginHorizontal: 16, marginVertical: 6, padding: 12, alignItems: "center" },
+  title: { fontSize: 24, fontWeight: "bold", color: colors.text },
+  addBtn: { color: colors.accent, fontSize: 16, fontWeight: "600" },
+  card: { flexDirection: "row", backgroundColor: colors.surface, borderRadius: 12, marginHorizontal: 16, marginVertical: 6, padding: 12, alignItems: "center" },
   cover: { width: 65, height: 95, borderRadius: 6 },
-  noCover: { width: 65, height: 95, borderRadius: 6, backgroundColor: "#2a2a3e", justifyContent: "center", alignItems: "center" },
+  noCover: { width: 65, height: 95, borderRadius: 6, backgroundColor: colors.surfaceAlt, justifyContent: "center", alignItems: "center" },
   info: { flex: 1, marginLeft: 12 },
-  bookTitle: { fontSize: 15, fontWeight: "bold", color: "#fff", marginBottom: 3 },
-  author: { fontSize: 12, color: "#aaa", marginBottom: 6 },
+  bookTitle: { fontSize: 15, fontWeight: "bold", color: colors.text, marginBottom: 3 },
+  author: { fontSize: 12, color: colors.textMuted, marginBottom: 6 },
   statusRow: { flexDirection: "row", marginBottom: 6 },
-  statusBadge: { fontSize: 12, color: "#cba6f7" },
-  progressContainer: { height: 4, backgroundColor: "#2a2a3e", borderRadius: 2, marginBottom: 4, overflow: "hidden" },
-  progressBar: { height: 4, backgroundColor: "#cba6f7", borderRadius: 2 },
-  pageText: { fontSize: 11, color: "#666" },
+  statusBadge: { fontSize: 12, color: colors.accent },
+  progressContainer: { height: 4, backgroundColor: colors.surfaceAlt, borderRadius: 2, marginBottom: 4, overflow: "hidden" },
+  progressBar: { height: 4, backgroundColor: colors.accent, borderRadius: 2 },
+  pageText: { fontSize: 11, color: colors.textDim },
   ratingRow: { flexDirection: "row", gap: 2, marginTop: 2 },
-  rating: { fontSize: 12, marginTop: 2 },
-  empty: { color: "#666", textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
+  empty: { color: colors.textDim, textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
 filterRow: { flexDirection: "row", paddingHorizontal: 16, paddingBottom: 12, gap: 8, flexWrap: "wrap" },
-filterBtn: { backgroundColor: "#1e1e2e", borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
-filterBtnActive: { backgroundColor: "#cba6f7" },
-filterText: { color: "#666", fontSize: 12 },
-filterTextActive: { color: "#13131f", fontWeight: "bold" },
+filterBtn: { backgroundColor: colors.surface, borderRadius: 20, paddingHorizontal: 12, paddingVertical: 6 },
+filterBtnActive: { backgroundColor: colors.accent },
+filterText: { color: colors.textDim, fontSize: 12 },
+filterTextActive: { color: colors.onAccent, fontWeight: "bold" },
 });

@@ -1,7 +1,9 @@
 import { useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
 import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, updateBookPages } from "../services/api";
+import { getBookDescription } from "../services/openLibrary";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const STATUS_OPTIONS = [
@@ -14,6 +16,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function BookDetailScreen({ route, navigation }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const { book, onGoBack } = route.params;
   const isInLibrary = !!book.status;
   const [selectedStatus, setSelectedStatus] = useState(book.status ?? null);
@@ -33,6 +37,12 @@ const [startedAt, setStartedAt] = useState(book.started_at ? new Date(book.start
 const [finishedAt, setFinishedAt] = useState(book.finished_at ? new Date(book.finished_at) : null);
 const [showStartPicker, setShowStartPicker] = useState(false);
 const [showEndPicker, setShowEndPicker] = useState(false);
+  const [description, setDescription] = useState(book.description ?? null);
+  useEffect(() => {
+    if (!description && (book.workKey || book.description)) {
+      getBookDescription(book.workKey).then(setDescription).catch(console.error);
+    }
+  }, []);
   useEffect(() => {
     if (!isInLibrary && book.id) {
       checkBook(book.id).then((data) => {
@@ -183,7 +193,7 @@ const handleDeleteNote = (id) => {
           <Image source={{ uri: book.cover }} style={styles.cover} />
         ) : (
           <View style={styles.noCover}>
-            <Ionicons name="book" size={48} color="#666" />
+            <Ionicons name="book" size={48} color={colors.textDim} />
           </View>
         )}
         <Text style={styles.title}>{String(book.title)}</Text>
@@ -193,6 +203,13 @@ const handleDeleteNote = (id) => {
           <Text style={styles.meta}>{book.pages || totalPages} páginas</Text>
         )}
       </View>
+
+      {!!description && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Descripción</Text>
+          <Text style={styles.description}>{description}</Text>
+        </View>
+      )}
 
       {alreadyInLibrary && (
         <View style={styles.section}>
@@ -204,7 +221,7 @@ const handleDeleteNote = (id) => {
             <TextInput
               style={styles.pageInput}
               placeholder="Ej. 647"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.placeholder}
               keyboardType="numeric"
               value={totalPages}
               onChangeText={setTotalPages}
@@ -259,7 +276,7 @@ const handleDeleteNote = (id) => {
           {alreadyInLibrary ? "Cambiar estado" : "Agregar a biblioteca"}
         </Text>
         {loading ? (
-          <ActivityIndicator color="#cba6f7" />
+          <ActivityIndicator color={colors.accent} />
         ) : (
           <View style={styles.statusRow}>
             {STATUS_OPTIONS.map((opt) => (
@@ -286,7 +303,7 @@ const handleDeleteNote = (id) => {
             <TextInput
               style={styles.pageInput}
               placeholder="¿En qué página vas?"
-              placeholderTextColor="#666"
+              placeholderTextColor={colors.placeholder}
               keyboardType="numeric"
               value={currentPage}
               onChangeText={setCurrentPage}
@@ -313,7 +330,7 @@ const handleDeleteNote = (id) => {
                 <Ionicons
                   name={star <= rating ? "star" : "star-outline"}
                   size={32}
-                  color={star <= rating ? "#f5c97b" : "#666"}
+                  color={star <= rating ? colors.star : colors.textDim}
                 />
               </TouchableOpacity>
             ))}
@@ -328,7 +345,7 @@ const handleDeleteNote = (id) => {
       <TextInput
         style={styles.noteInput}
         placeholder="Escribe una nota..."
-        placeholderTextColor="#666"
+        placeholderTextColor={colors.placeholder}
         value={newNote}
         onChangeText={setNewNote}
         multiline
@@ -338,7 +355,7 @@ const handleDeleteNote = (id) => {
       <TextInput
         style={[styles.pageInput, { flex: 1 }]}
         placeholder="Página (opcional)"
-        placeholderTextColor="#666"
+        placeholderTextColor={colors.placeholder}
         keyboardType="numeric"
         value={notePage}
         onChangeText={setNotePage}
@@ -358,7 +375,7 @@ const handleDeleteNote = (id) => {
       {alreadyInLibrary && (
         <View style={styles.section}>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={16} color="#f38ba8" />
+            <Ionicons name="trash-outline" size={16} color={colors.danger} />
             <Text style={styles.deleteBtnText}>Quitar de biblioteca</Text>
           </TouchableOpacity>
         </View>
@@ -367,36 +384,38 @@ const handleDeleteNote = (id) => {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#13131f" },
+const createStyles = (colors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background },
   hero: { alignItems: "center", paddingTop: 60, paddingBottom: 30, paddingHorizontal: 20 },
   cover: { width: 120, height: 180, borderRadius: 10, marginBottom: 16 },
-  noCover: { width: 120, height: 180, borderRadius: 10, backgroundColor: "#2a2a3e", justifyContent: "center", alignItems: "center", marginBottom: 16 },
-  title: { fontSize: 20, fontWeight: "bold", color: "#fff", textAlign: "center", marginBottom: 6 },
-  author: { fontSize: 15, color: "#aaa", marginBottom: 4 },
-  meta: { fontSize: 13, color: "#666" },
+  noCover: { width: 120, height: 180, borderRadius: 10, backgroundColor: colors.surfaceAlt, justifyContent: "center", alignItems: "center", marginBottom: 16 },
+  title: { fontSize: 20, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 6 },
+  author: { fontSize: 15, color: colors.textMuted, marginBottom: 4 },
+  meta: { fontSize: 13, color: colors.textDim },
+  description: { fontSize: 14, color: colors.text, lineHeight: 21 },
   section: { paddingHorizontal: 20, marginTop: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", color: "#fff", marginBottom: 12 },
+  sectionTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, marginBottom: 12 },
   statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  statusBtn: { backgroundColor: "#1e1e2e", borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
-  statusBtnActive: { backgroundColor: "#cba6f7" },
-  statusBtnText: { color: "#cba6f7", fontSize: 13 },
-  statusBtnTextActive: { color: "#13131f", fontWeight: "bold" },
+  statusBtn: { backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
+  statusBtnActive: { backgroundColor: colors.accent },
+  statusBtnText: { color: colors.accent, fontSize: 13 },
+  statusBtnTextActive: { color: colors.onAccent, fontWeight: "bold" },
   pageRow: { flexDirection: "row", gap: 8, alignItems: "center" },
-  pageInput: { flex: 1, backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
-  pageBtn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  pageBtnText: { color: "#1e1e2e", fontWeight: "bold" },
+  pageInput: { flex: 1, backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
+  pageBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+  pageBtnText: { color: colors.onAccent, fontWeight: "bold" },
   starsRow: { flexDirection: "row", gap: 8 },
-  deleteBtn: { backgroundColor: "#20221b", borderRadius: 10, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 40 },
-  deleteBtnText: { color: "#f38ba8", fontWeight: "bold", fontSize: 15 },
+  deleteBtn: { backgroundColor: colors.danger + "22", borderRadius: 10, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 40 },
+  deleteBtnText: { color: colors.danger, fontWeight: "bold", fontSize: 15 },
 noteInputRow: { marginBottom: 8 },
-noteInput: { backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 80, textAlignVertical: "top" },
-noteCard: { backgroundColor: "#1e1e2e", borderRadius: 10, padding: 12, marginTop: 8 },
-notePage: { fontSize: 11, color: "#cba6f7", marginBottom: 4 },
-noteContent: { fontSize: 14, color: "#cdd6f4" },
-hint: { fontSize: 12, color: "#666", marginBottom: 8 },
-dateText: { fontSize: 13, color: "#aaa", marginBottom: 4 },
-dateRow: { flexDirection: "row", justifyContent: "space-between", backgroundColor: "#1e1e2e", borderRadius: 10, padding: 12, marginBottom: 8 },
-dateLabel: { color: "#aaa", fontSize: 14 },
-dateValue: { color: "#cba6f7", fontSize: 14 },
+noteInput: { backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 80, textAlignVertical: "top" },
+noteCard: { backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginTop: 8 },
+notePage: { fontSize: 11, color: colors.accent, marginBottom: 4 },
+noteContent: { fontSize: 14, color: colors.text },
+hint: { fontSize: 12, color: colors.textDim, marginBottom: 8 },
+dateText: { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
+dateRow: { flexDirection: "row", justifyContent: "space-between", backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginBottom: 8 },
+dateLabel: { color: colors.textMuted, fontSize: 14 },
+dateValue: { color: colors.accent, fontSize: 14 },
 });

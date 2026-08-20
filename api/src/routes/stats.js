@@ -52,7 +52,7 @@ router.get("/", async (req, res) => {
   res.json({
     ...base[0],
     completed_this_year: parseInt(yearRows[0].completed_this_year),
-    goal_this_year: goalRows[0]?.goal ?? null,
+    goal_this_year: goalRows[0]?.value ?? null,
     pages_per_day: speedRows[0]?.pages_per_day ?? null,
     year,
   });

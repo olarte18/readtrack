@@ -6,8 +6,11 @@ import BookCard from "../components/BookCard";
 import BarcodeScanner from "../components/BarcodeScanner";
 import { searchByISBN } from "../services/openLibrary";
 import { Ionicons } from "@expo/vector-icons";
+import { useTheme } from "../contexts/ThemeContext";
 
 export default function SearchScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -43,22 +46,22 @@ const handleScan = async (isbn) => {
         <TextInput
           style={styles.input}
           placeholder="Título, autor..."
-          placeholderTextColor="#666"
+          placeholderTextColor={colors.placeholder}
           value={query}
           onChangeText={handleChange}
           returnKeyType="search"
         />
         <TouchableOpacity style={styles.scanBtn} onPress={() => setScannerVisible(true)}>
-  <Ionicons name="barcode-outline" size={22} color="#cba6f7" />
+  <Ionicons name="barcode-outline" size={22} color={colors.accent} />
 </TouchableOpacity>
         {query.length > 0 && (
           <TouchableOpacity style={styles.clearBtn} onPress={() => { setQuery(""); setResults([]); }}>
-            <Ionicons name="close" size={18} color="#aaa" />
+            <Ionicons name="close" size={18} color={colors.textMuted} />
           </TouchableOpacity>
         )}
       </View>
       
-      {loading && <ActivityIndicator color="#cba6f7" style={{ marginTop: 20 }} />}
+      {loading && <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />}
       <FlatList
         data={results}
         keyExtractor={(item) => item.id}
@@ -82,11 +85,13 @@ const handleScan = async (isbn) => {
   );
 }
 
-const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: "#13131f", paddingTop: 50 },
-  title: { fontSize: 24, fontWeight: "bold", color: "#fff", paddingHorizontal: 20, marginBottom: 16 },
+const createStyles = (colors) =>
+  StyleSheet.create({
+  container: { flex: 1, backgroundColor: colors.background, paddingTop: 50 },
+  title: { fontSize: 24, fontWeight: "bold", color: colors.text, paddingHorizontal: 20, marginBottom: 16 },
   searchRow: { flexDirection: "row", paddingHorizontal: 16, marginBottom: 12, gap: 8, alignItems: "center" },
-  input: { flex: 1, backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
-  clearBtn: { backgroundColor: "#2a2a3e", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  empty: { color: "#666", textAlign: "center", marginTop: 40 },
+  input: { flex: 1, backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
+  scanBtn: { backgroundColor: colors.surface, borderRadius: 10, padding: 10 },
+  clearBtn: { backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
+  empty: { color: colors.textDim, textAlign: "center", marginTop: 40 },
 });
