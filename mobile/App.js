@@ -13,6 +13,12 @@ import { Ionicons } from "@expo/vector-icons";
 import StatsScreen from "./src/screens/StatsScreen";
 import ReadingScreen from "./src/screens/ReadingScreen";
 import ActiveSessionScreen from "./src/screens/ActiveSessionScreen";
+import GoalsScreen from "./src/screens/GoalsScreen";
+
+
+
+
+
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -64,6 +70,8 @@ function AppStack() {
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
     <Stack.Screen name="Stats" component={StatsScreen} />
     <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />
+    <Stack.Screen name="Goals" component={GoalsScreen} />
+   
     </Stack.Navigator>
   );
 }

@@ -75,9 +75,14 @@ export default function ProfileScreen({ navigation }) {
       </View>
 
       <View style={styles.menuContainer}>
-        <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("Stats")}>
+                <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("Stats")}>
           <Ionicons name="bar-chart-outline" size={22} color="#cba6f7" />
           <Text style={styles.menuLabel}>Estadísticas</Text>
+          <Ionicons name="chevron-forward" size={18} color="#666" />
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Goals")}>
+          <Ionicons name="trophy-outline" size={22} color="#cba6f7" />
+          <Text style={styles.menuLabel}>Metas</Text>
           <Ionicons name="chevron-forward" size={18} color="#666" />
         </TouchableOpacity>
       </View>

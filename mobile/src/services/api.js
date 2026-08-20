@@ -109,3 +109,16 @@ export const updateReadingGoal = async (goal) => {
   });
   return res.json();
 };
+export const getGoals = async () => {
+  const res = await fetch(`${API_URL}/goals`, { headers: await getHeaders() });
+  return res.json();
+};
+
+export const saveGoal = async (type, metric, value) => {
+  const res = await fetch(`${API_URL}/goals`, {
+    method: "POST",
+    headers: await getHeaders(),
+    body: JSON.stringify({ type, metric, value }),
+  });
+  return res.json();
+};
