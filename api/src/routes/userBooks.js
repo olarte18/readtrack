@@ -79,7 +79,7 @@ router.patch("/:id", async (req, res) => {
 router.get("/check/:google_id", async (req, res) => {
   try {
     const { rows } = await pool.query(`
-      SELECT ub.id, ub.status FROM user_books ub
+      SELECT ub.id, ub.status, ub.started_at, ub.finished_at FROM user_books ub
       JOIN books b ON ub.book_id = b.id
       WHERE b.google_id = $1 AND ub.user_id = $2
     `, [req.params.google_id, req.userId]);

@@ -95,3 +95,17 @@ export const getReadingSpeed = async (user_book_id) => {
   });
   return res.json();
 };
+
+export const getReadingGoal = async () => {
+  const res = await fetch(`${API_URL}/stats/goal`, { headers: await getHeaders() });
+  return res.json();
+};
+
+export const updateReadingGoal = async (goal) => {
+  const res = await fetch(`${API_URL}/stats/goal`, {
+    method: "PATCH",
+    headers: await getHeaders(),
+    body: JSON.stringify({ goal }),
+  });
+  return res.json();
+};
