@@ -30,7 +30,7 @@ export default function ProfileScreen({ navigation }) {
     <ScrollView contentContainerStyle={styles.container}>
       <View style={styles.profileHeader}>
         <View style={styles.avatarPlaceholder}>
-          <Text style={styles.avatarEmoji}>👤</Text>
+          <Ionicons name="person" size={40} color="#666" />
         </View>
         <Text style={styles.name}>{user?.username}</Text>
         <Text style={styles.email}>{user?.email}</Text>
@@ -38,7 +38,7 @@ export default function ProfileScreen({ navigation }) {
 
       <View style={styles.section}>
         <View style={styles.goalHeader}>
-          <Text style={styles.goalTitle}>🎯 Meta {goalData?.year ?? new Date().getFullYear()}</Text>
+          <Text style={styles.goalTitle}>Meta {goalData?.year ?? new Date().getFullYear()}</Text>
           <TouchableOpacity onPress={() => { setEditingGoal(true); setGoalInput(String(goalData?.goal ?? "")); }}>
             <Text style={styles.editBtn}>Editar</Text>
           </TouchableOpacity>
@@ -98,7 +98,6 @@ const styles = StyleSheet.create({
   container: { flexGrow: 1, backgroundColor: "#13131f", alignItems: "center", paddingTop: 60, paddingBottom: 40 },
   profileHeader: { alignItems: "center", marginBottom: 30 },
   avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: "#2a2a3e", justifyContent: "center", alignItems: "center", marginBottom: 12 },
-  avatarEmoji: { fontSize: 40 },
   name: { fontSize: 22, fontWeight: "bold", color: "#fff", marginBottom: 4 },
   email: { fontSize: 14, color: "#666" },
   section: { width: "100%", paddingHorizontal: 20, marginBottom: 20, backgroundColor: "#1e1e2e", padding: 16, borderRadius: 12, marginHorizontal: 20 },

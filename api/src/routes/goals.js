@@ -2,112 +2,108 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
+const httpError = require("../utils/httpError");
+const { validate } = require("../utils/validators");
+
+const TYPES = ["annual", "monthly", "weekly", "daily"];
+const METRICS = ["books", "minutes", "hours"];
 
 router.use(authMiddleware);
 
 // GET /goals — obtener todas las metas del año actual
 router.get("/", async (req, res) => {
   const year = new Date().getFullYear();
-  try {
-    const { rows: goals } = await pool.query(
-      "SELECT * FROM reading_goals WHERE user_id = $1 AND year = $2",
-      [req.userId, year]
-    );
 
-    // Progreso anual — libros completados este año
-    const { rows: annualProgress } = await pool.query(
-      `SELECT COUNT(*) AS books
-       FROM user_books
-       WHERE user_id = $1 AND status = 'completed'
-       AND EXTRACT(YEAR FROM finished_at) = $2`,
-      [req.userId, year]
-    );
+  const { rows: goals } = await pool.query(
+    "SELECT * FROM reading_goals WHERE user_id = $1 AND year = $2",
+    [req.userId, year]
+  );
 
-    // Progreso semanal — minutos leídos esta semana
-    const { rows: weeklyProgress } = await pool.query(
-      `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
-       FROM reading_sessions
-       WHERE user_id = $1
-       AND created_at >= date_trunc('week', NOW())`,
-      [req.userId]
-    );
+  const { rows: annualProgress } = await pool.query(
+    `SELECT COUNT(*) AS books
+     FROM user_books
+     WHERE user_id = $1 AND status = 'completed'
+     AND EXTRACT(YEAR FROM finished_at) = $2`,
+    [req.userId, year]
+  );
 
-    // Progreso diario — minutos leídos hoy
-    const { rows: dailyProgress } = await pool.query(
-      `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
-       FROM reading_sessions
-       WHERE user_id = $1
-       AND created_at >= date_trunc('day', NOW())`,
-      [req.userId]
-    );
+  const { rows: weeklyProgress } = await pool.query(
+    `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
+     FROM reading_sessions
+     WHERE user_id = $1
+     AND created_at >= date_trunc('week', NOW())`,
+    [req.userId]
+  );
 
-    // Progreso mensual — libros o minutos este mes
-    const { rows: monthlyBooksProgress } = await pool.query(
-      `SELECT COUNT(*) AS books
-       FROM user_books
-       WHERE user_id = $1 AND status = 'completed'
-       AND EXTRACT(YEAR FROM finished_at) = $2
-       AND EXTRACT(MONTH FROM finished_at) = $3`,
-      [req.userId, year, new Date().getMonth() + 1]
-    );
+  const { rows: dailyProgress } = await pool.query(
+    `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
+     FROM reading_sessions
+     WHERE user_id = $1
+     AND created_at >= date_trunc('day', NOW())`,
+    [req.userId]
+  );
 
-    const { rows: monthlyMinutesProgress } = await pool.query(
-      `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
-       FROM reading_sessions
-       WHERE user_id = $1
-       AND created_at >= date_trunc('month', NOW())`,
-      [req.userId]
-    );
+  const { rows: monthlyBooksProgress } = await pool.query(
+    `SELECT COUNT(*) AS books
+     FROM user_books
+     WHERE user_id = $1 AND status = 'completed'
+     AND EXTRACT(YEAR FROM finished_at) = $2
+     AND EXTRACT(MONTH FROM finished_at) = $3`,
+    [req.userId, year, new Date().getMonth() + 1]
+  );
 
-    // Calendario — días con sesiones en los últimos 3 meses
-    const { rows: calendar } = await pool.query(
-      `SELECT DATE(created_at) AS date, 
-              COALESCE(SUM(duration_seconds) / 60, 0) AS minutes,
-              COALESCE(SUM(pages_read), 0) AS pages
-       FROM reading_sessions
-       WHERE user_id = $1
-       AND created_at >= NOW() - INTERVAL '90 days'
-       GROUP BY DATE(created_at)
-       ORDER BY date ASC`,
-      [req.userId]
-    );
+  const { rows: monthlyMinutesProgress } = await pool.query(
+    `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
+     FROM reading_sessions
+     WHERE user_id = $1
+     AND created_at >= date_trunc('month', NOW())`,
+    [req.userId]
+  );
 
-    res.json({
-      goals,
-      progress: {
-        annual: parseInt(annualProgress[0].books),
-weekly_minutes: parseInt(weeklyProgress[0].minutes),
-weekly: Math.round(parseInt(weeklyProgress[0].minutes) / 60),
-monthly_minutes: parseInt(monthlyMinutesProgress[0].minutes),
-monthly_hours: Math.round(parseInt(monthlyMinutesProgress[0].minutes) / 60),
-      },
-      calendar,
-      year,
-    });
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error al obtener metas" });
-  }
+  const { rows: calendar } = await pool.query(
+    `SELECT DATE(created_at) AS date, 
+            COALESCE(SUM(duration_seconds) / 60, 0) AS minutes,
+            COALESCE(SUM(pages_read), 0) AS pages
+     FROM reading_sessions
+     WHERE user_id = $1
+     AND created_at >= NOW() - INTERVAL '90 days'
+     GROUP BY DATE(created_at)
+     ORDER BY date ASC`,
+    [req.userId]
+  );
+
+  res.json({
+    goals,
+    progress: {
+      annual: parseInt(annualProgress[0].books),
+      weekly_minutes: parseInt(weeklyProgress[0].minutes),
+      weekly: Math.round(parseInt(weeklyProgress[0].minutes) / 60),
+      monthly_minutes: parseInt(monthlyMinutesProgress[0].minutes),
+      monthly_hours: Math.round(parseInt(monthlyMinutesProgress[0].minutes) / 60),
+    },
+    calendar,
+    year,
+  });
 });
 
 // POST /goals — crear o actualizar meta
 router.post("/", async (req, res) => {
-  const { type, metric, value } = req.body;
+  const data = validate(req.body, {
+    type: { required: true, type: "string", enum: TYPES },
+    metric: { required: true, type: "string", enum: METRICS },
+    value: { required: true, type: "integer", min: 1 },
+  });
   const year = new Date().getFullYear();
-  if (!type || !metric || !value) return res.status(400).json({ error: "type, metric y value requeridos" });
-  try {
-    const { rows } = await pool.query(
-      `INSERT INTO reading_goals (user_id, type, metric, value, year)
-       VALUES ($1, $2, $3, $4, $5)
-       ON CONFLICT (user_id, type, year)
-       DO UPDATE SET metric = $3, value = $4
-       RETURNING *`,
-      [req.userId, type, metric, parseInt(value), year]
-    );
-    res.status(201).json(rows[0]);
-  } catch (error) {
-    console.error(error);
-    res.status(500).json({ error: "Error al guardar meta" });
-  }
+
+  const { rows } = await pool.query(
+    `INSERT INTO reading_goals (user_id, type, metric, value, year)
+     VALUES ($1, $2, $3, $4, $5)
+     ON CONFLICT (user_id, type, year)
+     DO UPDATE SET metric = $3, value = $4
+     RETURNING *`,
+    [req.userId, data.type, data.metric, data.value, year]
+  );
+  res.status(201).json(rows[0]);
 });
+
 module.exports = router;

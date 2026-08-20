@@ -1,15 +1,16 @@
 import { useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, updateBookPages } from "../services/api";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const STATUS_OPTIONS = [
-  { key: "reading", label: "📖 Leyendo" },
-  { key: "paused", label: "⏸ Pausado" },
-  { key: "completed", label: "✅ Completado" },
-  { key: "pending", label: "🕐 Pendiente" },
-  { key: "wishlist", label: "🌟 Deseos" },
-  { key: "abandoned", label: "❌ Abandonado" },
+  { key: "reading", label: "Leyendo" },
+  { key: "paused", label: "Pausado" },
+  { key: "completed", label: "Completado" },
+  { key: "pending", label: "Pendiente" },
+  { key: "wishlist", label: "Deseos" },
+  { key: "abandoned", label: "Abandonado" },
 ];
 
 export default function BookDetailScreen({ route, navigation }) {
@@ -58,7 +59,7 @@ useEffect(() => {
     try {
       const result = await addBook({ ...book, google_id: book.id }, status);
       setLibraryEntry({ id: result.id, status });
-      Alert.alert("✅ Listo", `"${book.title}" agregado a tu biblioteca`);
+      Alert.alert("Listo", `"${book.title}" agregado a tu biblioteca`);
       onGoBack?.();
     } catch (error) {
       Alert.alert("Error", "No se pudo agregar el libro");
@@ -99,10 +100,10 @@ await updateBook(id, updates);
         await updateBook(entryId, { current_page: page, status: "completed" });
         setSelectedStatus("completed");
         setLibraryEntry((prev) => ({ ...prev, status: "completed" }));
-        Alert.alert("🎉 ¡Felicidades!", `Terminaste "${book.title}"`);
+        Alert.alert("¡Felicidades!", `Terminaste "${book.title}"`);
       } else {
         await updateBook(entryId, { current_page: page });
-        Alert.alert("✅ Guardado", `Página ${page} guardada`);
+        Alert.alert("Guardado", `Página ${page} guardada`);
       }
       onGoBack?.();
     } catch {
@@ -182,7 +183,7 @@ const handleDeleteNote = (id) => {
           <Image source={{ uri: book.cover }} style={styles.cover} />
         ) : (
           <View style={styles.noCover}>
-            <Text style={styles.noCoverEmoji}>📚</Text>
+            <Ionicons name="book" size={48} color="#666" />
           </View>
         )}
         <Text style={styles.title}>{String(book.title)}</Text>
@@ -215,7 +216,7 @@ const handleDeleteNote = (id) => {
                 if (isNaN(p) || p <= 0) return Alert.alert("Error", "Ingresa un número válido");
                 try {
                   await updateBookPages(book.google_id ?? book.id, p);
-                  Alert.alert("✅ Guardado", `${p} páginas guardadas`);
+                  Alert.alert("Guardado", `${p} páginas guardadas`);
                 } catch {
                   Alert.alert("Error", "No se pudo guardar");
                 }
@@ -230,14 +231,14 @@ const handleDeleteNote = (id) => {
   <View style={styles.section}>
     <Text style={styles.sectionTitle}>Fechas</Text>
     <TouchableOpacity style={styles.dateRow} onPress={() => setShowStartPicker(true)}>
-      <Text style={styles.dateLabel}>📅 Inicio</Text>
+      <Text style={styles.dateLabel}>Inicio</Text>
       <Text style={styles.dateValue}>
         {startedAt ? startedAt.toISOString().split("T")[0] : "Toca para agregar"}
       </Text>
     </TouchableOpacity>
     {selectedStatus === "completed" && (
   <TouchableOpacity style={styles.dateRow} onPress={() => setShowEndPicker(true)}>
-    <Text style={styles.dateLabel}>🏁 Fin</Text>
+    <Text style={styles.dateLabel}>Fin</Text>
     <Text style={styles.dateValue}>
       {finishedAt ? finishedAt.toISOString().split("T")[0] : "Toca para agregar"}
     </Text>
@@ -309,7 +310,11 @@ const handleDeleteNote = (id) => {
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((star) => (
               <TouchableOpacity key={star} onPress={() => handleRating(star)}>
-                <Text style={styles.star}>{star <= rating ? "⭐" : "☆"}</Text>
+                <Ionicons
+                  name={star <= rating ? "star" : "star-outline"}
+                  size={32}
+                  color={star <= rating ? "#f5c97b" : "#666"}
+                />
               </TouchableOpacity>
             ))}
           </View>
@@ -353,7 +358,8 @@ const handleDeleteNote = (id) => {
       {alreadyInLibrary && (
         <View style={styles.section}>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-            <Text style={styles.deleteBtnText}>🗑 Quitar de biblioteca</Text>
+            <Ionicons name="trash-outline" size={16} color="#f38ba8" />
+            <Text style={styles.deleteBtnText}>Quitar de biblioteca</Text>
           </TouchableOpacity>
         </View>
       )}
@@ -366,7 +372,6 @@ const styles = StyleSheet.create({
   hero: { alignItems: "center", paddingTop: 60, paddingBottom: 30, paddingHorizontal: 20 },
   cover: { width: 120, height: 180, borderRadius: 10, marginBottom: 16 },
   noCover: { width: 120, height: 180, borderRadius: 10, backgroundColor: "#2a2a3e", justifyContent: "center", alignItems: "center", marginBottom: 16 },
-  noCoverEmoji: { fontSize: 48 },
   title: { fontSize: 20, fontWeight: "bold", color: "#fff", textAlign: "center", marginBottom: 6 },
   author: { fontSize: 15, color: "#aaa", marginBottom: 4 },
   meta: { fontSize: 13, color: "#666" },
@@ -382,8 +387,7 @@ const styles = StyleSheet.create({
   pageBtn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   pageBtnText: { color: "#1e1e2e", fontWeight: "bold" },
   starsRow: { flexDirection: "row", gap: 8 },
-  star: { fontSize: 32 , color: "#cba6f7" },
-  deleteBtn: { backgroundColor: "#20221b", borderRadius: 10, paddingVertical: 12, alignItems: "center", marginBottom: 40 },
+  deleteBtn: { backgroundColor: "#20221b", borderRadius: 10, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 40 },
   deleteBtnText: { color: "#f38ba8", fontWeight: "bold", fontSize: 15 },
 noteInputRow: { marginBottom: 8 },
 noteInput: { backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 80, textAlignVertical: "top" },

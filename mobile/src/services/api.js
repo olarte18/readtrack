@@ -10,115 +10,74 @@ const getHeaders = async () => {
   };
 };
 
-export const getLibrary = async () => {
-  const res = await fetch(`${API_URL}/user-books`, { headers: await getHeaders() });
-  return res.json();
+const request = async (path, options = {}) => {
+  const res = await fetch(`${API_URL}${path}`, {
+    headers: await getHeaders(),
+    ...options,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+  return data;
 };
 
-export const addBook = async (book, status = "pending") => {
-  const res = await fetch(`${API_URL}/user-books`, {
+export const getLibrary = async () => request("/user-books");
+
+export const addBook = async (book, status = "pending") =>
+  request("/user-books", {
     method: "POST",
-    headers: await getHeaders(),
     body: JSON.stringify({ ...book, status }),
   });
-  return res.json();
-};
 
-export const updateBook = async (id, data) => {
-  const res = await fetch(`${API_URL}/user-books/${id}`, {
+export const updateBook = async (id, data) =>
+  request(`/user-books/${id}`, {
     method: "PATCH",
-    headers: await getHeaders(),
     body: JSON.stringify(data),
   });
-  return res.json();
-};
 
-export const deleteBook = async (id) => {
-  const res = await fetch(`${API_URL}/user-books/${id}`, {
-    method: "DELETE",
-    headers: await getHeaders(),
-  });
-  return res.json();
-};
+export const deleteBook = async (id) =>
+  request(`/user-books/${id}`, { method: "DELETE" });
 
-export const checkBook = async (google_id) => {
-  const res = await fetch(`${API_URL}/user-books/check/${google_id}`, { headers: await getHeaders() });
-  return res.json();
-};
+export const checkBook = async (google_id) => request(`/user-books/check/${google_id}`);
 
-export const getNotes = async (book_id) => {
-  const res = await fetch(`${API_URL}/notes/${book_id}`, { headers: await getHeaders() });
-  return res.json();
-};
+export const getNotes = async (book_id) => request(`/notes/${book_id}`);
 
-export const addNote = async (book_id, content, page) => {
-  const res = await fetch(`${API_URL}/notes`, {
+export const addNote = async (book_id, content, page) =>
+  request("/notes", {
     method: "POST",
-    headers: await getHeaders(),
     body: JSON.stringify({ book_id, content, page }),
   });
-  return res.json();
-};
 
-export const deleteNote = async (id) => {
-  const res = await fetch(`${API_URL}/notes/${id}`, {
-    method: "DELETE",
-    headers: await getHeaders(),
-  });
-  return res.json();
-};
+export const deleteNote = async (id) => request(`/notes/${id}`, { method: "DELETE" });
 
-export const updateBookPages = async (google_id, pages) => {
-  const res = await fetch(`${API_URL}/books/${google_id}/pages`, {
+export const updateBookPages = async (google_id, pages) =>
+  request(`/books/${google_id}/pages`, {
     method: "PATCH",
-    headers: await getHeaders(),
     body: JSON.stringify({ pages }),
   });
-  return res.json();
-};
-export const getStats = async () => {
-  const res = await fetch(`${API_URL}/stats`, { headers: await getHeaders() });
-  return res.json();
-};
-export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read) => {
-  const res = await fetch(`${API_URL}/reading-sessions`, {
+
+export const getStats = async () => request("/stats");
+
+export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read) =>
+  request("/reading-sessions", {
     method: "POST",
-    headers: await getHeaders(),
     body: JSON.stringify({ user_book_id, page, duration_seconds, pages_read }),
   });
-  return res.json();
-};
 
-export const getReadingSpeed = async (user_book_id) => {
-  const res = await fetch(`${API_URL}/reading-sessions/${user_book_id}/speed`, {
-    headers: await getHeaders(),
-  });
-  return res.json();
-};
+export const getReadingSpeed = async (user_book_id) =>
+  request(`/reading-sessions/${user_book_id}/speed`);
 
-export const getReadingGoal = async () => {
-  const res = await fetch(`${API_URL}/stats/goal`, { headers: await getHeaders() });
-  return res.json();
-};
+export const getReadingGoal = async () => request("/stats/goal");
 
-export const updateReadingGoal = async (goal) => {
-  const res = await fetch(`${API_URL}/stats/goal`, {
+export const updateReadingGoal = async (goal) =>
+  request("/stats/goal", {
     method: "PATCH",
-    headers: await getHeaders(),
     body: JSON.stringify({ goal }),
   });
-  return res.json();
-};
-export const getGoals = async () => {
-  const res = await fetch(`${API_URL}/goals`, { headers: await getHeaders() });
-  return res.json();
-};
 
-export const saveGoal = async (type, metric, value) => {
-  const res = await fetch(`${API_URL}/goals`, {
+export const getGoals = async () => request("/goals");
+
+export const saveGoal = async (type, metric, value) =>
+  request("/goals", {
     method: "POST",
-    headers: await getHeaders(),
     body: JSON.stringify({ type, metric, value }),
   });
-  return res.json();
-};

@@ -1,10 +1,11 @@
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 const STATUS_LABEL = {
-  reading: "📖 Leyendo",
-  completed: "✅ Completado",
-  pending: "🕐 Pendiente",
-  abandoned: "❌ Abandonado",
+  reading: "Leyendo",
+  completed: "Completado",
+  pending: "Pendiente",
+  abandoned: "Abandonado",
 };
 
 export default function BookCard({ book, onPress }) {
@@ -14,7 +15,7 @@ export default function BookCard({ book, onPress }) {
         <Image source={{ uri: book.cover }} style={styles.cover} />
       ) : (
         <View style={styles.noCover}>
-          <Text style={styles.noCoverText}>📚</Text>
+          <Ionicons name="book" size={26} color="#666" />
         </View>
       )}
       <View style={styles.info}>
@@ -56,7 +57,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  noCoverText: { fontSize: 28 },
   info: { flex: 1, marginLeft: 12 },
   title: { fontSize: 15, fontWeight: "bold", color: "#fff", marginBottom: 4 },
   author: { fontSize: 13, color: "#aaa", marginBottom: 6 },

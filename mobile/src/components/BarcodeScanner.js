@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { CameraView, useCameraPermissions } from "expo-camera";
 
 export default function BarcodeScanner({ visible, onScan, onClose }) {
@@ -52,7 +53,8 @@ const handleScan = ({ data }) => {
           </View>
         )}
         <TouchableOpacity style={styles.closeBtn} onPress={onClose}>
-          <Text style={styles.closeBtnText}>✕ Cancelar</Text>
+          <Ionicons name="close" size={20} color="#f38ba8" />
+          <Text style={styles.closeBtnText}>Cancelar</Text>
         </TouchableOpacity>
       </View>
     </Modal>
@@ -74,6 +76,6 @@ const styles = StyleSheet.create({
   text: { color: "#fff", fontSize: 16 },
   btn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 20, paddingVertical: 10 },
   btnText: { color: "#13131f", fontWeight: "bold" },
-  closeBtn: { backgroundColor: "#1e1e2e", padding: 16, alignItems: "center" },
+  closeBtn: { backgroundColor: "#1e1e2e", padding: 16, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
   closeBtnText: { color: "#f38ba8", fontSize: 16, fontWeight: "bold" },
 });

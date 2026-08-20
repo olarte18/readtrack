@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 import { getLibrary } from "../services/api";
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function HomeScreen({ navigation ,route}) {
   const [books, setBooks] = useState([]);
@@ -34,12 +35,12 @@ const filteredBooks = filter === "all" ? books : books.filter((b) => b.status ==
 <View style={styles.filterRow}>
 {[
   { key: "all", label: "Todos" },
-  { key: "reading", label: "📖 Leyendo" },
-  { key: "paused", label: "⏸ Pausado" },
-  { key: "completed", label: "✅ Leídos" },
-  { key: "pending", label: "🕐 Pendiente" },
-  { key: "wishlist", label: "🌟 Deseos" },
-  { key: "abandoned", label: "❌ Abandonado" },
+  { key: "reading", label: "Leyendo" },
+  { key: "paused", label: "Pausado" },
+  { key: "completed", label: "Leídos" },
+  { key: "pending", label: "Pendiente" },
+  { key: "wishlist", label: "Deseos" },
+  { key: "abandoned", label: "Abandonado" },
 ].map((f) => (
     <TouchableOpacity
       key={f.key}
@@ -67,19 +68,19 @@ renderItem={({ item }) => (
       <Image source={{ uri: item.cover }} style={styles.cover} />
     ) : (
       <View style={styles.noCover}>
-        <Text style={styles.coverEmoji}>📚</Text>
+        <Ionicons name="book" size={26} color="#666" />
       </View>
     )}
     <View style={styles.info}>
       <Text style={styles.bookTitle} numberOfLines={2}>{String(item.title)}</Text>
       <Text style={styles.author} numberOfLines={1}>{String(item.author)}</Text>
       <View style={styles.statusRow}>
-{item.status === "completed" && <Text style={styles.statusBadge}>✅ Completado</Text>}
-{item.status === "reading" && <Text style={styles.statusBadge}>📖 Leyendo</Text>}
-{item.status === "pending" && <Text style={styles.statusBadge}>🕐 Pendiente</Text>}
-{item.status === "abandoned" && <Text style={styles.statusBadge}>❌ Abandonado</Text>}
-{item.status === "wishlist" && <Text style={styles.statusBadge}>🌟 Deseos</Text>}
-{item.status === "paused" && <Text style={styles.statusBadge}>⏸ Pausado</Text>}
+{item.status === "completed" && <Text style={styles.statusBadge}>Completado</Text>}
+{item.status === "reading" && <Text style={styles.statusBadge}>Leyendo</Text>}
+{item.status === "pending" && <Text style={styles.statusBadge}>Pendiente</Text>}
+{item.status === "abandoned" && <Text style={styles.statusBadge}>Abandonado</Text>}
+{item.status === "wishlist" && <Text style={styles.statusBadge}>Deseos</Text>}
+{item.status === "paused" && <Text style={styles.statusBadge}>Pausado</Text>}
       </View>
       {item.status === "reading" && !!item.pages && (
         <View style={styles.progressContainer}>
@@ -92,7 +93,11 @@ renderItem={({ item }) => (
         </Text>
       )}
       {item.status === "completed" && item.rating > 0 && (
-        <Text style={styles.rating}>{"⭐".repeat(item.rating)}</Text>
+        <View style={styles.ratingRow}>
+          {Array.from({ length: item.rating }).map((_, i) => (
+            <Ionicons key={i} name="star" size={12} color="#f5c97b" />
+          ))}
+        </View>
       )}
     </View>
   </TouchableOpacity>
@@ -116,7 +121,6 @@ const styles = StyleSheet.create({
   card: { flexDirection: "row", backgroundColor: "#1e1e2e", borderRadius: 12, marginHorizontal: 16, marginVertical: 6, padding: 12, alignItems: "center" },
   cover: { width: 65, height: 95, borderRadius: 6 },
   noCover: { width: 65, height: 95, borderRadius: 6, backgroundColor: "#2a2a3e", justifyContent: "center", alignItems: "center" },
-  coverEmoji: { fontSize: 28 },
   info: { flex: 1, marginLeft: 12 },
   bookTitle: { fontSize: 15, fontWeight: "bold", color: "#fff", marginBottom: 3 },
   author: { fontSize: 12, color: "#aaa", marginBottom: 6 },
@@ -125,6 +129,7 @@ const styles = StyleSheet.create({
   progressContainer: { height: 4, backgroundColor: "#2a2a3e", borderRadius: 2, marginBottom: 4, overflow: "hidden" },
   progressBar: { height: 4, backgroundColor: "#cba6f7", borderRadius: 2 },
   pageText: { fontSize: 11, color: "#666" },
+  ratingRow: { flexDirection: "row", gap: 2, marginTop: 2 },
   rating: { fontSize: 12, marginTop: 2 },
   empty: { color: "#666", textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
 filterRow: { flexDirection: "row", paddingHorizontal: 16, paddingBottom: 12, gap: 8, flexWrap: "wrap" },

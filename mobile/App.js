@@ -15,11 +15,6 @@ import ReadingScreen from "./src/screens/ReadingScreen";
 import ActiveSessionScreen from "./src/screens/ActiveSessionScreen";
 import GoalsScreen from "./src/screens/GoalsScreen";
 
-
-
-
-
-
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
 
@@ -39,14 +34,17 @@ function HomeTabs() {
           return <Ionicons name={iconName} size={size} color={color} />;
         },
       })}
-      
     >
-      <Tab.Screen name="Reading" component={ReadingScreen} options={{ 
-  tabBarLabel: "Leyendo",
-  tabBarIcon: ({ focused, color, size }) => (
-    <Ionicons name={focused ? "book" : "book-outline"} size={size} color={color} />
-  )
-}} />
+      <Tab.Screen
+        name="Reading"
+        component={ReadingScreen}
+        options={{
+          tabBarLabel: "Leyendo",
+          tabBarIcon: ({ focused, color, size }) => (
+            <Ionicons name={focused ? "book" : "book-outline"} size={size} color={color} />
+          ),
+        }}
+      />
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: "Biblioteca" }} />
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: "Buscar" }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: "Perfil" }} />
@@ -68,10 +66,9 @@ function AppStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main" component={HomeTabs} />
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
-    <Stack.Screen name="Stats" component={StatsScreen} />
-    <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />
-    <Stack.Screen name="Goals" component={GoalsScreen} />
-   
+      <Stack.Screen name="Stats" component={StatsScreen} />
+      <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />
+      <Stack.Screen name="Goals" component={GoalsScreen} />
     </Stack.Navigator>
   );
 }

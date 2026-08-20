@@ -1,12 +1,13 @@
 import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { getGoals, saveGoal } from "../services/api";
 
 const GOAL_TYPES = [
-  { key: "annual", label: "📅 Anual", description: "Libros al año", metrics: ["books"] },
-  { key: "monthly", label: "🗓 Mensual", description: "Libros u horas al mes", metrics: ["books", "hours"] },
-  { key: "weekly", label: "📆 Semanal", description: "Horas a la semana", metrics: ["hours"] },
-  { key: "daily", label: "☀️ Diaria", description: "Minutos al día", metrics: ["minutes"] },
+  { key: "annual", label: "Anual", description: "Libros al año", metrics: ["books"] },
+  { key: "monthly", label: "Mensual", description: "Libros u horas al mes", metrics: ["books", "hours"] },
+  { key: "weekly", label: "Semanal", description: "Horas a la semana", metrics: ["hours"] },
+  { key: "daily", label: "Diaria", description: "Minutos al día", metrics: ["minutes"] },
 ];
 
 const METRIC_LABELS = { books: "libros", hours: "horas", minutes: "minutos" };
@@ -164,7 +165,7 @@ data.calendar.forEach((d) => {
                     <Text style={styles.saveBtnText}>Guardar</Text>
                   </TouchableOpacity>
                   <TouchableOpacity onPress={() => setEditing(null)}>
-                    <Text style={styles.cancelBtn}>✕</Text>
+                    <Ionicons name="close" size={20} color="#666" />
                   </TouchableOpacity>
                 </View>
               </View>
@@ -174,12 +175,15 @@ data.calendar.forEach((d) => {
       })}
 
       <View style={styles.calendarCard}>
-        <Text style={styles.calendarTitle}>📖 Actividad — últimos 90 días</Text>
-        <Text style={styles.calendarLegend}>
-          <Text style={{ color: "#2a2a3e" }}>■</Text> Sin sesión {"  "}
-          <Text style={{ color: "#6c5ce7" }}>■</Text> Sesión {"  "}
-          <Text style={{ color: "#cba6f7" }}>■</Text> +30 min
-        </Text>
+        <Text style={styles.calendarTitle}>Actividad — últimos 90 días</Text>
+        <View style={styles.calendarLegendRow}>
+          <View style={[styles.legendSwatch, { backgroundColor: "#2a2a3e" }]} />
+          <Text style={styles.calendarLegendText}>Sin sesión</Text>
+          <View style={[styles.legendSwatch, { backgroundColor: "#6c5ce7" }]} />
+          <Text style={styles.calendarLegendText}>Sesión</Text>
+          <View style={[styles.legendSwatch, { backgroundColor: "#cba6f7" }]} />
+          <Text style={styles.calendarLegendText}>+30 min</Text>
+        </View>
         {renderCalendar()}
       </View>
     </ScrollView>
@@ -209,10 +213,11 @@ const styles = StyleSheet.create({
   input: { flex: 1, backgroundColor: "#2a2a3e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   saveBtn: { backgroundColor: "#cba6f7", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   saveBtnText: { color: "#13131f", fontWeight: "bold" },
-  cancelBtn: { color: "#666", fontSize: 18 },
   calendarCard: { backgroundColor: "#1e1e2e", borderRadius: 12, marginHorizontal: 16, marginBottom: 12, padding: 16 },
   calendarTitle: { fontSize: 16, fontWeight: "bold", color: "#fff", marginBottom: 6 },
-  calendarLegend: { fontSize: 11, color: "#666", marginBottom: 12 },
+  calendarLegendRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
+  legendSwatch: { width: 10, height: 10, borderRadius: 2 },
+  calendarLegendText: { fontSize: 11, color: "#666", marginRight: 10 },
   calendarGrid: { flexDirection: "row", flexWrap: "wrap", gap: 3 },
   calendarDay: { width: 10, height: 10, borderRadius: 2, backgroundColor: "#2a2a3e" },
   calendarDayActive: { backgroundColor: "#6c5ce7" },

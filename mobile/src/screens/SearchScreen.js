@@ -52,9 +52,8 @@ const handleScan = async (isbn) => {
   <Ionicons name="barcode-outline" size={22} color="#cba6f7" />
 </TouchableOpacity>
         {query.length > 0 && (
-          
           <TouchableOpacity style={styles.clearBtn} onPress={() => { setQuery(""); setResults([]); }}>
-            <Text style={styles.clearText}>✕</Text>
+            <Ionicons name="close" size={18} color="#aaa" />
           </TouchableOpacity>
         )}
       </View>
@@ -89,6 +88,5 @@ const styles = StyleSheet.create({
   searchRow: { flexDirection: "row", paddingHorizontal: 16, marginBottom: 12, gap: 8, alignItems: "center" },
   input: { flex: 1, backgroundColor: "#1e1e2e", color: "#fff", borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
   clearBtn: { backgroundColor: "#2a2a3e", borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
-  clearText: { color: "#aaa", fontSize: 14 },
   empty: { color: "#666", textAlign: "center", marginTop: 40 },
 });

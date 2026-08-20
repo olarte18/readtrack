@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
 
 export default function ActiveSessionScreen({ route, navigation }) {
@@ -71,7 +72,7 @@ const handleFinish = async () => {
     await updateBook(book.id, { current_page: page });
     await addReadingSession(book.id, page, seconds, pagesRead);
     Alert.alert(
-      "✅ Sesión guardada",
+      "Sesión guardada",
       `Leíste ${pagesRead} páginas en ${formatTime(seconds)}`,
       [{ text: "OK", onPress: () => navigation.goBack() }]
     );
@@ -87,7 +88,10 @@ const handleFinish = async () => {
       <View style={styles.timerContainer}>
         <Text style={styles.timer}>{formatTime(seconds)}</Text>
         <TouchableOpacity style={styles.pauseBtn} onPress={() => setRunning((r) => !r)}>
-          <Text style={styles.pauseBtnText}>{running ? "⏸ Pausar" : "▶ Continuar"}</Text>
+          <View style={styles.pauseBtnRow}>
+            <Ionicons name={running ? "pause" : "play"} size={18} color="#cba6f7" />
+            <Text style={styles.pauseBtnText}>{running ? "Pausar" : "Continuar"}</Text>
+          </View>
         </TouchableOpacity>
       </View>
         {avgSpeed && (
@@ -102,7 +106,7 @@ const handleFinish = async () => {
         </View>
 
         <View style={styles.pageBoxArrow}>
-          <Text style={styles.arrow}>→</Text>
+          <Ionicons name="arrow-forward" size={24} color="#666" />
         </View>
         <View style={styles.pageBox}>
           <Text style={styles.pageBoxLabel}>Página actual</Text>
@@ -164,6 +168,7 @@ const styles = StyleSheet.create({
   timerContainer: { alignItems: "center", marginBottom: 30 },
   timer: { fontSize: 64, fontWeight: "bold", color: "#cba6f7", fontVariant: ["tabular-nums"] },
   pauseBtn: { backgroundColor: "#1e1e2e", borderRadius: 12, paddingHorizontal: 40, paddingVertical: 19, marginTop: 20 },
+  pauseBtnRow: { flexDirection: "row", alignItems: "center", gap: 8 },
   pauseBtnText: { color: "#cba6f7", fontSize: 20, fontWeight: "bold" },
   pagesContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 30, gap: 12 },
   pageBox: { backgroundColor: "#1e1e2e", borderRadius: 12, padding: 16, alignItems: "center", minWidth: 100 },
@@ -171,7 +176,6 @@ const styles = StyleSheet.create({
   pageBoxValue: { color: "#fff", fontSize: 28, fontWeight: "bold" },
   pageInput: { color: "#cba6f7", fontSize: 28, fontWeight: "bold", textAlign: "center", minWidth: 80 },
   pageBoxArrow: { alignItems: "center" },
-  arrow: { color: "#666", fontSize: 24 },
   statsContainer: { flexDirection: "row", justifyContent: "space-around", backgroundColor: "#1e1e2e", borderRadius: 12, padding: 16, marginBottom: 24 },
   statItem: { alignItems: "center" },
   statValue: { fontSize: 22, fontWeight: "bold", color: "#cba6f7" },

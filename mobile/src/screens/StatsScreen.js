@@ -1,14 +1,15 @@
 import { useEffect, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { getStats } from "../services/api";
 
 const STAT_ITEMS = [
-  { key: "completed", label: "Leídos", emoji: "✅" },
-  { key: "reading", label: "Leyendo", emoji: "📖" },
-  { key: "paused", label: "Pausados", emoji: "⏸" },
-  { key: "pending", label: "Pendientes", emoji: "🕐" },
-  { key: "wishlist", label: "Lista de deseos", emoji: "🌟" },
-  { key: "abandoned", label: "Abandonados", emoji: "❌" },
+  { key: "completed", label: "Leídos", icon: "checkmark-circle" },
+  { key: "reading", label: "Leyendo", icon: "book" },
+  { key: "paused", label: "Pausados", icon: "pause-circle" },
+  { key: "pending", label: "Pendientes", icon: "time" },
+  { key: "wishlist", label: "Lista de deseos", icon: "star" },
+  { key: "abandoned", label: "Abandonados", icon: "close-circle" },
 ];
 
 export default function StatsScreen({ navigation }) {
@@ -45,7 +46,7 @@ export default function StatsScreen({ navigation }) {
             style={styles.statCard}
             onPress={() => handleStatPress(item.key)}
           >
-            <Text style={styles.emoji}>{item.emoji}</Text>
+            <Ionicons name={item.icon} size={24} color="#aaa" style={styles.icon} />
             <Text style={styles.statNumber}>{stats?.[item.key] ?? 0}</Text>
             <Text style={styles.statLabel}>{item.label}</Text>
           </TouchableOpacity>
@@ -58,9 +59,12 @@ export default function StatsScreen({ navigation }) {
           <Text style={styles.bigStatLabel}>Páginas leídas</Text>
         </View>
         <View style={styles.bigStat}>
-          <Text style={styles.bigStatNumber}>
-            {stats?.avg_rating > 0 ? stats.avg_rating + " ⭐" : "—"}
-          </Text>
+          <View style={styles.bigStatTop}>
+            <Ionicons name="star" size={18} color="#f5c97b" />
+            <Text style={styles.bigStatNumber}>
+              {stats?.avg_rating > 0 ? stats.avg_rating : "—"}
+            </Text>
+          </View>
           <Text style={styles.bigStatLabel}>Rating promedio</Text>
         </View>
       </View>
@@ -74,11 +78,12 @@ const styles = StyleSheet.create({
   title: { fontSize: 24, fontWeight: "bold", color: "#fff", marginBottom: 24 },
   grid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginBottom: 16 },
   statCard: { backgroundColor: "#1e1e2e", borderRadius: 12, padding: 16, alignItems: "center", minWidth: "30%", flexGrow: 1 },
-  emoji: { fontSize: 24, marginBottom: 6 },
+  icon: { marginBottom: 6 },
   statNumber: { fontSize: 28, fontWeight: "bold", color: "#cba6f7" },
   statLabel: { fontSize: 11, color: "#aaa", marginTop: 4, textAlign: "center" },
   bigStatsRow: { flexDirection: "row", gap: 10 },
   bigStat: { flex: 1, backgroundColor: "#1e1e2e", borderRadius: 12, padding: 20, alignItems: "center" },
+  bigStatTop: { flexDirection: "row", alignItems: "center", gap: 6 },
   bigStatNumber: { fontSize: 28, fontWeight: "bold", color: "#cba6f7" },
   bigStatLabel: { fontSize: 12, color: "#aaa", marginTop: 4 },
 });

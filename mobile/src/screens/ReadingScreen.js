@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { getLibrary } from "../services/api";
 
@@ -40,7 +41,7 @@ export default function ReadingScreen({ navigation }) {
                   <Image source={{ uri: item.cover }} style={styles.cover} />
                 ) : (
                   <View style={styles.noCover}>
-                    <Text style={styles.coverEmoji}>📚</Text>
+                    <Ionicons name="book" size={24} color="#666" />
                   </View>
                 )}
                 <View style={styles.info}>
@@ -60,7 +61,7 @@ export default function ReadingScreen({ navigation }) {
                 style={styles.continueBtn}
                 onPress={() => navigation.navigate("ActiveSession", { book: item })}
               >
-                <Text style={styles.continueBtnText}>▶</Text>
+                <Ionicons name="play" size={16} color="#13131f" />
                 <Text style={styles.continueBtnLabel}>Leer</Text>
               </TouchableOpacity>
             </View>
@@ -83,7 +84,6 @@ const styles = StyleSheet.create({
   bookInfo: { flex: 1, flexDirection: "row", alignItems: "center" },
   cover: { width: 60, height: 90, borderRadius: 6 },
   noCover: { width: 60, height: 90, borderRadius: 6, backgroundColor: "#2a2a3e", justifyContent: "center", alignItems: "center" },
-  coverEmoji: { fontSize: 24 },
   info: { flex: 1, marginLeft: 12 },
   bookTitle: { fontSize: 14, fontWeight: "bold", color: "#fff", marginBottom: 3 },
   author: { fontSize: 12, color: "#aaa", marginBottom: 6 },
@@ -91,7 +91,6 @@ const styles = StyleSheet.create({
   progressBar: { height: 4, backgroundColor: "#cba6f7", borderRadius: 2 },
   pageText: { fontSize: 11, color: "#666" },
   continueBtn: { backgroundColor: "#cba6f7", borderRadius: 10, padding: 12, alignItems: "center", marginLeft: 10, minWidth: 50 },
-  continueBtnText: { color: "#13131f", fontSize: 16 },
   continueBtnLabel: { color: "#13131f", fontSize: 10, fontWeight: "bold" },
   empty: { color: "#666", textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
 });
