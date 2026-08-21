@@ -53,6 +53,9 @@ export const getBookDescription = async (workKey) => {
   if (!workKey) return null;
   try {
     const res = await fetch(`${OL_BASE}${workKey}.json`);
+    if (!res.ok) return null;
+    const contentType = res.headers.get("content-type") ?? "";
+    if (!contentType.includes("application/json")) return null;
     const data = await res.json();
     const desc = data?.description;
     if (!desc) return null;

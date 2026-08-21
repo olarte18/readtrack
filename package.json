@@ -1,0 +1,5 @@
+{
+  "scripts": {
+    "tunnel": "npm run api:tunnel --prefix mobile"
+  }
+}

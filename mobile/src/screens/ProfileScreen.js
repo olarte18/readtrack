@@ -16,7 +16,9 @@ export default function ProfileScreen({ navigation }) {
   useEffect(() => {
     getGoals().then((res) => {
       const annual = res.goals?.find((g) => g.type === "annual");
-      setGoalData({ value: annual?.value ?? 0, completed: res.progress.annual ?? 0, year: res.year });
+      const value = Number(annual?.value) || 0;
+      const completed = Number.isInteger(res.progress?.annual) ? res.progress.annual : 0;
+      setGoalData({ value, completed, year: res.year });
     }).catch(console.error);
   }, []);
 
@@ -55,7 +57,7 @@ export default function ProfileScreen({ navigation }) {
             <View style={styles.goalProgressBar}>
               <View style={[styles.goalProgressFill, { width: `${Math.min((goalData.completed / goalData.value) * 100, 100)}%` }]} />
             </View>
-            <Text style={styles.goalPercent}>{Math.round((goalData.completed / goalData.goal) * 100)}% completado</Text>
+            <Text style={styles.goalPercent}>{Math.round((goalData.completed / goalData.value) * 100)}% completado</Text>
           </>
         ) : (
           <Text style={styles.goalEmpty}>No has configurado una meta aún</Text>

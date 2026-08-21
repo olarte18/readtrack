@@ -21,7 +21,6 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const [minutesInput, setMinutesInput] = useState("15");
   const [avgSpeed, setAvgSpeed] = useState(null);
   const [timeUp, setTimeUp] = useState(false);
-  const [pagesReadInput, setPagesReadInput] = useState("0");
 
   const startPage = book.current_page ?? 0;
   const startTime = useRef(Date.now());
@@ -154,14 +153,6 @@ export default function ActiveSessionScreen({ route, navigation }) {
     saveSession({ page, pages: Math.max(0, page - startPage) });
   };
 
-  const saveTimerCompletion = () => {
-    const pages = parseInt(pagesReadInput, 10);
-    if (isNaN(pages) || pages < 0) {
-      return Alert.alert("Error", "Ingresa cuántas páginas leíste");
-    }
-    saveSession({ page: startPage + pages, pages });
-  };
-
   if (isTimer && !timerStarted) {
     return (
       <View style={styles.container}>
@@ -209,7 +200,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   }
 
   if (timeUp) {
-    const readPages = parseInt(pagesReadInput, 10) || 0;
+    const readPages = Math.max(0, parseInt(endPage || 0) - startPage);
     return (
       <View style={styles.container}>
         <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
@@ -223,12 +214,12 @@ export default function ActiveSessionScreen({ route, navigation }) {
         </View>
 
         <View style={styles.customRow}>
-          <Text style={styles.customLabel}>¿Cuántas páginas leíste?</Text>
+          <Text style={styles.customLabel}>¿En qué página quedaste?</Text>
           <View style={styles.customInputBox}>
             <TextInput
               style={styles.customInput}
-              value={pagesReadInput}
-              onChangeText={(t) => setPagesReadInput(t.replace(/[^0-9]/g, ""))}
+              value={endPage}
+              onChangeText={(t) => setEndPage(t.replace(/[^0-9]/g, ""))}
               keyboardType="numeric"
               maxLength={4}
               placeholderTextColor={colors.placeholder}
@@ -236,11 +227,11 @@ export default function ActiveSessionScreen({ route, navigation }) {
             <Text style={styles.customUnit}>págs</Text>
           </View>
           <Text style={styles.pagesEndHint}>
-            Terminaste en la página {startPage + readPages}
+            Leíste {readPages} páginas
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.finishBtn} onPress={saveTimerCompletion}>
+        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish}>
           <Text style={styles.finishBtnText}>Guardar sesión</Text>
         </TouchableOpacity>
       </View>
