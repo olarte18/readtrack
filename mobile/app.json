@@ -7,6 +7,12 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
     "newArchEnabled": true,
+    "updates": {
+      "url": "https://u.expo.dev/41bff96c-8830-49dc-9465-cc4f64c2858a"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -37,12 +43,14 @@
           "recordAudioAndroid": false
         }
       ],
-      "expo-asset"
+      "expo-asset",
+      "expo-updates"
     ],
     "extra": {
       "eas": {
         "projectId": "41bff96c-8830-49dc-9465-cc4f64c2858a"
       }
-    }
+    },
+    "owner": "alejolarte18"
   }
 }
