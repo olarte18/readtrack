@@ -1,19 +1,29 @@
 const DAY_MS = 86400000;
-const toDate = (d) => d.toISOString().split("T")[0];
+const APP_TZ = "America/Bogota";
+
+// Fecha de hoy según la zona de la app, no la del servidor (UTC en Render).
+const todayFmt = new Intl.DateTimeFormat("en-CA", {
+  timeZone: APP_TZ,
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+});
+
 const diffDays = (a, b) => Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / DAY_MS);
 
 // Rachas de días consecutivos con al menos una sesión registrada.
 // El día en curso no rompe la racha hasta que termina sin sesiones.
+// Trabaja solo con strings YYYY-MM-DD para evitar corrimientos de zona.
 function computeStreaks(dates) {
   const set = new Set(dates);
-  const today = new Date();
-  const cursor = new Date(Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate()));
+  const stepBack = (date) => new Date(Date.parse(`${date}T00:00:00Z`) - DAY_MS).toISOString().split("T")[0];
 
   let current = 0;
-  if (!set.has(toDate(cursor))) cursor.setUTCDate(cursor.getUTCDate() - 1);
-  while (set.has(toDate(cursor))) {
+  let cursor = todayFmt.format(new Date());
+  if (!set.has(cursor)) cursor = stepBack(cursor);
+  while (set.has(cursor)) {
     current++;
-    cursor.setUTCDate(cursor.getUTCDate() - 1);
+    cursor = stepBack(cursor);
   }
 
   let best = 0;

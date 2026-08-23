@@ -35,7 +35,8 @@ router.get("/", async (req, res) => {
     `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
      FROM reading_sessions
      WHERE user_id = $1
-     AND created_at >= date_trunc('week', NOW())`,
+     AND created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
+       >= date_trunc('week', NOW() AT TIME ZONE 'America/Bogota')`,
     [req.userId]
   );
 
@@ -43,7 +44,8 @@ router.get("/", async (req, res) => {
     `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
      FROM reading_sessions
      WHERE user_id = $1
-     AND created_at >= date_trunc('day', NOW())`,
+     AND created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
+       >= date_trunc('day', NOW() AT TIME ZONE 'America/Bogota')`,
     [req.userId]
   );
 
@@ -60,7 +62,8 @@ router.get("/", async (req, res) => {
     `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
      FROM reading_sessions
      WHERE user_id = $1
-     AND created_at >= date_trunc('month', NOW())`,
+     AND created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
+       >= date_trunc('month', NOW() AT TIME ZONE 'America/Bogota')`,
     [req.userId]
   );
 

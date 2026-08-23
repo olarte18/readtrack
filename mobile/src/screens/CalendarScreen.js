@@ -44,7 +44,8 @@ export default function CalendarScreen() {
   };
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-  const todayStr = new Date().toISOString().split("T")[0];
+  const n = new Date();
+  const todayStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
 
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstWeekday = (new Date(year, month - 1, 1).getDay() + 6) % 7;

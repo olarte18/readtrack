@@ -24,11 +24,13 @@ router.post("/", async (req, res) => {
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
 
-  // ¿Primera sesión del día? Con ella se define la racha de hoy.
+  // ¿Primera sesión del día (hora Colombia)? Con ella se define la racha de hoy.
   const { rows: prior } = await pool.query(
     `SELECT COUNT(*)::int AS n
      FROM reading_sessions
-     WHERE user_id = $1 AND created_at >= date_trunc('day', NOW()) AND id <> $2`,
+     WHERE user_id = $1 AND id <> $2
+       AND TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD')
+         = TO_CHAR(NOW() AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD')`,
     [req.userId, rows[0].id]
   );
 

@@ -15,13 +15,13 @@ router.get("/:year/:month", async (req, res) => {
     return res.status(400).json({ error: "Mes o año inválido" });
   }
 
-  const start = `${year}-${String(month).padStart(2, "0")}-01`;
+  const start = `${year}-${String(month).padStart(2, "0")}`;
   const cacheKey = `calendar:${req.userId}:${start}`;
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
   const { rows } = await pool.query(
-    `SELECT TO_CHAR(rs.created_at, 'YYYY-MM-DD') AS date,
+    `SELECT TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date,
             rs.user_book_id,
             SUM(rs.duration_seconds) / 60 AS minutes,
             SUM(rs.pages_read) AS pages,
@@ -30,11 +30,17 @@ router.get("/:year/:month", async (req, res) => {
      JOIN user_books ub ON ub.id = rs.user_book_id
      JOIN books b ON b.id = ub.book_id
      WHERE rs.user_id = $1
-       AND rs.created_at >= $2::date
-       AND rs.created_at < ($2::date + INTERVAL '1 month')
-     GROUP BY TO_CHAR(rs.created_at, 'YYYY-MM-DD'), rs.user_book_id, b.title, b.author, b.cover
+       AND TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM') = $2
+     GROUP BY 1, rs.user_book_id, b.title, b.author, b.cover
      ORDER BY date DESC`,
     [req.userId, start]
+  );
+
+  const { rows: sessionDates } = await pool.query(
+    `SELECT DISTINCT TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date
+     FROM reading_sessions
+     WHERE user_id = $1`,
+    [req.userId]
   );
 
   const dayMap = new Map();
@@ -56,13 +62,6 @@ router.get("/:year/:month", async (req, res) => {
       pages,
     });
   }
-
-  const { rows: sessionDates } = await pool.query(
-    `SELECT DISTINCT TO_CHAR(created_at, 'YYYY-MM-DD') AS date
-     FROM reading_sessions
-     WHERE user_id = $1`,
-    [req.userId]
-  );
 
   const payload = {
     year,
