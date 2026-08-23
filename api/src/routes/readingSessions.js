@@ -21,6 +21,7 @@ router.post("/", async (req, res) => {
     [data.user_book_id, req.userId, data.page, data.duration_seconds, data.pages_read]
   );
   cache.delPrefix(`goals:${req.userId}`);
+  cache.delPrefix(`calendar:${req.userId}`);
   res.status(201).json(rows[0]);
 });
 

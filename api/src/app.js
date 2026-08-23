@@ -9,6 +9,7 @@ const authRouter = require("./routes/auth");
 const statsRouter = require("./routes/stats");
 const readingSessionsRouter = require("./routes/readingSessions");
 const goalsRouter = require("./routes/goals");
+const calendarRouter = require("./routes/calendar");
 const importsRouter = require("./routes/imports");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -29,6 +30,7 @@ app.use("/user-books", userBooksRouter);
 app.use("/notes", notesRouter);
 app.use("/reading-sessions", readingSessionsRouter);
 app.use("/goals", goalsRouter);
+app.use("/calendar", calendarRouter);
 app.use("/import", importsRouter);
 app.get("/health", (req, res) => res.json({ status: "ok" }));
 

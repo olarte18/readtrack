@@ -22,6 +22,11 @@ const request = async (path, options = {}) => {
 
 export const getLibrary = async () => request("/user-books");
 
+export const searchBooks = async (q) => {
+  const res = await request(`/books/search?q=${encodeURIComponent(q)}`);
+  return res.books ?? [];
+};
+
 export const addBook = async (book, status = "pending") =>
   request("/user-books", {
     method: "POST",
@@ -75,6 +80,9 @@ export const updateReadingGoal = async (goal) =>
   });
 
 export const getGoals = async () => request("/goals");
+
+export const getCalendar = async (year, month) =>
+  request(`/calendar/${year}/${month}`);
 
 export const saveGoal = async (type, metric, value) =>
   request("/goals", {

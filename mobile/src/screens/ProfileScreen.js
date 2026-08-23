@@ -108,6 +108,11 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.menuLabel}>Importar biblioteca</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Calendar")}>
+          <Ionicons name="calendar-outline" size={22} color={colors.accent} />
+          <Text style={styles.menuLabel}>Calendario de lectura</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Stats")}>
           <Ionicons name="bar-chart-outline" size={22} color={colors.accent} />
           <Text style={styles.menuLabel}>Estadísticas</Text>

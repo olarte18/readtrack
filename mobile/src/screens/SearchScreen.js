@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
 import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { useDebouncedCallback } from "use-debounce";
-import { searchBooks } from "../services/openLibrary";
+import { searchBooks } from "../services/api";
+import { searchByISBN } from "../services/openLibrary";
 import BookCard from "../components/BookCard";
 import BarcodeScanner from "../components/BarcodeScanner";
-import { searchByISBN } from "../services/openLibrary";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -18,7 +18,7 @@ const [scannerVisible, setScannerVisible] = useState(false);
   const search = useDebouncedCallback(async (q) => {
     if (!q.trim()) { setResults([]); return; }
     setLoading(true);
-    const books = await searchBooks(q);
+    const books = await searchBooks(q).catch(() => []);
     setResults(books);
     setLoading(false);
   }, 500);

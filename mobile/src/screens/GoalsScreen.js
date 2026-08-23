@@ -61,37 +61,6 @@ if (type === "weekly") return data.progress.weekly;
     }
   };
 
-  const renderCalendar = () => {
-    if (!data?.calendar?.length) return (
-      <Text style={styles.calendarEmpty}>No hay sesiones registradas aún</Text>
-    );
-
-    const calendarMap = {};
-data.calendar.forEach((d) => {
-  const key = String(d.date).split("T")[0];
-  calendarMap[key] = d;
-});
-    const days = [];
-    for (let i = 89; i >= 0; i--) {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const key = d.toISOString().split("T")[0];
-      days.push({ key, data: calendarMap[key] ?? null });
-    }
-
-    return (
-      <View style={styles.calendarGrid}>
-        {days.map((d) => (
-          <View
-            key={d.key}
-            style={[styles.calendarDay, d.data ? styles.calendarDayActive : null,
-              d.data?.minutes > 30 ? styles.calendarDayHigh : null]}
-          />
-        ))}
-      </View>
-    );
-  };
-
   if (loading) return (
     <View style={styles.centered}>
       <ActivityIndicator color={colors.accent} size="large" />
@@ -176,19 +145,6 @@ data.calendar.forEach((d) => {
           </View>
         );
       })}
-
-      <View style={styles.calendarCard}>
-        <Text style={styles.calendarTitle}>Actividad — últimos 90 días</Text>
-        <View style={styles.calendarLegendRow}>
-          <View style={[styles.legendSwatch, { backgroundColor: colors.calendarLow }]} />
-          <Text style={styles.calendarLegendText}>Sin sesión</Text>
-          <View style={[styles.legendSwatch, { backgroundColor: colors.calendarMid }]} />
-          <Text style={styles.calendarLegendText}>Sesión</Text>
-          <View style={[styles.legendSwatch, { backgroundColor: colors.calendarHigh }]} />
-          <Text style={styles.calendarLegendText}>+30 min</Text>
-        </View>
-        {renderCalendar()}
-      </View>
     </ScrollView>
   );
 }
@@ -217,14 +173,4 @@ const createStyles = (colors) =>
   input: { flex: 1, backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   saveBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   saveBtnText: { color: colors.onAccent, fontWeight: "bold" },
-  calendarCard: { backgroundColor: colors.surface, borderRadius: 12, marginHorizontal: 16, marginBottom: 12, padding: 16 },
-  calendarTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, marginBottom: 6 },
-  calendarLegendRow: { flexDirection: "row", alignItems: "center", gap: 6, marginBottom: 12 },
-  legendSwatch: { width: 10, height: 10, borderRadius: 2 },
-  calendarLegendText: { fontSize: 11, color: colors.textDim, marginRight: 10 },
-  calendarGrid: { flexDirection: "row", flexWrap: "wrap", gap: 3 },
-  calendarDay: { width: 10, height: 10, borderRadius: 2, backgroundColor: colors.calendarLow },
-  calendarDayActive: { backgroundColor: colors.calendarMid },
-  calendarDayHigh: { backgroundColor: colors.calendarHigh },
-  calendarEmpty: { color: colors.textDim, fontSize: 13 },
 });
