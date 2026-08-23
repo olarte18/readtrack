@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/auth");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
+const { computeStreaks } = require("../utils/streaks");
 
 router.use(authMiddleware);
 
@@ -22,7 +23,26 @@ router.post("/", async (req, res) => {
   );
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
-  res.status(201).json(rows[0]);
+
+  // ¿Primera sesión del día? Con ella se define la racha de hoy.
+  const { rows: prior } = await pool.query(
+    `SELECT COUNT(*)::int AS n
+     FROM reading_sessions
+     WHERE user_id = $1 AND created_at >= date_trunc('day', NOW()) AND id <> $2`,
+    [req.userId, rows[0].id]
+  );
+
+  let streak = null;
+  if (prior[0].n === 0) {
+    const { rows: dates } = await pool.query(
+      `SELECT DISTINCT TO_CHAR(created_at, 'YYYY-MM-DD') AS date
+       FROM reading_sessions WHERE user_id = $1`,
+      [req.userId]
+    );
+    streak = computeStreaks(dates.map((r) => r.date)).current;
+  }
+
+  res.status(201).json({ ...rows[0], first_today: prior[0].n === 0, streak });
 });
 
 router.get("/:user_book_id", async (req, res) => {

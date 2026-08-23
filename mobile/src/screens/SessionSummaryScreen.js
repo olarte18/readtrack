@@ -1,4 +1,5 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -19,7 +20,27 @@ const formatMinutes = (min) => {
 export default function SessionSummaryScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const { book, pagesRead, readSeconds, endPage, speed } = route.params;
+  const { book, pagesRead, readSeconds, endPage, speed, streakInfo } = route.params;
+
+  const [streakVisible, setStreakVisible] = useState(!!streakInfo);
+  const flameScale = useRef(new Animated.Value(0)).current;
+  const flameRotate = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (!streakInfo) return;
+    Animated.sequence([
+      Animated.parallel([
+        Animated.spring(flameScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+        Animated.timing(flameRotate, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ]),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(flameScale, { toValue: 1.12, duration: 650, useNativeDriver: true }),
+          Animated.timing(flameScale, { toValue: 1, duration: 650, useNativeDriver: true }),
+        ])
+      ),
+    ]).start();
+  }, [streakInfo]);
 
   const pagesLeft = book.pages ? Math.max(0, book.pages - endPage) : null;
   const minutesLeft = speed > 0 && pagesLeft !== null ? pagesLeft / speed : null;
@@ -82,6 +103,41 @@ export default function SessionSummaryScreen({ route, navigation }) {
       <TouchableOpacity style={styles.finishBtn} onPress={() => navigation.goBack()}>
         <Text style={styles.finishBtnText}>Listo</Text>
       </TouchableOpacity>
+
+      <Modal visible={streakVisible} transparent animationType="fade">
+        <View style={styles.streakOverlay}>
+          <View style={styles.streakCard}>
+            <Animated.View
+              style={{
+                transform: [
+                  { scale: flameScale },
+                  {
+                    rotate: flameRotate.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["-10deg", "10deg"],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Ionicons name="flame" size={96} color={colors.star} />
+            </Animated.View>
+            <Text style={styles.streakTitle}>¡Se activó tu racha!</Text>
+            <Text style={styles.streakNumber}>{streakInfo?.days ?? 1}</Text>
+            <Text style={styles.streakDays}>
+              {(streakInfo?.days ?? 1) === 1 ? "día seguido" : "días seguidos"} de lectura
+            </Text>
+            <Text style={styles.streakCheer}>
+              {(streakInfo?.days ?? 1) === 1
+                ? "El fuego está encendido, no lo dejes apagar 🔥"
+                : "Sigue así, el fuego crece cada día más 🔥"}
+            </Text>
+            <TouchableOpacity style={styles.streakBtn} onPress={() => setStreakVisible(false)}>
+              <Text style={styles.streakBtnText}>¡Vamos!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -106,4 +162,22 @@ const createStyles = (colors) =>
     progressLabel: { fontSize: 11, color: colors.textDim, marginTop: 6 },
     finishBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 8 },
     finishBtnText: { color: colors.onAccent, fontSize: 16, fontWeight: "bold" },
+    streakOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 32 },
+    streakCard: {
+      width: "100%",
+      maxWidth: 340,
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      paddingVertical: 36,
+      paddingHorizontal: 24,
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: colors.accent + "55",
+    },
+    streakTitle: { fontSize: 22, fontWeight: "bold", color: colors.text, marginTop: 12 },
+    streakNumber: { fontSize: 64, fontWeight: "bold", color: colors.star, lineHeight: 72 },
+    streakDays: { fontSize: 15, color: colors.textMuted, marginBottom: 10 },
+    streakCheer: { fontSize: 13, color: colors.textDim, textAlign: "center", marginBottom: 24 },
+    streakBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 12, paddingHorizontal: 48 },
+    streakBtnText: { color: colors.onAccent, fontSize: 16, fontWeight: "bold" },
   });

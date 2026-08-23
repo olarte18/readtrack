@@ -132,13 +132,14 @@ export default function ActiveSessionScreen({ route, navigation }) {
     const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
     try {
       await updateBook(book.id, { current_page: page });
-      await addReadingSession(book.id, page, readSeconds, pages);
+      const saved = await addReadingSession(book.id, page, readSeconds, pages);
       navigation.replace("SessionSummary", {
         book,
         pagesRead: pages,
         readSeconds,
         endPage: page,
         speed: pagesPerMinute,
+        streakInfo: saved?.first_today ? { days: saved.streak ?? 1 } : null,
       });
     } catch {
       Alert.alert("Error", "No se pudo guardar la sesión");
