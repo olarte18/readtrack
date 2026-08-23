@@ -15,62 +15,52 @@ const normKey = (s) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
 
-// TEMPORAL: diagnóstico de Google Books desde producción. Quitar tras estabilizar.
-router.get("/debug-google", async (req, res) => {
-  const { q = "mistborn", country = "CO", ua } = req.query;
-  const keyParam = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${process.env.GOOGLE_BOOKS_API_KEY}` : "";
-  const countryParam = country ? `&country=${encodeURIComponent(String(country))}` : "";
-  const headers = ua ? { "User-Agent": String(ua) } : {};
-  try {
-    const response = await fetch(
-      `${GOOGLE_API}/volumes?q=${encodeURIComponent(q)}&maxResults=3${countryParam}${keyParam}`,
-      { headers }
-    );
-    const body = await response.text();
-    res.json({
-      status: response.status,
-      usedCountry: country || "(ninguno)",
-      usedUa: ua ?? "(default undici)",
-      hasKey: !!process.env.GOOGLE_BOOKS_API_KEY,
-      body: body.slice(0, 300),
-    });
-  } catch (e) {
-    res.json({ error: String(e), usedCountry: country });
-  }
-});
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function fetchGoogleBooks(q) {
-  try {
-    const keyParam = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${process.env.GOOGLE_BOOKS_API_KEY}` : "";
-    // Google exige poder ubicar el país del solicitante: desde IPs de datacenter
-    // (Render y similares) devuelve 503 si no se envía el parámetro country.
-    const response = await fetch(
-      `${GOOGLE_API}/volumes?q=${encodeURIComponent(q)}&maxResults=15&country=CO${keyParam}`
-    );
-    if (!response.ok) {
-      const body = await response.text();
-      console.error(`[books/search] Google Books ${response.status}: ${body.slice(0, 200)}`);
+  // Google desde IPs de datacenter responde 503 intermitente si no puede
+  // ubicar el país; el parámetro country lo resuelve y el reintento cubre
+  // los fallos residuales. Sin country devuelve 503 siempre.
+  const keyParam = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${process.env.GOOGLE_BOOKS_API_KEY}` : "";
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const response = await fetch(
+        `${GOOGLE_API}/volumes?q=${encodeURIComponent(q)}&maxResults=15&country=CO${keyParam}`
+      );
+      if (!response.ok) {
+        const body = await response.text();
+        console.error(`[books/search] Google Books ${response.status} (intento ${attempt + 1}): ${body.slice(0, 200)}`);
+        if (attempt < 2) {
+          await sleep(400 * (attempt + 1));
+          continue;
+        }
+        return [];
+      }
+      const data = await response.json();
+      return (data.items ?? []).map((item) => {
+        const info = item.volumeInfo ?? {};
+        return {
+          id: item.id,
+          workKey: null,
+          title: info.title ?? "Sin título",
+          author: info.authors?.[0] ?? "Autor desconocido",
+          year: info.publishedDate?.split("-")[0] ?? null,
+          pages: info.pageCount ?? null,
+          cover: info.imageLinks?.thumbnail?.replace("http://", "https://") ?? null,
+          isbn: info.industryIdentifiers?.[0]?.identifier ?? null,
+          description: info.description ?? null,
+          genre: info.categories?.[0] ?? null,
+        };
+      });
+    } catch {
+      if (attempt < 2) {
+        await sleep(400 * (attempt + 1));
+        continue;
+      }
       return [];
     }
-    const data = await response.json();
-    return (data.items ?? []).map((item) => {
-      const info = item.volumeInfo ?? {};
-      return {
-        id: item.id,
-        workKey: null,
-        title: info.title ?? "Sin título",
-        author: info.authors?.[0] ?? "Autor desconocido",
-        year: info.publishedDate?.split("-")[0] ?? null,
-        pages: info.pageCount ?? null,
-        cover: info.imageLinks?.thumbnail?.replace("http://", "https://") ?? null,
-        isbn: info.industryIdentifiers?.[0]?.identifier ?? null,
-        description: info.description ?? null,
-        genre: info.categories?.[0] ?? null,
-      };
-    });
-  } catch {
-    return [];
   }
+  return [];
 }
 
 async function fetchOpenLibraryBooks(q) {
@@ -139,7 +129,9 @@ router.get("/search", async (req, res) => {
   );
 
   const result = { source: "mixed", books };
-  cache.set(cacheKey, result, 600000);
+  // No cachea resultados vacíos: si Google falló intermitente, el próximo
+  // intento del usuario debe volver a consultar las fuentes.
+  if (books.length > 0) cache.set(cacheKey, result, 600000);
   res.json(result);
 });
 
