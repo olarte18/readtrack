@@ -9,7 +9,7 @@
         "buildType": "apk"
       },
       "env": {
-        "EXPO_PUBLIC_API_URL": "https://readtrack-api.onrender.com"
+        "EXPO_PUBLIC_API_URL": "https://readtrack-b3sj.onrender.com"
       },
       "distribution": "internal"
     },
