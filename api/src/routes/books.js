@@ -19,7 +19,11 @@ async function fetchGoogleBooks(q) {
   try {
     const keyParam = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${process.env.GOOGLE_BOOKS_API_KEY}` : "";
     const response = await fetch(`${GOOGLE_API}/volumes?q=${encodeURIComponent(q)}&maxResults=15${keyParam}`);
-    if (!response.ok) return [];
+    if (!response.ok) {
+      const body = await response.text();
+      console.error(`[books/search] Google Books ${response.status}: ${body.slice(0, 200)}`);
+      return [];
+    }
     const data = await response.json();
     return (data.items ?? []).map((item) => {
       const info = item.volumeInfo ?? {};
@@ -47,7 +51,10 @@ async function fetchOpenLibraryBooks(q) {
     const response = await fetch(
       `${OPENLIBRARY_API}/search.json?q=${encodeURIComponent(q)}&limit=15&fields=${fields}`
     );
-    if (!response.ok) return [];
+    if (!response.ok) {
+      console.error(`[books/search] Open Library ${response.status} para "${q}"`);
+      return [];
+    }
     const data = await response.json();
     return (data.docs ?? [])
       .filter((d) => d.title && d.key)
