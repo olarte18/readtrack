@@ -15,6 +15,30 @@ const normKey = (s) =>
     .replace(/[\u0300-\u036f]/g, "")
     .replace(/[^a-z0-9]/g, "");
 
+// TEMPORAL: diagnóstico de Google Books desde producción. Quitar tras estabilizar.
+router.get("/debug-google", async (req, res) => {
+  const { q = "mistborn", country = "CO", ua } = req.query;
+  const keyParam = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${process.env.GOOGLE_BOOKS_API_KEY}` : "";
+  const countryParam = country ? `&country=${encodeURIComponent(String(country))}` : "";
+  const headers = ua ? { "User-Agent": String(ua) } : {};
+  try {
+    const response = await fetch(
+      `${GOOGLE_API}/volumes?q=${encodeURIComponent(q)}&maxResults=3${countryParam}${keyParam}`,
+      { headers }
+    );
+    const body = await response.text();
+    res.json({
+      status: response.status,
+      usedCountry: country || "(ninguno)",
+      usedUa: ua ?? "(default undici)",
+      hasKey: !!process.env.GOOGLE_BOOKS_API_KEY,
+      body: body.slice(0, 300),
+    });
+  } catch (e) {
+    res.json({ error: String(e), usedCountry: country });
+  }
+});
+
 async function fetchGoogleBooks(q) {
   try {
     const keyParam = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${process.env.GOOGLE_BOOKS_API_KEY}` : "";
