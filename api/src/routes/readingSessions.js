@@ -4,6 +4,7 @@ const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
+const cache = require("../utils/cache");
 
 router.use(authMiddleware);
 
@@ -19,6 +20,7 @@ router.post("/", async (req, res) => {
     "INSERT INTO reading_sessions (user_book_id, user_id, page, duration_seconds, pages_read) VALUES ($1, $2, $3, $4, $5) RETURNING *",
     [data.user_book_id, req.userId, data.page, data.duration_seconds, data.pages_read]
   );
+  cache.delPrefix(`goals:${req.userId}`);
   res.status(201).json(rows[0]);
 });
 

@@ -4,13 +4,24 @@ const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
+const cache = require("../utils/cache");
 
 const STATUSES = ["pending", "reading", "paused", "completed", "wishlist", "abandoned"];
 
 router.use(authMiddleware);
 
+function invalidateUserData(userId) {
+  cache.delPrefix(`user-books:${userId}`);
+  cache.delPrefix(`stats:${userId}`);
+  cache.delPrefix(`goals:${userId}`);
+}
+
 // GET /user-books
 router.get("/", async (req, res) => {
+  const cacheKey = `user-books:${req.userId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
   const { rows } = await pool.query(`
     SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.review,
            b.title, b.author, b.cover, b.pages, b.year, b.genre, b.google_id
@@ -19,6 +30,7 @@ router.get("/", async (req, res) => {
     WHERE ub.user_id = $1
     ORDER BY ub.created_at DESC
   `, [req.userId]);
+  cache.set(cacheKey, rows, 30000);
   res.json(rows);
 });
 
@@ -55,6 +67,7 @@ router.post("/", async (req, res) => {
     RETURNING *
   `, [book_id, req.userId, data.status ?? "pending"]);
 
+  invalidateUserData(req.userId);
   res.status(201).json(rows[0]);
 });
 
@@ -79,6 +92,7 @@ router.patch("/:id", async (req, res) => {
        req.params.id, req.userId]);
 
   if (rows.length === 0) throw httpError(404, "No encontrado");
+  invalidateUserData(req.userId);
   res.json(rows[0]);
 });
 
@@ -98,6 +112,7 @@ router.get("/check/:google_id", async (req, res) => {
 router.delete("/:id", async (req, res) => {
   const result = await pool.query("DELETE FROM user_books WHERE id = $1 AND user_id = $2", [req.params.id, req.userId]);
   if (result.rowCount === 0) throw httpError(404, "Libro no encontrado");
+  invalidateUserData(req.userId);
   res.json({ message: "Libro eliminado" });
 });
 

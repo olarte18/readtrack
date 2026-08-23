@@ -4,6 +4,7 @@ const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
+const cache = require("../utils/cache");
 
 const TYPES = ["annual", "monthly", "weekly", "daily"];
 const METRICS = ["books", "minutes", "hours"];
@@ -13,6 +14,9 @@ router.use(authMiddleware);
 // GET /goals — obtener todas las metas del año actual
 router.get("/", async (req, res) => {
   const year = new Date().getFullYear();
+  const cacheKey = `goals:${req.userId}:${year}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
 
   const { rows: goals } = await pool.query(
     "SELECT * FROM reading_goals WHERE user_id = $1 AND year = $2",
@@ -72,7 +76,7 @@ router.get("/", async (req, res) => {
     [req.userId]
   );
 
-  res.json({
+  const payload = {
     goals,
     progress: {
       annual: parseInt(annualProgress[0].books),
@@ -85,7 +89,9 @@ router.get("/", async (req, res) => {
     },
     calendar,
     year,
-  });
+  };
+  cache.set(cacheKey, payload, 60000);
+  res.json(payload);
 });
 
 // POST /goals — crear o actualizar meta
@@ -105,6 +111,8 @@ router.post("/", async (req, res) => {
      RETURNING *`,
     [req.userId, data.type, data.metric, data.value, year]
   );
+  cache.delPrefix(`goals:${req.userId}`);
+  cache.delPrefix(`stats:${req.userId}`);
   res.status(201).json(rows[0]);
 });
 

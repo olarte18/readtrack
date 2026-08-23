@@ -3,12 +3,16 @@ const router = express.Router();
 const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
 const { validate } = require("../utils/validators");
+const cache = require("../utils/cache");
 
 router.use(authMiddleware);
 
 // GET /stats
 router.get("/", async (req, res) => {
   const year = new Date().getFullYear();
+  const cacheKey = `stats:${req.userId}:${year}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
 
   const { rows: base } = await pool.query(`
     SELECT
@@ -49,13 +53,15 @@ router.get("/", async (req, res) => {
       AND ub.finished_at > ub.started_at
   `, [req.userId]);
 
-  res.json({
+  const payload = {
     ...base[0],
     completed_this_year: parseInt(yearRows[0].completed_this_year),
     goal_this_year: goalRows[0]?.value ?? null,
     pages_per_day: speedRows[0]?.pages_per_day ?? null,
     year,
-  });
+  };
+  cache.set(cacheKey, payload, 60000);
+  res.json(payload);
 });
 
 // GET /stats/goal

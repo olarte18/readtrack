@@ -3,6 +3,7 @@ const router = express.Router();
 const pool = require("../db/connection");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
+const cache = require("../utils/cache");
 
 const GOOGLE_API = "https://www.googleapis.com/books/v1";
 
@@ -11,6 +12,11 @@ router.get("/search", async (req, res) => {
   const { q } = req.query;
   if (!q) throw httpError(400, "Query requerida");
 
+  const normalizedQ = String(q).trim().toLowerCase();
+  const cacheKey = `books:search:${normalizedQ}`;
+  const cachedSearch = cache.get(cacheKey);
+  if (cachedSearch) return res.json(cachedSearch);
+
   const terms = q.trim().split(/\s+/).map((t) => `%${t}%`);
   const cached = await pool.query(
     `SELECT * FROM books WHERE title ILIKE ALL($1) OR author ILIKE ALL($1) LIMIT 15`,
@@ -18,7 +24,9 @@ router.get("/search", async (req, res) => {
   );
 
   if (cached.rows.length > 0) {
-    return res.json({ source: "cache", books: cached.rows });
+    const localResult = { source: "cache", books: cached.rows };
+    cache.set(cacheKey, localResult, 600000);
+    return res.json(localResult);
   }
 
   const response = await fetch(
@@ -53,7 +61,9 @@ router.get("/search", async (req, res) => {
     );
   }
 
-  res.json({ source: "google", books });
+  const googleResult = { source: "google", books };
+  cache.set(cacheKey, googleResult, 600000);
+  res.json(googleResult);
 });
 
 // GET /books/:id
