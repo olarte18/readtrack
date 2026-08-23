@@ -19,10 +19,10 @@ const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function fetchGoogleBooks(q) {
   // Google desde IPs de datacenter responde 503 intermitente si no puede
-  // ubicar el país; el parámetro country lo resuelve y el reintento cubre
+  // ubicar el país; el parámetro country lo resuelve y los reintentos cubren
   // los fallos residuales. Sin country devuelve 503 siempre.
   const keyParam = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${process.env.GOOGLE_BOOKS_API_KEY}` : "";
-  for (let attempt = 0; attempt < 3; attempt++) {
+  for (let attempt = 0; attempt < 4; attempt++) {
     try {
       const response = await fetch(
         `${GOOGLE_API}/volumes?q=${encodeURIComponent(q)}&maxResults=15&country=CO${keyParam}`
@@ -30,8 +30,8 @@ async function fetchGoogleBooks(q) {
       if (!response.ok) {
         const body = await response.text();
         console.error(`[books/search] Google Books ${response.status} (intento ${attempt + 1}): ${body.slice(0, 200)}`);
-        if (attempt < 2) {
-          await sleep(400 * (attempt + 1));
+        if (attempt < 3) {
+          await sleep(400 * 2 ** attempt);
           continue;
         }
         return [];
@@ -53,8 +53,8 @@ async function fetchGoogleBooks(q) {
         };
       });
     } catch {
-      if (attempt < 2) {
-        await sleep(400 * (attempt + 1));
+      if (attempt < 3) {
+        await sleep(400 * 2 ** attempt);
         continue;
       }
       return [];
@@ -103,10 +103,20 @@ router.get("/search", async (req, res) => {
   const cachedSearch = cache.get(cacheKey);
   if (cachedSearch) return res.json(cachedSearch);
 
-  const [googleBooks, openLibraryBooks] = await Promise.all([
+  let [googleBooks, openLibraryBooks] = await Promise.all([
     fetchGoogleBooks(q),
     fetchOpenLibraryBooks(q),
   ]);
+
+  // Segunda ronda si ambas fuentes vinieron vacías: los fallos de Google
+  // desde datacenter son intermitentes y un reintento tardío suele bastar.
+  if (googleBooks.length === 0 && openLibraryBooks.length === 0) {
+    await sleep(700);
+    [googleBooks, openLibraryBooks] = await Promise.all([
+      fetchGoogleBooks(q),
+      fetchOpenLibraryBooks(q),
+    ]);
+  }
 
   // Prioriza Google (trae descripción y género) y descarta duplicados por título+autor
   const byKey = new Map();
