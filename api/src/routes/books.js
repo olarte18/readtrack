@@ -18,7 +18,11 @@ const normKey = (s) =>
 async function fetchGoogleBooks(q) {
   try {
     const keyParam = process.env.GOOGLE_BOOKS_API_KEY ? `&key=${process.env.GOOGLE_BOOKS_API_KEY}` : "";
-    const response = await fetch(`${GOOGLE_API}/volumes?q=${encodeURIComponent(q)}&maxResults=15${keyParam}`);
+    // Google exige poder ubicar el país del solicitante: desde IPs de datacenter
+    // (Render y similares) devuelve 503 si no se envía el parámetro country.
+    const response = await fetch(
+      `${GOOGLE_API}/volumes?q=${encodeURIComponent(q)}&maxResults=15&country=CO${keyParam}`
+    );
     if (!response.ok) {
       const body = await response.text();
       console.error(`[books/search] Google Books ${response.status}: ${body.slice(0, 200)}`);
