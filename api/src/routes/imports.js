@@ -152,6 +152,7 @@ router.post("/bookmory", async (req, res) => {
   const data = validate(req.body, { file_base64: { required: true, type: "string", max: 20_000_000 } });
   const parsed = await parseBookmory(Buffer.from(data.file_base64, "base64"));
   const plan = buildPlan(parsed);
+  const startedAtMs = Date.now();
 
   const client = await pool.connect();
   try {
@@ -178,118 +179,225 @@ router.post("/bookmory", async (req, res) => {
     let categoriesCreated = 0;
     let cyclesCreated = 0;
 
+    const bulkInsert = async (table, columns, rows, chunkSize = 500) => {
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const slice = rows.slice(i, i + chunkSize);
+        const placeholders = [];
+        const params = [];
+        let n = 1;
+        for (const row of slice) {
+          placeholders.push(`(${row.map(() => `$${n++}`).join(",")})`);
+          params.push(...row);
+        }
+        await client.query(
+          `INSERT INTO ${table} (${columns.join(",")}) VALUES ${placeholders.join(",")}`,
+          params
+        );
+      }
+    };
+
+    const bulkInsertReturning = async (table, columns, rows, chunkSize = 500) => {
+      const ids = [];
+      for (let i = 0; i < rows.length; i += chunkSize) {
+        const slice = rows.slice(i, i + chunkSize);
+        const placeholders = [];
+        const params = [];
+        let n = 1;
+        for (const row of slice) {
+          placeholders.push(`(${row.map(() => `$${n++}`).join(",")})`);
+          params.push(...row);
+        }
+        const res = await client.query(
+          `INSERT INTO ${table} (${columns.join(",")}) VALUES ${placeholders.join(",")} RETURNING id`,
+          params
+        );
+        ids.push(...res.rows.map((r) => r.id));
+      }
+      return ids;
+    };
+
+    // Claves de sesiones ya existentes del usuario, para deduplicar reimportaciones
+    const { rows: sessExisting } = await client.query(
+      `SELECT rs.user_book_id AS ubid,
+              TO_CHAR(rs.created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS ts,
+              COALESCE(rs.duration_seconds, -1) AS dur,
+              COALESCE(rs.pages_read, -1) AS pages
+       FROM reading_sessions rs WHERE rs.user_id = $1`,
+      [req.userId]
+    );
+    const existingSessionKeys = new Set(
+      sessExisting.map((r) => `${r.ubid}|${r.ts}|${r.dur}|${r.pages}`)
+    );
+
+    // ---- Fase A: resolver ids de libros (nuevos en lote, existentes se actualizan) ----
+    const bidToBookId = new Map();
+    const pendingPairIdx = new Map();
+    const newBookRows = [];
+    const bookMergeUpdates = [];
+
     for (const book of plan.books) {
       if (!book.title) continue;
-
-      let bookId;
-      const existing = byPair.get(normPair(book.title, book.author));
+      const pair = normPair(book.title, book.author);
+      const existing = byPair.get(pair);
       if (existing) {
-        bookId = existing.id;
-        // Los datos de Bookmory ganan cuando existen; se conservan los actuales si no
-        await client.query(
-          `UPDATE books SET
-             cover = COALESCE($1, cover),
-             description = COALESCE($2, description),
-             pages = COALESCE($3, pages),
-             publisher = COALESCE($4, publisher),
-             book_type = COALESCE($5, book_type)
-           WHERE id = $6`,
-          [book.cover, book.description, book.pages, book.publisher, book.bookType, bookId]
-        );
+        bidToBookId.set(book.bid, existing.id);
+        bookMergeUpdates.push({ id: existing.id, cover: book.cover, description: book.description, pages: book.pages, publisher: book.publisher, bookType: book.bookType });
+        booksMerged++;
+      } else if (pendingPairIdx.has(pair)) {
+        // duplicado dentro del archivo: apunta al libro que se va a crear
+        const marker = `N${pendingPairIdx.get(pair)}`;
+        bidToBookId.set(book.bid, marker);
+        bookMergeUpdates.push({ marker, cover: book.cover, description: book.description, pages: book.pages, publisher: book.publisher, bookType: book.bookType });
         booksMerged++;
       } else {
-        const inserted = await client.query(
-          `INSERT INTO books (google_id, title, author, cover, pages, year, isbn, description, genre, publisher, book_type)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11) RETURNING id`,
-          [book.googleId, book.title, book.author, book.cover, book.pages, book.year,
-           book.isbn, book.description, null, book.publisher, book.bookType]
-        );
-        bookId = inserted.rows[0].id;
-        byPair.set(normPair(book.title, book.author), { id: bookId });
+        pendingPairIdx.set(pair, newBookRows.length);
+        bidToBookId.set(book.bid, `N${newBookRows.length}`);
+        newBookRows.push([book.googleId, book.title, book.author, book.cover, book.pages, book.year,
+          book.isbn, book.description, null, book.publisher, book.bookType]);
         booksCreated++;
       }
+    }
 
-      // Categorías: máx 3, la primera es la principal
-      await client.query("DELETE FROM book_categories WHERE book_id = $1", [bookId]);
-      for (let i = 0; i < book.categories.length; i++) {
-        await client.query(
-          "INSERT INTO book_categories (book_id, name, is_primary, position) VALUES ($1,$2,$3,$4)",
-          [bookId, book.categories[i].name, book.categories[i].isPrimary, i]
-        );
-        categoriesCreated++;
-      }
+    if (newBookRows.length > 0) {
+      const insertedIds = await bulkInsertReturning(
+        "books",
+        ["google_id", "title", "author", "cover", "pages", "year", "isbn", "description", "genre", "publisher", "book_type"],
+        newBookRows
+      );
+      insertedIds.forEach((realId, idx) => {
+        const marker = `N${idx}`;
+        for (const [bid, val] of bidToBookId) {
+          if (val === marker) bidToBookId.set(bid, realId);
+        }
+        for (const upd of bookMergeUpdates) {
+          if (upd.marker === marker) { upd.id = realId; delete upd.marker; }
+        }
+      });
+    }
 
-      // Fusionar con entrada existente o crearla; Bookmory manda como fuente de verdad
-      let userBookId = ownedByBookId.get(bookId);
-      if (userBookId) {
-        await client.query(
-          `UPDATE user_books SET status = $1, current_page = $2,
-             rating = COALESCE($3, rating),
-             started_at = COALESCE($4, started_at),
-             finished_at = COALESCE($5, finished_at),
-             review = COALESCE($6, review)
-           WHERE id = $7`,
-          [book.status, book.currentPage, book.rating, book.startedAt, book.finishedAt, book.review, userBookId]
-        );
+    // Los datos de Bookmory ganan cuando existen; se conservan los actuales si no
+    for (const upd of bookMergeUpdates) {
+      if (!upd.id) continue;
+      await client.query(
+        `UPDATE books SET
+           cover = COALESCE($1, cover),
+           description = COALESCE($2, description),
+           pages = COALESCE($3, pages),
+           publisher = COALESCE($4, publisher),
+           book_type = COALESCE($5, book_type)
+         WHERE id = $6`,
+        [upd.cover, upd.description, upd.pages, upd.publisher, upd.bookType, upd.id]
+      );
+    }
+
+    // ---- Fase B: entradas de usuario (nuevas en lote, existentes se actualizan) ----
+    const bidToUb = new Map();
+    const ubPendingIdx = new Map();
+    const ubNewRows = [];
+    const ubUpdates = [];
+
+    for (const book of plan.books) {
+      if (!book.title) continue;
+      const bookId = bidToBookId.get(book.bid);
+      const owned = ownedByBookId.get(bookId);
+      const base = [book.status, book.currentPage || 0, book.rating, book.startedAt, book.finishedAt, book.review];
+      if (owned !== undefined) {
+        bidToUb.set(book.bid, owned);
+        ubUpdates.push([...base, owned]);
+      } else if (ubPendingIdx.has(bookId)) {
+        // duplicado dentro del archivo: comparte la entrada recién creada
+        bidToUb.set(book.bid, `U${ubPendingIdx.get(bookId)}`);
       } else {
-        const inserted = await client.query(
-          `INSERT INTO user_books (book_id, user_id, status, current_page, rating, started_at, finished_at, review)
-           VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
-          [bookId, req.userId, book.status, book.currentPage, book.rating,
-           book.startedAt, book.finishedAt, book.review]
-        );
-        userBookId = inserted.rows[0].id;
-        ownedByBookId.set(bookId, userBookId);
+        ubPendingIdx.set(bookId, ubNewRows.length);
+        bidToUb.set(book.bid, `U${ubNewRows.length}`);
+        ubNewRows.push([bookId, req.userId, ...base]);
       }
+    }
 
-      // Ciclos de relectura (nth >= 2); se reemplazan para que reimportar no duplique
-      await client.query("DELETE FROM reading_cycles WHERE user_book_id = $1", [userBookId]);
+    if (ubNewRows.length > 0) {
+      const insertedUbIds = await bulkInsertReturning(
+        "user_books",
+        ["book_id", "user_id", "status", "current_page", "rating", "started_at", "finished_at", "review"],
+        ubNewRows
+      );
+      insertedUbIds.forEach((realId, idx) => {
+        const marker = `U${idx}`;
+        ownedByBookId.set(ubNewRows[idx][0], realId);
+        for (const [bid, val] of bidToUb) {
+          if (val === marker) bidToUb.set(bid, realId);
+        }
+      });
+    }
+
+    for (const u of ubUpdates) {
+      await client.query(
+        `UPDATE user_books SET status = $1, current_page = $2,
+           rating = COALESCE($3, rating),
+           started_at = COALESCE($4, started_at),
+           finished_at = COALESCE($5, finished_at),
+           review = COALESCE($6, review)
+         WHERE id = $7`,
+        u
+      );
+    }
+
+    // ---- Fase C: dependientes, escritura masiva global ----
+    const categoryRows = [];
+    const categoryBookIds = new Set();
+    const cycleRows = [];
+    const cycleUbids = new Set();
+    const sessionRows = [];
+    const noteRows = [];
+    const bidToNoteBook = new Map(plan.books.map((b) => [b.bid, bidToBookId.get(b.bid)]));
+
+    for (const book of plan.books) {
+      if (!book.title) continue;
+      const bookId = bidToBookId.get(book.bid);
+      const ubid = bidToUb.get(book.bid);
+      if (!bookId || ubid == null) continue;
+
+      for (let i = 0; i < book.categories.length; i++) {
+        categoryRows.push([bookId, book.categories[i].name, book.categories[i].isPrimary, i]);
+        categoryBookIds.add(bookId);
+      }
       for (const cycle of book.cycles) {
-        await client.query(
-          `INSERT INTO reading_cycles (user_book_id, nth, started_at, finished_at, rating, review)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
-          [userBookId, cycle.nth, cycle.startedAt, cycle.finishedAt, cycle.rating, cycle.review]
-        );
-        cyclesCreated++;
+        cycleRows.push([ubid, cycle.nth, cycle.startedAt, cycle.finishedAt, cycle.rating, cycle.review]);
+        cycleUbids.add(ubid);
       }
-
-      // Sesiones: se deduplican por (fecha, duración, páginas) para que
-      // reimportar no duplique y las sesiones reales del usuario queden intactas.
-      const { rows: existingSessions } = await client.query(
-        `SELECT TO_CHAR(created_at, 'YYYY-MM-DD"T"HH24:MI:SS') AS ts,
-                COALESCE(duration_seconds, -1) AS dur,
-                COALESCE(pages_read, -1) AS pages
-         FROM reading_sessions WHERE user_book_id = $1`,
-        [userBookId]
-      );
-      const existingKeys = new Set(
-        existingSessions.map((r) => `${r.ts}|${r.dur}|${r.pages}`)
-      );
-
       for (const day of book.sessionDays) {
-        const key = `${pgTs(day.createdAtMs).replace(" ", "T")}|${day.durationSec ?? -1}|${day.pagesRead}`;
-        if (existingKeys.has(key)) continue;
-        await client.query(
-          `INSERT INTO reading_sessions (user_book_id, user_id, page, duration_seconds, pages_read, created_at)
-           VALUES ($1,$2,$3,$4,$5,$6)`,
-          [userBookId, req.userId, book.currentPage, day.durationSec, day.pagesRead, pgTs(day.createdAtMs)]
-        );
+        const key = `${ubid}|${pgTs(day.createdAtMs).replace(" ", "T")}|${day.durationSec ?? -1}|${day.pagesRead}`;
+        if (existingSessionKeys.has(key)) continue;
+        existingSessionKeys.add(key);
+        sessionRows.push([ubid, req.userId, book.currentPage || 0, day.durationSec, day.pagesRead, pgTs(day.createdAtMs)]);
         sessionsCreated++;
       }
     }
 
-    // Notas vinculadas al libro correspondiente
-    const bidToBookId = new Map(plan.books.map((b) => [b.bid, byPair.get(normPair(b.title, b.author))?.id]));
-    for (const note of plan.notes) {
-      const bookId = bidToBookId.get(note.bid);
-      if (!bookId) continue;
-      await client.query(
-        `INSERT INTO notes (book_id, user_id, content, page, created_at)
-         VALUES ($1,$2,$3,$4,$5)`,
-        [bookId, req.userId, note.content, note.page, note.createdAtMs ? pgTs(note.createdAtMs) : null]
-      );
-      notesCreated++;
+    if (categoryBookIds.size > 0) {
+      await client.query("DELETE FROM book_categories WHERE book_id = ANY($1::int[])", [[...categoryBookIds]]);
     }
+    await bulkInsert("book_categories", ["book_id", "name", "is_primary", "position"], categoryRows);
+    categoriesCreated += categoryRows.length;
+
+    if (cycleUbids.size > 0) {
+      await client.query("DELETE FROM reading_cycles WHERE user_book_id = ANY($1::int[])", [[...cycleUbids]]);
+    }
+    await bulkInsert("reading_cycles", ["user_book_id", "nth", "started_at", "finished_at", "rating", "review"], cycleRows);
+    cyclesCreated += cycleRows.length;
+
+    await bulkInsert(
+      "reading_sessions",
+      ["user_book_id", "user_id", "page", "duration_seconds", "pages_read", "created_at"],
+      sessionRows
+    );
+
+    for (const note of plan.notes) {
+      const bookId = bidToNoteBook.get(note.bid);
+      if (!bookId || !note.content) continue;
+      noteRows.push([bookId, req.userId, note.content, note.page, note.createdAtMs ? pgTs(note.createdAtMs) : null]);
+    }
+    await bulkInsert("notes", ["book_id", "user_id", "content", "page", "created_at"], noteRows, 200);
+    notesCreated = noteRows.length;
 
     // Metas anuales de libros y meta diaria de minutos
     for (const goal of plan.yearlyGoals) {
@@ -312,6 +420,10 @@ router.post("/bookmory", async (req, res) => {
 
     await client.query("COMMIT");
     invalidateUserData(req.userId);
+    console.log(
+      `[import/bookmory] usuario ${req.userId}: ${booksCreated + booksMerged} libros, ` +
+      `${sessionsCreated} sesiones, ${notesCreated} notas en ${Date.now() - startedAtMs}ms`
+    );
 
     res.json({
       imported: booksCreated + booksMerged,
