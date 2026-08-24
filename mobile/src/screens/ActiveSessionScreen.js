@@ -37,7 +37,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   useEffect(() => {
     getReadingSpeed(book.id).then((data) => {
-      if (data.avg_pages_per_minute > 0) setAvgSpeed(data.avg_pages_per_minute);
+      if (data.avg_pages_per_hour > 0) setAvgSpeed(data.avg_pages_per_hour);
     }).catch(console.error);
   }, []);
 
@@ -119,12 +119,12 @@ export default function ActiveSessionScreen({ route, navigation }) {
   };
 
   const pagesRead = Math.max(0, parseInt(endPage || 0) - startPage);
-  const minutesElapsed = (isTimer ? (duration ?? 0) - seconds : seconds) / 60;
-  const currentSpeed = minutesElapsed > 0 && pagesRead > 0 ? pagesRead / minutesElapsed : 0;
-  const effectiveSpeed = currentSpeed > 0 ? (avgSpeed ? (currentSpeed + avgSpeed) / 2 : currentSpeed) : (avgSpeed ?? 0);
-  const pagesPerMinute = effectiveSpeed;
+  const hoursElapsed = (isTimer ? (duration ?? 0) - seconds : seconds) / 3600;
+  const currentSpeedH = hoursElapsed > 0 && pagesRead > 0 ? pagesRead / hoursElapsed : 0;
+  const effectiveSpeed = currentSpeedH > 0 ? (avgSpeed ? (currentSpeedH + avgSpeed) / 2 : currentSpeedH) : (avgSpeed ?? 0);
+  const pagesPerHour = effectiveSpeed;
   const pagesLeft = book.pages ? Math.max(0, book.pages - parseInt(endPage || 0)) : null;
-  const minutesLeft = pagesPerMinute > 0 && pagesLeft !== null ? pagesLeft / pagesPerMinute : null;
+  const minutesLeft = pagesPerHour > 0 && pagesLeft !== null ? pagesLeft / (pagesPerHour / 60) : null;
 
   const saveSession = async ({ page, pages }) => {
     setRunning(false);
@@ -138,7 +138,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         pagesRead: pages,
         readSeconds,
         endPage: page,
-        speed: pagesPerMinute,
+        speed: pagesPerHour,
         streakInfo: saved?.first_today ? { days: saved.streak ?? 1 } : null,
       });
     } catch {
@@ -256,7 +256,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
       {avgSpeed && (
         <Text style={styles.avgSpeed}>
-          Velocidad promedio: {avgSpeed.toFixed(1)} págs/min
+          Velocidad promedio: {avgSpeed.toFixed(0)} págs/h
         </Text>
       )}
 
@@ -288,9 +288,9 @@ export default function ActiveSessionScreen({ route, navigation }) {
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
-            {pagesPerMinute > 0 ? pagesPerMinute.toFixed(1) : "—"}
+            {pagesPerHour > 0 ? pagesPerHour.toFixed(0) : "—"}
           </Text>
-          <Text style={styles.statLabel}>Págs/min</Text>
+          <Text style={styles.statLabel}>Págs/h</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>

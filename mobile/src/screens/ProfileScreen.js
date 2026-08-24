@@ -1,9 +1,33 @@
 import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from "react-native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as Updates from "expo-updates";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { getGoals, saveGoal } from "../services/api";
 import { Ionicons } from "@expo/vector-icons";
+
+const WHATS_NEW_KEY = "whats_new_seen_id";
+const WHATS_NEW_SEEN_AT = "whats_new_seen_at";
+const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
+
+// La sección Novedades aparece al recibir una actualización y desaparece
+// una semana después. No existe en desarrollo (Expo Go no tiene updateId).
+async function isWhatsNewVisible() {
+  try {
+    if (!Updates.updateId) return false;
+    const storedId = await AsyncStorage.getItem(WHATS_NEW_KEY);
+    if (storedId === Updates.updateId) {
+      const seenAt = Number((await AsyncStorage.getItem(WHATS_NEW_SEEN_AT)) || 0);
+      return seenAt > 0 && Date.now() - seenAt < WEEK_MS;
+    }
+    await AsyncStorage.setItem(WHATS_NEW_KEY, Updates.updateId);
+    await AsyncStorage.setItem(WHATS_NEW_SEEN_AT, String(Date.now()));
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -12,6 +36,11 @@ export default function ProfileScreen({ navigation }) {
   const [goalData, setGoalData] = useState(null);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
+  const [whatsNewVisible, setWhatsNewVisible] = useState(false);
+
+  useEffect(() => {
+    isWhatsNewVisible().then(setWhatsNewVisible);
+  }, []);
 
   useEffect(() => {
     getGoals().then((res) => {
@@ -103,7 +132,19 @@ export default function ProfileScreen({ navigation }) {
       </View>
 
       <View style={styles.menuContainer}>
-                <TouchableOpacity style={styles.menuItem} onPress={() => navigation.navigate("Import")}>
+        {whatsNewVisible && (
+          <TouchableOpacity
+            style={[styles.menuItem, styles.whatsNewItem]}
+            onPress={() => navigation.navigate("WhatsNew")}
+          >
+            <Ionicons name="sparkles" size={22} color={colors.star} />
+            <Text style={styles.menuLabel}>Novedades</Text>
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>NUEVO</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+        <TouchableOpacity style={[styles.menuItem, whatsNewVisible && { marginTop: 8 }]} onPress={() => navigation.navigate("Import")}>
           <Ionicons name="cloud-upload-outline" size={22} color={colors.accent} />
           <Text style={styles.menuLabel}>Importar biblioteca</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
@@ -159,8 +200,16 @@ const createStyles = (colors) =>
   themeBtnActive: { backgroundColor: colors.accent },
   themeBtnText: { color: colors.textMuted, fontSize: 14 },
   themeBtnTextActive: { color: colors.onAccent, fontWeight: "bold" },
-  menuContainer: { width: "100%", paddingHorizontal: 20, marginBottom: 30, maxWidth: 440 },
-  menuItem: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 12, padding: 16, gap: 12 },
+    menuContainer: { width: "100%", paddingHorizontal: 20, marginBottom: 30, maxWidth: 440 },
+    menuItem: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 12, padding: 16, gap: 12 },
+    whatsNewItem: { borderWidth: 1, borderColor: colors.star + "66" },
+    newBadge: {
+      backgroundColor: colors.star + "22",
+      borderRadius: 8,
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+    },
+    newBadgeText: { fontSize: 10, fontWeight: "bold", color: colors.star },
   menuLabel: { flex: 1, fontSize: 16, color: colors.text },
   logoutButton: { backgroundColor: colors.danger, borderRadius: 10, paddingHorizontal: 32, paddingVertical: 12 },
   logoutButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },

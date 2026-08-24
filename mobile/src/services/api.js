@@ -16,6 +16,11 @@ const request = async (path, options = {}) => {
     ...options,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401) {
+    // Token de una cuenta eliminada o sesión inválida: forzar re-login
+    await AsyncStorage.removeItem("token");
+    throw new Error(data.error || "Tu sesión expiró. Inicia sesión de nuevo.");
+  }
   if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
   return data;
 };
@@ -61,6 +66,10 @@ export const updateBookPages = async (google_id, pages) =>
   });
 
 export const getStats = async () => request("/stats");
+
+export const getStreak = async () => request("/stats/streak");
+
+export const getAllNotes = async () => request("/notes");
 
 export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read) =>
   request("/reading-sessions", {

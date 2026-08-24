@@ -21,6 +21,8 @@ import GoalsScreen from "./src/screens/GoalsScreen";
 import CalendarScreen from "./src/screens/CalendarScreen";
 import ThemePickerScreen from "./src/screens/ThemePickerScreen";
 import ImportScreen from "./src/screens/ImportScreen";
+import NotesScreen from "./src/screens/NotesScreen";
+import WhatsNewScreen from "./src/screens/WhatsNewScreen";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 
 const Tab = createBottomTabNavigator();
@@ -30,6 +32,7 @@ function HomeTabs() {
   const { colors } = useTheme();
   return (
     <Tab.Navigator
+      initialRouteName="Reading"
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
@@ -37,25 +40,19 @@ function HomeTabs() {
         tabBarInactiveTintColor: colors.textDim,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
-          if (route.name === "Home") iconName = focused ? "library" : "library-outline";
+          if (route.name === "Reading") iconName = focused ? "book" : "book-outline";
+          else if (route.name === "Home") iconName = focused ? "library" : "library-outline";
           else if (route.name === "Search") iconName = focused ? "search" : "search-outline";
+          else if (route.name === "Notes") iconName = focused ? "document-text" : "document-text-outline";
           else if (route.name === "Profile") iconName = focused ? "person" : "person-outline";
           return <Ionicons name={iconName} size={size} color={color} />;
         },
       })}
     >
-      <Tab.Screen
-        name="Reading"
-        component={ReadingScreen}
-        options={{
-          tabBarLabel: "Leyendo",
-          tabBarIcon: ({ focused, color, size }) => (
-            <Ionicons name={focused ? "book" : "book-outline"} size={size} color={color} />
-          ),
-        }}
-      />
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: "Biblioteca" }} />
       <Tab.Screen name="Search" component={SearchScreen} options={{ tabBarLabel: "Buscar" }} />
+      <Tab.Screen name="Reading" component={ReadingScreen} options={{ tabBarLabel: "Leyendo" }} />
+      <Tab.Screen name="Notes" component={NotesScreen} options={{ tabBarLabel: "Notas" }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: "Perfil" }} />
     </Tab.Navigator>
   );
@@ -82,6 +79,7 @@ function AppStack() {
       <Stack.Screen name="Import" component={ImportScreen} />
       <Stack.Screen name="Goals" component={GoalsScreen} />
       <Stack.Screen name="Calendar" component={CalendarScreen} />
+      <Stack.Screen name="WhatsNew" component={WhatsNewScreen} />
     </Stack.Navigator>
   );
 }

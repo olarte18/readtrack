@@ -4,8 +4,25 @@ const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
+const { computeStreaks } = require("../utils/streaks");
 
 router.use(authMiddleware);
+
+// GET /stats/streak — racha actual y récord, sin cargar el calendario completo
+router.get("/streak", async (req, res) => {
+  const cacheKey = `stats:streak:${req.userId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  const { rows } = await pool.query(
+    `SELECT DISTINCT TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date
+     FROM reading_sessions WHERE user_id = $1`,
+    [req.userId]
+  );
+  const streak = computeStreaks(rows.map((r) => r.date));
+  cache.set(cacheKey, streak, 60000);
+  res.json(streak);
+});
 
 // GET /stats
 router.get("/", async (req, res) => {

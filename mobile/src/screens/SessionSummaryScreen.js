@@ -43,7 +43,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
   }, [streakInfo]);
 
   const pagesLeft = book.pages ? Math.max(0, book.pages - endPage) : null;
-  const minutesLeft = speed > 0 && pagesLeft !== null ? pagesLeft / speed : null;
+  const hoursLeft = speed > 0 && pagesLeft !== null ? pagesLeft / speed : null;
   const progress = book.pages ? Math.min((endPage / book.pages) * 100, 100) : 0;
 
   return (
@@ -76,7 +76,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
           <Ionicons name="speedometer" size={20} color={colors.accent} />
           <View style={styles.rowInfo}>
             <Text style={styles.rowLabel}>Velocidad</Text>
-            <Text style={styles.rowValue}>{speed > 0 ? `${speed.toFixed(1)} págs/min` : "—"}</Text>
+            <Text style={styles.rowValue}>{speed > 0 ? `${speed.toFixed(0)} págs/h` : "—"}</Text>
           </View>
         </View>
       </View>
@@ -86,9 +86,9 @@ export default function SessionSummaryScreen({ route, navigation }) {
           <Text style={styles.leftText}>
             Te faltan <Text style={styles.leftHighlight}>{pagesLeft} páginas</Text> para terminar
           </Text>
-          {minutesLeft !== null && minutesLeft > 0 ? (
+          {hoursLeft !== null && hoursLeft > 0 ? (
             <Text style={styles.leftEstimate}>
-              A este ritmo, cerca de {formatMinutes(minutesLeft)} de lectura
+              A este ritmo, cerca de {formatMinutes(hoursLeft * 60)} de lectura
             </Text>
           ) : (
             <Text style={styles.leftEstimate}>A este ritmo, cerca de terminar</Text>

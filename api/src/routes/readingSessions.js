@@ -23,6 +23,7 @@ router.post("/", async (req, res) => {
   );
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
+  cache.delPrefix(`stats:${req.userId}`);
 
   // ¿Primera sesión del día (hora Colombia)? Con ella se define la racha de hoy.
   const { rows: prior } = await pool.query(
@@ -37,7 +38,7 @@ router.post("/", async (req, res) => {
   let streak = null;
   if (prior[0].n === 0) {
     const { rows: dates } = await pool.query(
-      `SELECT DISTINCT TO_CHAR(created_at, 'YYYY-MM-DD') AS date
+      `SELECT DISTINCT TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date
        FROM reading_sessions WHERE user_id = $1`,
       [req.userId]
     );
@@ -58,7 +59,7 @@ router.get("/:user_book_id", async (req, res) => {
 router.get("/:user_book_id/speed", async (req, res) => {
   const { rows } = await pool.query(
     `SELECT 
-      AVG(pages_read::float / NULLIF(duration_seconds, 0) * 60) AS avg_pages_per_minute,
+      AVG(pages_read::float / NULLIF(duration_seconds, 0) * 3600) AS avg_pages_per_hour,
       COUNT(*) AS total_sessions
      FROM reading_sessions 
      WHERE user_book_id = $1 AND user_id = $2

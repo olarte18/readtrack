@@ -7,6 +7,20 @@ const { validate } = require("../utils/validators");
 
 router.use(authMiddleware);
 
+// GET /notes — todas las notas del usuario con los datos de su libro
+router.get("/", async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT n.id, n.content, n.page, n.created_at,
+            b.id AS db_id, b.title AS book_title, b.author AS book_author, b.cover AS book_cover
+     FROM notes n
+     JOIN books b ON b.id = n.book_id
+     WHERE n.user_id = $1
+     ORDER BY n.created_at DESC`,
+    [req.userId]
+  );
+  res.json(rows);
+});
+
 // GET /notes/:book_id
 router.get("/:book_id", async (req, res) => {
   const { rows } = await pool.query(
