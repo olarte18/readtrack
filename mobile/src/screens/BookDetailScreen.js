@@ -38,6 +38,7 @@ const [finishedAt, setFinishedAt] = useState(book.finished_at ? new Date(book.fi
 const [showStartPicker, setShowStartPicker] = useState(false);
 const [showEndPicker, setShowEndPicker] = useState(false);
   const [description, setDescription] = useState(book.description ?? null);
+  const [bookDbId, setBookDbId] = useState(book.db_id ?? null);
   useEffect(() => {
     if (!description && (book.workKey || book.description)) {
       getBookDescription(book.workKey).then(setDescription).catch(console.error);
@@ -50,15 +51,16 @@ const [showEndPicker, setShowEndPicker] = useState(false);
           console.log("checkBook data:", JSON.stringify(data));
           setLibraryEntry(data);
           setSelectedStatus(data.status);
+          if (data.book_db_id) setBookDbId(data.book_db_id);
         }
       });
     }
   }, []);
 useEffect(() => {
-  if (alreadyInLibrary && entryId) {
-    getNotes(entryId).then(setNotes).catch(console.error);
+  if (alreadyInLibrary && bookDbId) {
+    getNotes(bookDbId).then(setNotes).catch(console.error);
   }
-}, [alreadyInLibrary]);
+}, [alreadyInLibrary, bookDbId]);
 
   const alreadyInLibrary = isInLibrary || !!libraryEntry;
   const entryId = libraryEntry?.id ?? book.id;
@@ -69,6 +71,7 @@ useEffect(() => {
     try {
       const result = await addBook({ ...book, google_id: book.id }, status);
       setLibraryEntry({ id: result.id, status });
+      if (result.book_id) setBookDbId(result.book_id);
       Alert.alert("Listo", `"${book.title}" agregado a tu biblioteca`);
       onGoBack?.();
     } catch (error) {
@@ -165,7 +168,7 @@ const handleDateChange = async (field, date) => {
 const handleAddNote = async () => {
   if (!newNote.trim()) return Alert.alert("Error", "Escribe algo en la nota");
   try {
-    const note = await addNote(entryId, newNote.trim(), notePage ? parseInt(notePage) : null);
+    const note = await addNote(bookDbId, newNote.trim(), notePage ? parseInt(notePage) : null);
     setNotes((prev) => [note, ...prev]);
     setNewNote("");
     setNotePage("");
@@ -201,6 +204,24 @@ const handleDeleteNote = (id) => {
         {!!book.year && <Text style={styles.meta}>{String(book.year)}</Text>}
         {!!(book.pages || totalPages) && (
           <Text style={styles.meta}>{book.pages || totalPages} páginas</Text>
+        )}
+        {(!!book.publisher || !!book.book_type) && (
+          <Text style={styles.meta}>
+            {[book.publisher, { ebook: "eBook", physical: "Físico", audio: "Audiolibro" }[book.book_type]]
+              .filter(Boolean)
+              .join(" · ")}
+          </Text>
+        )}
+        {Array.isArray(book.categories) && book.categories.length > 0 && (
+          <View style={styles.categoriesRow}>
+            {book.categories.map((cat) => (
+              <View key={String(cat.name)} style={[styles.categoryChip, cat.is_primary && styles.categoryChipPrimary]}>
+                <Text style={[styles.categoryChipText, cat.is_primary && styles.categoryChipTextPrimary]}>
+                  {String(cat.name)}
+                </Text>
+              </View>
+            ))}
+          </View>
         )}
       </View>
 
@@ -393,6 +414,18 @@ const createStyles = (colors) =>
   title: { fontSize: 20, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 6 },
   author: { fontSize: 15, color: colors.textMuted, marginBottom: 4 },
   meta: { fontSize: 13, color: colors.textDim },
+  categoriesRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6, marginTop: 10 },
+  categoryChip: {
+    backgroundColor: colors.surfaceAlt,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  categoryChipPrimary: { backgroundColor: colors.accent + "22", borderColor: colors.accent },
+  categoryChipText: { fontSize: 11, color: colors.textMuted },
+  categoryChipTextPrimary: { color: colors.accent, fontWeight: "bold" },
   description: { fontSize: 14, color: colors.text, lineHeight: 21 },
   section: { paddingHorizontal: 20, marginTop: 20 },
   sectionTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, marginBottom: 12 },

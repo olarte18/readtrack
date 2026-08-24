@@ -23,7 +23,36 @@ CREATE TABLE IF NOT EXISTS books (
   isbn        VARCHAR(20),
   description TEXT,
   created_at  TIMESTAMP DEFAULT NOW(),
-  genre       VARCHAR(100)
+  genre       VARCHAR(100),
+  publisher   VARCHAR(120),
+  book_type   VARCHAR(20)
+);
+
+-- Para bases creadas antes de estas columnas
+ALTER TABLE books ADD COLUMN IF NOT EXISTS publisher VARCHAR(120);
+ALTER TABLE books ADD COLUMN IF NOT EXISTS book_type   VARCHAR(20);
+
+-- Categorías por libro: máximo 3, la primera es la principal
+CREATE TABLE IF NOT EXISTS book_categories (
+  id         SERIAL PRIMARY KEY,
+  book_id    INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+  name       VARCHAR(40) NOT NULL,
+  is_primary BOOLEAN DEFAULT FALSE,
+  position   SMALLINT NOT NULL DEFAULT 0,
+  CONSTRAINT book_categories_position_check CHECK (position >= 0 AND position <= 2)
+);
+
+-- Relecturas de un libro (ciclos distintos a la primera lectura)
+CREATE TABLE IF NOT EXISTS reading_cycles (
+  id           SERIAL PRIMARY KEY,
+  user_book_id INTEGER NOT NULL REFERENCES user_books(id) ON DELETE CASCADE,
+  nth          INTEGER NOT NULL,
+  started_at   DATE,
+  finished_at  DATE,
+  rating       INTEGER,
+  review       TEXT,
+  created_at   TIMESTAMP DEFAULT NOW(),
+  CONSTRAINT reading_cycles_rating_check CHECK (rating >= 1 AND rating <= 5 OR rating IS NULL)
 );
 
 CREATE TABLE IF NOT EXISTS user_books (

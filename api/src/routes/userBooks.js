@@ -24,7 +24,12 @@ router.get("/", async (req, res) => {
 
   const { rows } = await pool.query(`
     SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.review,
-           b.title, b.author, b.cover, b.pages, b.year, b.genre, b.google_id
+           b.id AS db_id,
+           b.title, b.author, b.cover, b.pages, b.year, b.genre, b.google_id, b.publisher, b.book_type,
+           (
+             SELECT json_agg(json_build_object('name', bc.name, 'is_primary', bc.is_primary) ORDER BY bc.position)
+             FROM book_categories bc WHERE bc.book_id = b.id
+           ) AS categories
     FROM user_books ub
     JOIN books b ON ub.book_id = b.id
     WHERE ub.user_id = $1
@@ -99,12 +104,15 @@ router.patch("/:id", async (req, res) => {
 // GET /user-books/check/:google_id
 router.get("/check/:google_id", async (req, res) => {
   const { rows } = await pool.query(`
-    SELECT ub.id, ub.status, ub.started_at, ub.finished_at FROM user_books ub
-    JOIN books b ON ub.book_id = b.id
+    SELECT ub.id, ub.status, ub.started_at, ub.finished_at, b.id AS book_db_id
+    FROM user_books ub
+    JOIN books b ON b.id = ub.book_id
     WHERE b.google_id = $1 AND ub.user_id = $2
   `, [req.params.google_id, req.userId]);
 
-  if (rows.length > 0) return res.json({ exists: true, status: rows[0].status, id: rows[0].id });
+  if (rows.length > 0) {
+    return res.json({ exists: true, status: rows[0].status, id: rows[0].id, book_db_id: rows[0].book_db_id });
+  }
   res.json({ exists: false });
 });
 

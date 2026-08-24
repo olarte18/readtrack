@@ -101,3 +101,15 @@ export const importBooks = async (csv) =>
     method: "POST",
     body: JSON.stringify({ csv }),
   });
+
+export const previewImportBookmory = async (fileBase64) =>
+  request("/import/bookmory/preview", {
+    method: "POST",
+    body: JSON.stringify({ file_base64: fileBase64 }),
+  });
+
+export const importBookmory = async (fileBase64) =>
+  request("/import/bookmory", {
+    method: "POST",
+    body: JSON.stringify({ file_base64: fileBase64 }),
+  });

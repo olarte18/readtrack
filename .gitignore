@@ -12,3 +12,6 @@ api/.env
 .DS_Store
 mobile/.env
 mobile/.env
+
+# Respaldos locales de prueba (datos personales)
+pruebadb/
