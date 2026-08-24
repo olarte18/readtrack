@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -25,6 +25,7 @@ export default function LoginScreen({ navigation }) {
 
   return (
     <View style={styles.container}>
+      <Image source={require("../../assets/images/logo.png")} style={styles.logo} />
       <Text style={styles.title}>ReadTrack</Text>
       <Text style={styles.subtitle}>Inicia sesión</Text>
       <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.placeholder} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
@@ -46,6 +47,7 @@ export default function LoginScreen({ navigation }) {
 const createStyles = (colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, justifyContent: "center", paddingHorizontal: 24 },
+    logo: { width: 110, height: 110, borderRadius: 25, alignSelf: "center", marginBottom: 16 },
     title: { fontSize: 36, fontWeight: "bold", color: colors.accent, textAlign: "center", marginBottom: 8 },
     subtitle: { fontSize: 18, color: colors.textMuted, textAlign: "center", marginBottom: 32 },
     input: { backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, marginBottom: 12 },

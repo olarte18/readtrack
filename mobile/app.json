@@ -16,7 +16,7 @@
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#CECBF6"
     },
     "ios": {
       "supportsTablet": true
@@ -25,7 +25,7 @@
       "package": "com.alejandro.readtrack",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#CECBF6"
       },
       "edgeToEdgeEnabled": true,
       "permissions": [
