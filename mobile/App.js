@@ -1,3 +1,4 @@
+import { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
@@ -23,7 +24,9 @@ import ThemePickerScreen from "./src/screens/ThemePickerScreen";
 import ImportScreen from "./src/screens/ImportScreen";
 import NotesScreen from "./src/screens/NotesScreen";
 import WhatsNewScreen from "./src/screens/WhatsNewScreen";
+import WhatsNewPopup from "./src/components/WhatsNewPopup";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
+import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -84,6 +87,21 @@ function AppStack() {
   );
 }
 
+function AppShell() {
+  const [showWhatsNew, setShowWhatsNew] = useState(false);
+
+  useEffect(() => {
+    shouldShowWhatsNewPopup().then(setShowWhatsNew);
+  }, []);
+
+  return (
+    <>
+      <AppStack />
+      <WhatsNewPopup visible={showWhatsNew} onClose={() => setShowWhatsNew(false)} />
+    </>
+  );
+}
+
 function RootNavigator() {
   const { user, loading, setupDone, setupReady } = useAuth();
   const { ready, isPicked, colors } = useTheme();
@@ -98,7 +116,7 @@ function RootNavigator() {
 
   if (!isPicked) return <ThemePickerScreen />;
   if (user && !setupDone) return <GoalSetupScreen />;
-  return user ? <AppStack /> : <AuthStack />;
+  return user ? <AppShell /> : <AuthStack />;
 }
 
 function Navigation() {

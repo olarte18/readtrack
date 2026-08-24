@@ -1,33 +1,10 @@
 import { useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from "react-native";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as Updates from "expo-updates";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { getGoals, saveGoal } from "../services/api";
+import { isWhatsNewVisible } from "../utils/whatsNew";
 import { Ionicons } from "@expo/vector-icons";
-
-const WHATS_NEW_KEY = "whats_new_seen_id";
-const WHATS_NEW_SEEN_AT = "whats_new_seen_at";
-const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
-
-// La sección Novedades aparece al recibir una actualización y desaparece
-// una semana después. No existe en desarrollo (Expo Go no tiene updateId).
-async function isWhatsNewVisible() {
-  try {
-    if (!Updates.updateId) return false;
-    const storedId = await AsyncStorage.getItem(WHATS_NEW_KEY);
-    if (storedId === Updates.updateId) {
-      const seenAt = Number((await AsyncStorage.getItem(WHATS_NEW_SEEN_AT)) || 0);
-      return seenAt > 0 && Date.now() - seenAt < WEEK_MS;
-    }
-    await AsyncStorage.setItem(WHATS_NEW_KEY, Updates.updateId);
-    await AsyncStorage.setItem(WHATS_NEW_SEEN_AT, String(Date.now()));
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
