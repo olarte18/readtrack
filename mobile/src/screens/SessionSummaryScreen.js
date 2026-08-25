@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import { updateBook } from "../services/api";
 
 const formatTime = (s) => {
   const h = Math.floor(s / 3600);
@@ -20,7 +21,17 @@ const formatMinutes = (min) => {
 export default function SessionSummaryScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const { book, pagesRead, readSeconds, endPage, speed, streakInfo } = route.params;
+  const { book, pagesRead, readSeconds, endPage, speed, streakInfo, completed } = route.params;
+  const [rating, setRating] = useState(0);
+
+  const handleRate = async (stars) => {
+    setRating(stars);
+    try {
+      await updateBook(book.id, { rating: stars });
+    } catch {
+      Alert.alert("Error", "No se pudo guardar la calificación");
+    }
+  };
 
   const [streakVisible, setStreakVisible] = useState(!!streakInfo);
   const flameScale = useRef(new Animated.Value(0)).current;
@@ -49,11 +60,40 @@ export default function SessionSummaryScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Ionicons name="checkmark-circle" size={64} color={colors.accent} />
-        <Text style={styles.title}>¡Sesión guardada!</Text>
+        {completed ? (
+          <>
+            <Ionicons name="trophy" size={64} color={colors.star} />
+            <Text style={styles.title}>¡Felicidades!</Text>
+            <Text style={styles.completedText}>Terminaste "{book.title}"</Text>
+          </>
+        ) : (
+          <>
+            <Ionicons name="checkmark-circle" size={64} color={colors.accent} />
+            <Text style={styles.title}>¡Sesión guardada!</Text>
+            <Text style={styles.completedText}>{book.title}</Text>
+          </>
+        )}
       </View>
 
-      <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+      {completed && (
+        <View style={styles.card}>
+          <Text style={styles.ratingTitle}>¿Qué te pareció?</Text>
+          <View style={styles.starsRow}>
+            {[1, 2, 3, 4, 5].map((star) => (
+              <TouchableOpacity key={star} onPress={() => handleRate(star)}>
+                <Ionicons
+                  name={star <= rating ? "star" : "star-outline"}
+                  size={36}
+                  color={star <= rating ? colors.star : colors.textDim}
+                />
+              </TouchableOpacity>
+            ))}
+          </View>
+          <Text style={styles.ratingHint}>
+            {rating > 0 ? `${rating} de 5 — toca para cambiarla` : "Opcional — tócalas para calificar"}
+          </Text>
+        </View>
+      )}
 
       <View style={styles.card}>
         <View style={styles.row}>
@@ -81,7 +121,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
         </View>
       </View>
 
-      {pagesLeft !== null && (
+      {!completed && pagesLeft !== null && (
         <View style={styles.card}>
           <Text style={styles.leftText}>
             Te faltan <Text style={styles.leftHighlight}>{pagesLeft} páginas</Text> para terminar
@@ -147,7 +187,10 @@ const createStyles = (colors) =>
     container: { flex: 1, backgroundColor: colors.background, paddingTop: 70, paddingHorizontal: 24 },
     header: { alignItems: "center", marginBottom: 24 },
     title: { fontSize: 24, fontWeight: "bold", color: colors.text, marginTop: 10 },
-    bookTitle: { fontSize: 17, fontWeight: "bold", color: colors.textDim, textAlign: "center", marginBottom: 28 },
+    completedText: { fontSize: 15, color: colors.textMuted, marginTop: 6, textAlign: "center" },
+    ratingTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 12 },
+    starsRow: { flexDirection: "row", justifyContent: "center", gap: 10 },
+    ratingHint: { fontSize: 12, color: colors.textDim, textAlign: "center", marginTop: 10 },
     card: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16 },
     row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
     rowInfo: { flex: 1 },

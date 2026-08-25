@@ -136,7 +136,14 @@ export default function ActiveSessionScreen({ route, navigation }) {
     stopAlarm();
     const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
     try {
-      await updateBook(book.id, { current_page: page });
+      const completed = !!book.pages && page >= book.pages;
+      const updates = { current_page: page };
+      if (completed) {
+        const n = new Date();
+        updates.status = "completed";
+        updates.finished_at = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+      }
+      await updateBook(book.id, updates);
       const saved = await addReadingSession(book.id, page, readSeconds, pages);
       navigation.replace("SessionSummary", {
         book,
@@ -144,6 +151,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         readSeconds,
         endPage: page,
         speed: pagesPerHour,
+        completed,
         streakInfo: saved?.first_today ? { days: saved.streak ?? 1 } : null,
       });
     } catch {

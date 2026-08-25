@@ -1,8 +1,9 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 
 import { getLibrary } from "../services/api";
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 
 export default function HomeScreen({ navigation ,route}) {
@@ -25,7 +26,15 @@ const [filter, setFilter] = useState(filterStatus ?? "all");  const fetchLibrary
 
   useEffect(() => {
     fetchLibrary();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Refresca al volver al tab: refleja cambios de estado, imports y sesiones
+  useFocusEffect(
+    useCallback(() => {
+      fetchLibrary();
+    }, [])
+  );
 const filteredBooks = filter === "all" ? books : books.filter((b) => b.status === filter);
   return (
     <View style={styles.container}>
