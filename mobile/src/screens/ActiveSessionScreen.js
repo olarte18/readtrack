@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useTheme } from "../contexts/ThemeContext";
@@ -21,6 +21,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const [minutesInput, setMinutesInput] = useState("15");
   const [avgSpeed, setAvgSpeed] = useState(null);
   const [timeUp, setTimeUp] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const savingRef = useRef(false);
 
   const startPage = book.current_page ?? 0;
   const startTime = useRef(Date.now());
@@ -127,6 +129,9 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const minutesLeft = pagesPerHour > 0 && pagesLeft !== null ? pagesLeft / (pagesPerHour / 60) : null;
 
   const saveSession = async ({ page, pages }) => {
+    if (savingRef.current) return; // toques repetidos se ignoran al instante
+    savingRef.current = true;
+    setSaving(true);
     setRunning(false);
     stopAlarm();
     const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
@@ -143,6 +148,9 @@ export default function ActiveSessionScreen({ route, navigation }) {
       });
     } catch {
       Alert.alert("Error", "No se pudo guardar la sesión");
+    } finally {
+      savingRef.current = false;
+      setSaving(false);
     }
   };
 
@@ -232,8 +240,12 @@ export default function ActiveSessionScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish}>
-          <Text style={styles.finishBtnText}>Guardar sesión</Text>
+        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
+          {saving ? (
+            <ActivityIndicator color={colors.onAccent} />
+          ) : (
+            <Text style={styles.finishBtnText}>Guardar sesión</Text>
+          )}
         </TouchableOpacity>
       </View>
     );
@@ -317,8 +329,12 @@ export default function ActiveSessionScreen({ route, navigation }) {
         </View>
       )}
 
-      <TouchableOpacity style={styles.finishBtn} onPress={handleFinish}>
-        <Text style={styles.finishBtnText}>Finalizar sesión</Text>
+      <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
+        {saving ? (
+          <ActivityIndicator color={colors.onAccent} />
+        ) : (
+          <Text style={styles.finishBtnText}>Finalizar sesión</Text>
+        )}
       </TouchableOpacity>
     </View>
   );
