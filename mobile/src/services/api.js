@@ -77,6 +77,17 @@ export const addReadingSession = async (user_book_id, page, duration_seconds, pa
     body: JSON.stringify({ user_book_id, page, duration_seconds, pages_read }),
   });
 
+export const getReadingSessions = async (user_book_id, date) =>
+  request(
+    `/reading-sessions/${user_book_id}${date ? `?date=${encodeURIComponent(date)}` : ""}`
+  );
+
+export const updateReadingSession = async (id, data) =>
+  request(`/reading-sessions/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+
 export const getReadingSpeed = async (user_book_id) =>
   request(`/reading-sessions/${user_book_id}/speed`);
 

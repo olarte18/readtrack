@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState, ActivityIndicator, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useTheme } from "../contexts/ThemeContext";
@@ -22,6 +22,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const [avgSpeed, setAvgSpeed] = useState(null);
   const [timeUp, setTimeUp] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [finishVisible, setFinishVisible] = useState(false);
   const savingRef = useRef(false);
 
   const startPage = book.current_page ?? 0;
@@ -122,6 +123,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   const pagesRead = Math.max(0, parseInt(endPage || 0) - startPage);
   const hoursElapsed = (isTimer ? (duration ?? 0) - seconds : seconds) / 3600;
+  const estimatedPages = avgSpeed && hoursElapsed > 0 ? Math.round(avgSpeed * hoursElapsed) : null;
   const currentSpeedH = hoursElapsed > 0 && pagesRead > 0 ? pagesRead / hoursElapsed : 0;
   const effectiveSpeed = currentSpeedH > 0 ? (avgSpeed ? (currentSpeedH + avgSpeed) / 2 : currentSpeedH) : (avgSpeed ?? 0);
   const pagesPerHour = effectiveSpeed;
@@ -162,13 +164,56 @@ export default function ActiveSessionScreen({ route, navigation }) {
     }
   };
 
-  const handleFinish = () => {
+  const handleFinish = () => setFinishVisible(true);
+
+  const confirmSave = () => {
     const page = parseInt(endPage);
     if (isNaN(page) || page < startPage) {
       return Alert.alert("Error", "La página final debe ser mayor o igual a la inicial");
     }
+    setFinishVisible(false);
     saveSession({ page, pages: Math.max(0, page - startPage) });
   };
+
+  const finishModal = (
+    <Modal visible={finishVisible} transparent animationType="fade" onRequestClose={() => setFinishVisible(false)}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalCard}>
+          <Text style={styles.modalTitle}>¿En qué página quedaste?</Text>
+          <View style={styles.customInputBox}>
+            <TextInput
+              style={styles.customInput}
+              value={endPage}
+              onChangeText={(t) => setEndPage(t.replace(/[^0-9]/g, ""))}
+              keyboardType="numeric"
+              maxLength={4}
+              autoFocus
+              selectTextOnFocus
+            />
+            <Text style={styles.customUnit}>págs</Text>
+          </View>
+          <Text style={styles.pagesEndHint}>
+            Leíste {Math.max(0, parseInt(endPage || 0) - startPage)} páginas
+          </Text>
+          <View style={styles.modalBtnRow}>
+            <TouchableOpacity
+              style={[styles.modalBtn, styles.modalBtnCancel]}
+              onPress={() => setFinishVisible(false)}
+            >
+              <Text style={styles.modalBtnCancelText}>Cancelar</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={[styles.modalBtn, styles.finishBtn]} onPress={confirmSave} disabled={saving}>
+              {saving ? (
+                <ActivityIndicator color={colors.onAccent} />
+              ) : (
+                <Text style={styles.finishBtnText}>Guardar</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
 
   if (isTimer && !timerStarted) {
     return (
@@ -217,7 +262,6 @@ export default function ActiveSessionScreen({ route, navigation }) {
   }
 
   if (timeUp) {
-    const readPages = Math.max(0, parseInt(endPage || 0) - startPage);
     return (
       <View style={styles.container}>
         <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
@@ -230,24 +274,6 @@ export default function ActiveSessionScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <View style={styles.customRow}>
-          <Text style={styles.customLabel}>¿En qué página quedaste?</Text>
-          <View style={styles.customInputBox}>
-            <TextInput
-              style={styles.customInput}
-              value={endPage}
-              onChangeText={(t) => setEndPage(t.replace(/[^0-9]/g, ""))}
-              keyboardType="numeric"
-              maxLength={4}
-              placeholderTextColor={colors.placeholder}
-            />
-            <Text style={styles.customUnit}>págs</Text>
-          </View>
-          <Text style={styles.pagesEndHint}>
-            Leíste {readPages} páginas
-          </Text>
-        </View>
-
         <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
           {saving ? (
             <ActivityIndicator color={colors.onAccent} />
@@ -255,6 +281,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
             <Text style={styles.finishBtnText}>Guardar sesión</Text>
           )}
         </TouchableOpacity>
+
+        {finishModal}
       </View>
     );
   }
@@ -282,28 +310,14 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
       <View style={styles.pagesContainer}>
         <View style={styles.pageBox}>
-          <Text style={styles.pageBoxLabel}>Página inicial</Text>
+          <Text style={styles.pageBoxLabel}>Estás en la página</Text>
           <Text style={styles.pageBoxValue}>{startPage}</Text>
-        </View>
-
-        <View style={styles.pageBoxArrow}>
-          <Ionicons name="arrow-forward" size={24} color={colors.textDim} />
-        </View>
-        <View style={styles.pageBox}>
-          <Text style={styles.pageBoxLabel}>Página actual</Text>
-          <TextInput
-            style={styles.pageInput}
-            value={endPage}
-            onChangeText={setEndPage}
-            keyboardType="numeric"
-            placeholderTextColor={colors.placeholder}
-          />
         </View>
       </View>
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{pagesRead}</Text>
+          <Text style={styles.statValue}>{estimatedPages ?? "—"}</Text>
           <Text style={styles.statLabel}>Páginas leídas</Text>
         </View>
         <View style={styles.statItem}>
@@ -344,6 +358,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
           <Text style={styles.finishBtnText}>Finalizar sesión</Text>
         )}
       </TouchableOpacity>
+
+      {finishModal}
     </View>
   );
 }
@@ -375,8 +391,6 @@ const createStyles = (colors) =>
     pageBox: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, alignItems: "center", minWidth: 100 },
     pageBoxLabel: { color: colors.textDim, fontSize: 12, marginBottom: 8 },
     pageBoxValue: { color: colors.text, fontSize: 28, fontWeight: "bold" },
-    pageInput: { color: colors.accent, fontSize: 28, fontWeight: "bold", textAlign: "center", minWidth: 80 },
-    pageBoxArrow: { alignItems: "center" },
     statsContainer: { flexDirection: "row", justifyContent: "space-around", backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 24 },
     statItem: { alignItems: "center" },
     statValue: { fontSize: 22, fontWeight: "bold", color: colors.accent },
@@ -392,4 +406,21 @@ const createStyles = (colors) =>
     completedTitle: { fontSize: 22, fontWeight: "bold", color: colors.text, marginTop: 12 },
     completedSub: { fontSize: 14, color: colors.textDim, marginTop: 6 },
     pagesEndHint: { fontSize: 12, color: colors.textDim, marginTop: 10 },
+    modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 32 },
+    modalCard: {
+      width: "100%",
+      maxWidth: 340,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      paddingVertical: 28,
+      paddingHorizontal: 24,
+      alignItems: "center",
+      borderWidth: 2,
+      borderColor: colors.accent + "55",
+    },
+    modalTitle: { fontSize: 18, fontWeight: "bold", color: colors.text, marginBottom: 18 },
+    modalBtnRow: { flexDirection: "row", gap: 12, marginTop: 22 },
+    modalBtn: { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 28 },
+    modalBtnCancel: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
+    modalBtnCancelText: { color: colors.textDim, fontSize: 15, fontWeight: "bold" },
   });
