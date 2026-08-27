@@ -10,22 +10,73 @@ const getHeaders = async () => {
   };
 };
 
+const DEFAULT_TIMEOUT = 30000;
+const RETRY_DELAYS = [1500, 3000];
+
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
 const request = async (path, options = {}) => {
-  const res = await fetch(`${API_URL}${path}`, {
-    headers: await getHeaders(),
-    ...options,
-  });
-  const data = await res.json().catch(() => ({}));
-  if (res.status === 401) {
-    // Token de una cuenta eliminada o sesión inválida: forzar re-login
-    await AsyncStorage.removeItem("token");
-    throw new Error(data.error || "Tu sesión expiró. Inicia sesión de nuevo.");
+  const { timeout = DEFAULT_TIMEOUT, retry, retries, ...fetchOptions } = options;
+  const isGet = (fetchOptions.method || "GET") === "GET";
+  const maxRetries = retry === false ? 0 : (retries ?? (isGet ? 2 : 0));
+  let attempt = 0;
+
+  while (true) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeout);
+    try {
+      const res = await fetch(`${API_URL}${path}`, {
+        headers: await getHeaders(),
+        signal: controller.signal,
+        ...fetchOptions,
+      });
+      clearTimeout(timer);
+      const data = await res.json().catch(() => ({}));
+      if (res.status === 401) {
+        // Token de una cuenta eliminada o sesión inválida: forzar re-login
+        await AsyncStorage.removeItem("token");
+        throw new Error(data.error || "Tu sesión expiró. Inicia sesión de nuevo.");
+      }
+      if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      return data;
+    } catch (err) {
+      clearTimeout(timer);
+      const retryable = err.name === "AbortError" || err.message === "Network request failed";
+      if (retryable && attempt < maxRetries) {
+        attempt += 1;
+        await sleep(RETRY_DELAYS[attempt - 1] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1]);
+        continue;
+      }
+      throw err;
+    }
   }
-  if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+};
+
+export const getLibrary = async () => {
+  const data = await request("/user-books");
+  const token = await AsyncStorage.getItem("token");
+  if (token) await AsyncStorage.setItem(`library:${token}`, JSON.stringify(data));
   return data;
 };
 
-export const getLibrary = async () => request("/user-books");
+export const getLibraryCached = async () => {
+  try {
+    const token = await AsyncStorage.getItem("token");
+    if (!token) return null;
+    const raw = await AsyncStorage.getItem(`library:${token}`);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+export const warmup = () => {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 8000);
+  fetch(`${API_URL}/health`, { signal: controller.signal })
+    .catch(() => {})
+    .finally(() => clearTimeout(timer));
+};
 
 export const searchBooks = async (q) => {
   const res = await request(`/books/search?q=${encodeURIComponent(q)}`);

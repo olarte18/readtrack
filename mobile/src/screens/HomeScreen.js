@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 
-import { getLibrary } from "../services/api";
+import { getLibrary, getLibraryCached } from "../services/api";
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -14,6 +14,11 @@ export default function HomeScreen({ navigation ,route}) {
 const { filterStatus } = route?.params ?? {};
 const [filter, setFilter] = useState(filterStatus ?? "all");  const fetchLibrary = async () => {
     setLoading(true);
+    const cached = await getLibraryCached();
+    if (cached) {
+      setBooks(cached);
+      setLoading(false);
+    }
     try {
       const data = await getLibrary();
       setBooks(data);

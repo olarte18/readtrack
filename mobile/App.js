@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, View } from "react-native";
+import { ActivityIndicator, View, AppState } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext";
@@ -27,6 +27,7 @@ import WhatsNewScreen from "./src/screens/WhatsNewScreen";
 import WhatsNewPopup from "./src/components/WhatsNewPopup";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
+import { warmup } from "./src/services/api";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -130,6 +131,14 @@ function Navigation() {
 }
 
 export default function App() {
+  useEffect(() => {
+    warmup();
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") warmup();
+    });
+    return () => sub.remove();
+  }, []);
+
   return (
     <AuthProvider>
       <ThemeProvider>
