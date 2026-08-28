@@ -395,6 +395,21 @@ const handleDeleteNote = (id) => {
 )}
       {alreadyInLibrary && (
         <View style={styles.section}>
+          {!!(bookDbId || book.db_id) && (
+            <TouchableOpacity
+              style={styles.editBtn}
+              onPress={() =>
+                navigation.navigate("EditBook", {
+                  book,
+                  dbId: bookDbId ?? book.db_id,
+                  onGoBack,
+                })
+              }
+            >
+              <Ionicons name="create-outline" size={16} color={colors.accent} />
+              <Text style={styles.editBtnText}>Editar ficha</Text>
+            </TouchableOpacity>
+          )}
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
             <Ionicons name="trash-outline" size={16} color={colors.danger} />
             <Text style={styles.deleteBtnText}>Quitar de biblioteca</Text>
@@ -439,6 +454,17 @@ const createStyles = (colors) =>
   pageBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
   pageBtnText: { color: colors.onAccent, fontWeight: "bold" },
   starsRow: { flexDirection: "row", gap: 8 },
+  editBtn: {
+    backgroundColor: colors.accent + "22",
+    borderRadius: 10,
+    paddingVertical: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 10,
+  },
+  editBtnText: { color: colors.accent, fontWeight: "bold", fontSize: 15 },
   deleteBtn: { backgroundColor: colors.danger + "22", borderRadius: 10, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 40 },
   deleteBtnText: { color: colors.danger, fontWeight: "bold", fontSize: 15 },
 noteInputRow: { marginBottom: 8 },

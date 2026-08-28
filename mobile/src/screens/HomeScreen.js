@@ -80,6 +80,10 @@ renderItem={({ item }) => (
   <TouchableOpacity
     style={styles.card}
     onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: fetchLibrary })}
+    onLongPress={() =>
+      navigation.navigate("EditBook", { book: item, dbId: item.db_id, onGoBack: fetchLibrary })
+    }
+    delayLongPress={400}
   >
     {item.cover ? (
       <Image source={{ uri: item.cover }} style={styles.cover} />

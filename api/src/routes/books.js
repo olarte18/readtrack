@@ -4,6 +4,7 @@ const pool = require("../db/connection");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
+const authMiddleware = require("../middleware/auth");
 
 const GOOGLE_API = "https://www.googleapis.com/books/v1";
 const OPENLIBRARY_API = "https://openlibrary.org";
@@ -149,6 +150,53 @@ router.get("/search", async (req, res) => {
 router.get("/:id", async (req, res) => {
   const { rows } = await pool.query("SELECT * FROM books WHERE id = $1", [req.params.id]);
   if (rows.length === 0) throw httpError(404, "Libro no encontrado");
+  res.json(rows[0]);
+});
+
+const EDITABLE_FIELDS = {
+  title: { type: "string", max: 500 },
+  author: { type: "string", max: 300 },
+  cover: { type: "string", max: 1000 },
+  pages: { type: "integer", min: 1 },
+  year: { type: "integer", min: 1, max: 2100 },
+  isbn: { type: "string", max: 50 },
+  description: { type: "string", max: 5000 },
+  genre: { type: "string", max: 100 },
+  publisher: { type: "string", max: 120 },
+  book_type: { type: "string", enum: ["physical", "ebook", "audio"] },
+};
+
+// PATCH /books/:id — edición global de la ficha. Campo lleno lo actualiza,
+// campo vacío lo limpia (NULL); title no puede quedar vacío (columna NOT NULL).
+router.patch("/:id", authMiddleware, async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) throw httpError(404, "Libro no encontrado");
+
+  const data = validate(req.body, EDITABLE_FIELDS);
+
+  const sets = [];
+  const values = [];
+  for (const field of Object.keys(EDITABLE_FIELDS)) {
+    if (!(field in req.body)) continue; // ausente => se conserva el valor actual
+    const clean = data[field]; // falsy si el campo se envió vacío o solo espacios
+    if (field === "title" && !clean) {
+      throw httpError(400, "El título no puede quedar vacío");
+    }
+    values.push(field === "year" && clean ? String(clean) : (clean || null));
+    sets.push(`${field} = $${values.length}`);
+  }
+  if (sets.length === 0) throw httpError(400, "Sin campos para actualizar");
+
+  const { rows } = await pool.query(
+    `UPDATE books SET ${sets.join(", ")} WHERE id = $${values.length + 1} RETURNING *`,
+    [...values, req.params.id]
+  );
+  if (rows.length === 0) throw httpError(404, "Libro no encontrado");
+
+  // La ficha viaja dentro de las respuestas cacheadas de todos los usuarios
+  cache.delPrefix("user-books:");
+  cache.delPrefix("books:search:");
+  cache.delPrefix("calendar:");
+
   res.json(rows[0]);
 });
 

@@ -116,6 +116,12 @@ export const updateBookPages = async (google_id, pages) =>
     body: JSON.stringify({ pages }),
   });
 
+export const updateBookFicha = async (id, data) =>
+  request(`/books/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify(data),
+  });
+
 export const getStats = async () => request("/stats");
 
 export const getStreak = async () => request("/stats/streak");

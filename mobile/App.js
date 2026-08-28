@@ -10,6 +10,7 @@ import HomeScreen from "./src/screens/HomeScreen";
 import SearchScreen from "./src/screens/SearchScreen";
 import ManualAddBookScreen from "./src/screens/ManualAddBookScreen";
 import BookDetailScreen from "./src/screens/BookDetailScreen";
+import EditBookScreen from "./src/screens/EditBookScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
@@ -79,6 +80,7 @@ function AppStack() {
       <Stack.Screen name="Main" component={HomeTabs} />
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
       <Stack.Screen name="ManualAdd" component={ManualAddBookScreen} />
+      <Stack.Screen name="EditBook" component={EditBookScreen} />
       <Stack.Screen name="Stats" component={StatsScreen} />
       <Stack.Screen name="ReadingMode" component={ReadingModeScreen} />
       <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />

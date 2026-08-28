@@ -134,6 +134,75 @@ describe("PATCH /books/:id/pages", () => {
   });
 });
 
+describe("PATCH /books/:id (edición global de la ficha)", () => {
+  async function setupBook(token) {
+    const added = await addBook(token);
+    const dbId = (await request(app).get("/user-books").set(authHeader(token))).body[0].db_id;
+    return { bookId: added.body.id, dbId };
+  }
+
+  test("actualiza campos y se reflejan en la ficha global", async () => {
+    const { token } = await registerUser();
+    const { dbId } = await setupBook(token);
+
+    const res = await request(app)
+      .patch(`/books/${dbId}`)
+      .set(authHeader(token))
+      .send({ author: "Patrick Rothfuss (editado)", cover: "https://cdn.example.com/portada.jpg", pages: 750 });
+    expect(res.status).toBe(200);
+
+    const book = await request(app).get(`/books/${dbId}`);
+    expect(book.body.author).toBe("Patrick Rothfuss (editado)");
+    expect(book.body.cover).toBe("https://cdn.example.com/portada.jpg");
+    expect(book.body.pages).toBe(750);
+  });
+
+  test("un campo vacío limpia el dato", async () => {
+    const { token } = await registerUser();
+    const { dbId } = await setupBook(token);
+
+    await request(app).patch(`/books/${dbId}`).set(authHeader(token)).send({ isbn: "978-12345" });
+    const withIsbn = await request(app).get(`/books/${dbId}`);
+    expect(withIsbn.body.isbn).toBe("978-12345");
+
+    const res = await request(app).patch(`/books/${dbId}`).set(authHeader(token)).send({ isbn: "" });
+    expect(res.status).toBe(200);
+    const cleared = await request(app).get(`/books/${dbId}`);
+    expect(cleared.body.isbn).toBeNull();
+  });
+
+  test("rechaza título vacío", async () => {
+    const { token } = await registerUser();
+    const { dbId } = await setupBook(token);
+    const res = await request(app).patch(`/books/${dbId}`).set(authHeader(token)).send({ title: "  " });
+    expect(res.status).toBe(400);
+  });
+
+  test("rechaza book_type inválido y pages inválidas", async () => {
+    const { token } = await registerUser();
+    const { dbId } = await setupBook(token);
+
+    const badType = await request(app).patch(`/books/${dbId}`).set(authHeader(token)).send({ book_type: "manga" });
+    expect(badType.status).toBe(400);
+
+    const badPages = await request(app).patch(`/books/${dbId}`).set(authHeader(token)).send({ pages: 0 });
+    expect(badPages.status).toBe(400);
+  });
+
+  test("libro inexistente devuelve 404", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).patch("/books/999999").set(authHeader(token)).send({ author: "X" });
+    expect(res.status).toBe(404);
+  });
+
+  test("sin token devuelve 401", async () => {
+    const { token } = await registerUser();
+    const { dbId } = await setupBook(token);
+    const res = await request(app).patch(`/books/${dbId}`).send({ author: "X" });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe("DELETE /user-books/:id", () => {
   test("elimina un libro propio", async () => {
     const { token } = await registerUser();
