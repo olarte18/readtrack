@@ -1,5 +1,5 @@
 import * as Notifications from "expo-notifications";
-import { AppState, Platform } from "react-native";
+import { AppState, Linking, Platform } from "react-native";
 
 const CHANNEL_ID = "lectura";
 const SOUND_FILE = "alarm.wav";
@@ -38,7 +38,16 @@ export async function ensureChannel() {
         name: "Alarma de lectura",
         importance: Notifications.AndroidImportance.MAX,
         sound: SOUND_FILE,
+        bypassDnd: true,
         vibrationPattern: [0, 250, 250, 250],
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.ALARM,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+          flags: {
+            enforceAudibility: true,
+            requestHardwareAudioVideoSynchronization: false,
+          },
+        },
       });
     }
   } catch {}
@@ -53,6 +62,18 @@ export async function requestAlarmPermission() {
   } catch {
     return { granted: false, available: false };
   }
+}
+
+export function openAlarmSettings() {
+  try {
+    if (Platform.OS === "android" && typeof Linking.sendIntent === "function") {
+      Linking.sendIntent("android.settings.NOTIFICATION_POLICY_ACCESS_SETTINGS");
+      return;
+    }
+  } catch {}
+  try {
+    if (Platform.OS === "android") Linking.openSettings();
+  } catch {}
 }
 
 export async function scheduleAlarm(msFromNow, { title, body } = {}) {
