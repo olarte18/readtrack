@@ -1,17 +1,31 @@
 import * as Notifications from "expo-notifications";
-import { Platform } from "react-native";
+import { AppState, Platform } from "react-native";
 
 const CHANNEL_ID = "lectura";
+const SOUND_FILE = "alarm.wav";
+
+let appInForeground = true;
+
+try {
+  if (Platform.OS !== "web") {
+    AppState.addEventListener("change", (next) => {
+      appInForeground = next === "active";
+    });
+  }
+} catch {}
 
 export function configureNotifications() {
   try {
     Notifications.setNotificationHandler({
-      handleNotification: async () => ({
-        shouldShowBanner: false,
-        shouldShowList: false,
-        shouldPlaySound: false,
-        shouldSetBadge: false,
-      }),
+      handleNotification: async () => {
+        const silent = appInForeground;
+        return {
+          shouldShowBanner: !silent,
+          shouldShowList: !silent,
+          shouldPlaySound: !silent,
+          shouldSetBadge: false,
+        };
+      },
     });
   } catch {}
 }
@@ -19,10 +33,11 @@ export function configureNotifications() {
 export async function ensureChannel() {
   try {
     if (Platform.OS === "android") {
+      await Notifications.deleteNotificationChannelAsync(CHANNEL_ID);
       await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
         name: "Alarma de lectura",
         importance: Notifications.AndroidImportance.MAX,
-        sound: "default",
+        sound: SOUND_FILE,
         vibrationPattern: [0, 250, 250, 250],
       });
     }
@@ -46,7 +61,7 @@ export async function scheduleAlarm(msFromNow, { title, body } = {}) {
       content: {
         title: title || "ReadTrack",
         body: body || "",
-        sound: "default",
+        sound: SOUND_FILE,
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,

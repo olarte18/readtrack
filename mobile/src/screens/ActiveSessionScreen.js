@@ -120,6 +120,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   };
 
   const scheduleTimerAlarm = async (msFromNow) => {
+    await ensureChannel();
     const id = await scheduleAlarm(msFromNow, {
       title: "Tiempo cumplido",
       body: `¡Terminaste tu sesión de ${Math.max(1, Math.round(msFromNow / 60000))} minutos!`,
@@ -156,7 +157,6 @@ export default function ActiveSessionScreen({ route, navigation }) {
     setSeconds(min * 60);
     setTimerStarted(true);
     setRunning(true);
-    ensureChannel();
     requestTimerPermission();
     scheduleTimerAlarm(min * 60000);
   };

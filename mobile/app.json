@@ -45,7 +45,12 @@
       ],
       "expo-asset",
       "expo-updates",
-      "expo-notifications"
+      [
+        "expo-notifications",
+        {
+          "sounds": ["./assets/alarm.wav"]
+        }
+      ]
     ],
     "extra": {
       "eas": {
