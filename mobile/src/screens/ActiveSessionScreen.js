@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useTheme } from "../contexts/ThemeContext";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
+import { cancelAlarm, ensureChannel, requestAlarmPermission, scheduleAlarm } from "../services/notifications";
 
 const QUICK_MINUTES = [10, 15, 20, 30, 45, 60];
 
@@ -31,11 +32,19 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const backgroundTime = useRef(null);
   const intervalRef = useRef(null);
   const alarmFiredRef = useRef(false);
+  const alarmIdRef = useRef(null);
+  const permissionWarnedRef = useRef(false);
 
   const alarm = useAudioPlayer(require("../../assets/alarm.wav"));
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true });
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      if (alarmIdRef.current !== null) cancelAlarm(alarmIdRef.current);
+    };
   }, []);
 
   useEffect(() => {
@@ -76,6 +85,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     if (!isTimer || !timerStarted || seconds > 0 || alarmFiredRef.current) return;
     alarmFiredRef.current = true;
     setRunning(false);
+    cancelTimerAlarm();
     alarm.loop = true;
     alarm.play();
     Alert.alert(
@@ -109,6 +119,33 @@ export default function ActiveSessionScreen({ route, navigation }) {
     alarm.seekTo(0);
   };
 
+  const scheduleTimerAlarm = async (msFromNow) => {
+    const id = await scheduleAlarm(msFromNow, {
+      title: "Tiempo cumplido",
+      body: `¡Terminaste tu sesión de ${Math.max(1, Math.round(msFromNow / 60000))} minutos!`,
+    });
+    if (id !== null) alarmIdRef.current = id;
+  };
+
+  const cancelTimerAlarm = async () => {
+    if (alarmIdRef.current !== null) {
+      await cancelAlarm(alarmIdRef.current);
+      alarmIdRef.current = null;
+    }
+  };
+
+  const requestTimerPermission = async () => {
+    const { granted, available } = await requestAlarmPermission();
+    if (available && !granted && !permissionWarnedRef.current) {
+      permissionWarnedRef.current = true;
+      Alert.alert(
+        "Alarma con la pantalla apagada",
+        "Permite las notificaciones de ReadTrack para que la alarma del temporizador suene aunque dejes la app en segundo plano."
+      );
+    }
+    return granted;
+  };
+
   const startTimer = () => {
     const min = parseInt(minutesInput, 10);
     if (isNaN(min) || min <= 0 || min > 600) {
@@ -119,6 +156,24 @@ export default function ActiveSessionScreen({ route, navigation }) {
     setSeconds(min * 60);
     setTimerStarted(true);
     setRunning(true);
+    ensureChannel();
+    requestTimerPermission();
+    scheduleTimerAlarm(min * 60000);
+  };
+
+  const togglePause = () => {
+    if (!isTimer) {
+      setRunning((r) => !r);
+      return;
+    }
+    if (running) {
+      cancelTimerAlarm();
+      setRunning(false);
+    } else {
+      requestTimerPermission();
+      scheduleTimerAlarm(seconds * 1000);
+      setRunning(true);
+    }
   };
 
   const pagesRead = Math.max(0, parseInt(endPage || 0) - startPage);
@@ -136,6 +191,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     setSaving(true);
     setRunning(false);
     stopAlarm();
+    cancelTimerAlarm();
     const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
     try {
       const completed = !!book.pages && page >= book.pages;
@@ -294,7 +350,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
       <View style={styles.timerContainer}>
         <Text style={styles.timerLabel}>{isTimer ? "Tiempo restante" : "Tiempo transcurrido"}</Text>
         <Text style={styles.timer}>{formatTime(seconds)}</Text>
-        <TouchableOpacity style={styles.pauseBtn} onPress={() => setRunning((r) => !r)}>
+        <TouchableOpacity style={styles.pauseBtn} onPress={togglePause}>
           <View style={styles.pauseBtnRow}>
             <Ionicons name={running ? "pause" : "play"} size={18} color={colors.accent} />
             <Text style={styles.pauseBtnText}>{running ? "Pausar" : "Continuar"}</Text>

@@ -28,6 +28,7 @@ import WhatsNewPopup from "./src/components/WhatsNewPopup";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
 import { warmup } from "./src/services/api";
+import { configureNotifications } from "./src/services/notifications";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -132,6 +133,7 @@ function Navigation() {
 
 export default function App() {
   useEffect(() => {
+    configureNotifications();
     warmup();
     const sub = AppState.addEventListener("change", (next) => {
       if (next === "active") warmup();

@@ -44,7 +44,8 @@
         }
       ],
       "expo-asset",
-      "expo-updates"
+      "expo-updates",
+      "expo-notifications"
     ],
     "extra": {
       "eas": {
