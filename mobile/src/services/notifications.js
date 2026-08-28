@@ -1,10 +1,12 @@
 import * as Notifications from "expo-notifications";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { AppState, Linking, Platform } from "react-native";
+import { AppState, Linking, NativeModules, Platform } from "react-native";
 
 const CHANNEL_ID = "lectura";
 const SOUND_FILE = "alarm.wav";
 const HINT_SEEN_KEY = "alarm_silent_hint_seen";
+
+const AlarmNative = Platform.OS === "android" ? NativeModules.ReadTrackAlarm : null;
 
 let appInForeground = true;
 
@@ -93,6 +95,14 @@ export async function markAlarmHintSeen() {
 }
 
 export async function scheduleAlarm(msFromNow, { title, body } = {}) {
+  if (AlarmNative) {
+    try {
+      await AlarmNative.schedule(Date.now() + msFromNow);
+      return Date.now();
+    } catch {
+      return null;
+    }
+  }
   try {
     return await Notifications.scheduleNotificationAsync({
       content: {
@@ -112,6 +122,12 @@ export async function scheduleAlarm(msFromNow, { title, body } = {}) {
 }
 
 export async function cancelAlarm(id) {
+  if (AlarmNative) {
+    try {
+      AlarmNative.cancel();
+    } catch {}
+    return;
+  }
   try {
     if (id !== null && id !== undefined) {
       await Notifications.cancelScheduledNotificationAsync(id);

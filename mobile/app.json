@@ -51,7 +51,8 @@
         {
           "sounds": ["./assets/alarm.wav"]
         }
-      ]
+      ],
+      "./plugins/withAlarm"
     ],
     "extra": {
       "eas": {
