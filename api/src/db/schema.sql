@@ -14,7 +14,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 CREATE TABLE IF NOT EXISTS books (
   id          SERIAL PRIMARY KEY,
-  google_id   VARCHAR(50) NOT NULL UNIQUE,
+  google_id   VARCHAR(50) UNIQUE,
   title       VARCHAR(255) NOT NULL,
   author      VARCHAR(255),
   cover       TEXT,
@@ -31,6 +31,9 @@ CREATE TABLE IF NOT EXISTS books (
 -- Para bases creadas antes de estas columnas
 ALTER TABLE books ADD COLUMN IF NOT EXISTS publisher VARCHAR(120);
 ALTER TABLE books ADD COLUMN IF NOT EXISTS book_type   VARCHAR(20);
+
+-- Libros creados manualmente no tienen google_id
+ALTER TABLE books ALTER COLUMN google_id DROP NOT NULL;
 
 -- Categorías por libro: máximo 3, la primera es la principal
 CREATE TABLE IF NOT EXISTS book_categories (

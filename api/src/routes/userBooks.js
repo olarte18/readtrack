@@ -42,8 +42,8 @@ router.get("/", async (req, res) => {
 // POST /user-books
 router.post("/", async (req, res) => {
   const data = validate(req.body, {
-    google_id: { required: true, type: "string", max: 100 },
-    title: { type: "string", max: 500 },
+    google_id: { type: "string", max: 100 },
+    title: { required: true, type: "string", max: 500 },
     author: { type: "string", max: 300 },
     cover: { type: "string", max: 1000 },
     pages: { type: "integer", min: 1 },
@@ -51,20 +51,30 @@ router.post("/", async (req, res) => {
     genre: { type: "string", max: 100 },
     isbn: { type: "string", max: 50 },
     description: { type: "string", max: 5000 },
+    publisher: { type: "string", max: 120 },
+    book_type: { type: "string", enum: ["physical", "ebook", "audio"] },
     status: { type: "string", enum: STATUSES },
   });
 
-  await pool.query(`
-    INSERT INTO books (google_id, title, author, cover, pages, year, genre, isbn, description)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+  // Un libro manual (sin google_id) siempre es "nuevo": no hay conflicto posible.
+  // Con google_id presente, ON CONFLICT evita duplicar; si no devuelve fila,
+  // significa que el libro ya existía y hay que recuperar su id por google_id.
+  const inserted = await pool.query(`
+    INSERT INTO books (google_id, title, author, cover, pages, year, genre, isbn, description, publisher, book_type)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
     ON CONFLICT (google_id) DO NOTHING
+    RETURNING id
   `, [data.google_id, data.title, data.author, data.cover, data.pages,
-       data.year, data.genre, data.isbn, data.description]);
+       data.year ? String(data.year) : null, data.genre, data.isbn,
+       data.description, data.publisher, data.book_type]);
 
-  const { rows: bookRows } = await pool.query(
-    "SELECT id FROM books WHERE google_id = $1", [data.google_id]
-  );
-  const book_id = bookRows[0].id;
+  let book_id = inserted.rows[0]?.id;
+  if (!book_id && data.google_id) {
+    const { rows: bookRows } = await pool.query(
+      "SELECT id FROM books WHERE google_id = $1", [data.google_id]
+    );
+    book_id = bookRows[0]?.id;
+  }
 
   const { rows } = await pool.query(`
     INSERT INTO user_books (book_id, user_id, status)

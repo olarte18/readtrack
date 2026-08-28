@@ -76,6 +76,13 @@ const handleScan = async (isbn) => {
         }
         
       />
+      <TouchableOpacity
+        style={styles.manualBtn}
+        onPress={() => navigation.navigate("ManualAdd")}
+      >
+        <Ionicons name="create-outline" size={18} color={colors.onAccent} />
+        <Text style={styles.manualBtnText}>¿No encuentras tu libro? Créalo manualmente</Text>
+      </TouchableOpacity>
           <BarcodeScanner
         visible={scannerVisible}
         onScan={handleScan}
@@ -94,4 +101,16 @@ const createStyles = (colors) =>
   scanBtn: { backgroundColor: colors.surface, borderRadius: 10, padding: 10 },
   clearBtn: { backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10 },
   empty: { color: colors.textDim, textAlign: "center", marginTop: 40 },
+  manualBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    backgroundColor: colors.accent,
+    borderRadius: 12,
+    paddingVertical: 13,
+    marginHorizontal: 16,
+    marginBottom: 20,
+  },
+  manualBtnText: { color: colors.onAccent, fontWeight: "bold", fontSize: 14 },
 });

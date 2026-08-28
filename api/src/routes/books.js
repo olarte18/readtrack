@@ -152,13 +152,18 @@ router.get("/:id", async (req, res) => {
   res.json(rows[0]);
 });
 
-// PATCH /books/:google_id/pages
+// PATCH /books/:google_id/pages — acepta google_id o el id numérico de BD
+// (los libros manuales no tienen google_id).
 router.patch("/:google_id/pages", async (req, res) => {
   const data = validate(req.body, { pages: { required: true, type: "integer", min: 1 } });
 
+  const param = req.params.google_id;
+  const isDbId = /^\d+$/.test(param);
   const { rows } = await pool.query(
-    "UPDATE books SET pages = $1 WHERE google_id = $2 RETURNING *",
-    [data.pages, req.params.google_id]
+    `UPDATE books SET pages = $1
+     WHERE google_id = $2 OR ($3::int IS NOT NULL AND id = $3::int)
+     RETURNING *`,
+    [data.pages, param, isDbId ? param : null]
   );
   if (rows.length === 0) throw httpError(404, "Libro no encontrado");
   res.json(rows[0]);

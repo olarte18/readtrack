@@ -8,6 +8,7 @@ import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext";
 import HomeScreen from "./src/screens/HomeScreen";
 import SearchScreen from "./src/screens/SearchScreen";
+import ManualAddBookScreen from "./src/screens/ManualAddBookScreen";
 import BookDetailScreen from "./src/screens/BookDetailScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import LoginScreen from "./src/screens/LoginScreen";
@@ -77,6 +78,7 @@ function AppStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main" component={HomeTabs} />
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
+      <Stack.Screen name="ManualAdd" component={ManualAddBookScreen} />
       <Stack.Screen name="Stats" component={StatsScreen} />
       <Stack.Screen name="ReadingMode" component={ReadingModeScreen} />
       <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />

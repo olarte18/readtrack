@@ -22,15 +22,36 @@ describe("POST /user-books", () => {
     expect(res.body.status).toBe("pending");
   });
 
-  test("rechaza libro sin google_id", async () => {
+  test("rechaza libro sin título", async () => {
     const { token } = await registerUser();
-    const res = await request(app).post("/user-books").set(authHeader(token)).send({ title: "X" });
+    const res = await request(app).post("/user-books").set(authHeader(token)).send({ google_id: "abc" });
     expect(res.status).toBe(400);
+  });
+
+  test("crea un libro manual sin google_id", async () => {
+    const { token } = await registerUser();
+    const res = await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ title: "Cuento manual", author: "Yo", pages: 120, status: "wishlist" });
+    expect(res.status).toBe(201);
+    expect(res.body.status).toBe("wishlist");
+
+    const list = await request(app).get("/user-books").set(authHeader(token));
+    expect(list.body).toHaveLength(1);
+    expect(list.body[0].google_id).toBeNull();
+    expect(list.body[0].title).toBe("Cuento manual");
   });
 
   test("rechaza un status inválido", async () => {
     const { token } = await registerUser();
     const res = await request(app).post("/user-books").set(authHeader(token)).send({ ...BOOK, status: "no-existe" });
+    expect(res.status).toBe(400);
+  });
+
+  test("rechaza un book_type inválido", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).post("/user-books").set(authHeader(token)).send({ ...BOOK, book_type: "manga" });
     expect(res.status).toBe(400);
   });
 
@@ -92,6 +113,24 @@ describe("PATCH /user-books/:id", () => {
       .set(authHeader(b.token))
       .send({ status: "completed" });
     expect(res.status).toBe(404);
+  });
+});
+
+describe("PATCH /books/:id/pages", () => {
+  test("actualiza páginas de un libro manual por su id de BD", async () => {
+    const { token } = await registerUser();
+    await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ title: "Manual con páginas", pages: 200 });
+    const bookDbId = (await request(app).get("/user-books").set(authHeader(token))).body[0].db_id;
+
+    const res = await request(app)
+      .patch(`/books/${bookDbId}/pages`)
+      .set(authHeader(token))
+      .send({ pages: 310 });
+    expect(res.status).toBe(200);
+    expect(res.body.pages).toBe(310);
   });
 });
 

@@ -253,7 +253,7 @@ const handleDeleteNote = (id) => {
                 const p = parseInt(totalPages);
                 if (isNaN(p) || p <= 0) return Alert.alert("Error", "Ingresa un número válido");
                 try {
-                  await updateBookPages(book.google_id ?? book.id, p);
+                  await updateBookPages(book.google_id ?? book.db_id ?? book.id, p);
                   Alert.alert("Guardado", `${p} páginas guardadas`);
                 } catch {
                   Alert.alert("Error", "No se pudo guardar");
