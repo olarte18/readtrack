@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Image, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useDebouncedCallback } from "use-debounce";
 import { useTheme } from "../contexts/ThemeContext";
 import { updateBookFicha } from "../services/api";
 
@@ -26,6 +27,18 @@ export default function EditBookScreen({ route, navigation }) {
   const [genre, setGenre] = useState(book.genre ?? "");
   const [description, setDescription] = useState(book.description ?? "");
   const [saving, setSaving] = useState(false);
+  const [previewCover, setPreviewCover] = useState(book.cover ?? "");
+  const [coverError, setCoverError] = useState(false);
+
+  const debouncedPreview = useDebouncedCallback((url) => {
+    setCoverError(false);
+    setPreviewCover(url);
+  }, 400);
+
+  const handleCoverChange = (text) => {
+    setCover(text);
+    debouncedPreview(text);
+  };
 
   const handleSave = async () => {
     if (!title.trim()) return Alert.alert("Error", "El título no puede quedar vacío");
@@ -96,6 +109,20 @@ export default function EditBookScreen({ route, navigation }) {
         </TouchableOpacity>
       </View>
 
+      <View style={styles.previewWrap}>
+        {previewCover && !coverError ? (
+          <Image
+            source={{ uri: previewCover }}
+            style={styles.previewCover}
+            onError={() => setCoverError(true)}
+          />
+        ) : (
+          <View style={styles.previewNoCover}>
+            <Ionicons name="book" size={48} color={colors.textDim} />
+          </View>
+        )}
+      </View>
+
       <View style={styles.section}>
         <Text style={styles.label}>Título *</Text>
         <TextInput
@@ -137,7 +164,7 @@ export default function EditBookScreen({ route, navigation }) {
           placeholder="https://..."
           placeholderTextColor={colors.placeholder}
           value={cover}
-          onChangeText={setCover}
+          onChangeText={handleCoverChange}
           autoCapitalize="none"
           keyboardType="url"
         />
@@ -241,6 +268,24 @@ const createStyles = (colors) =>
     },
     title: { fontSize: 24, fontWeight: "bold", color: colors.text },
     backBtn: { backgroundColor: colors.surface, borderRadius: 10, padding: 8 },
+    previewWrap: { alignItems: "center", marginTop: 4, marginBottom: 8 },
+    previewCover: {
+      width: 120,
+      height: 180,
+      borderRadius: 10,
+      borderWidth: 2,
+      borderColor: colors.accent + "55",
+    },
+    previewNoCover: {
+      width: 120,
+      height: 180,
+      borderRadius: 10,
+      backgroundColor: colors.surfaceAlt,
+      borderWidth: 2,
+      borderColor: colors.border,
+      justifyContent: "center",
+      alignItems: "center",
+    },
     section: { paddingHorizontal: 20, marginTop: 16 },
     label: { fontSize: 13, fontWeight: "bold", color: colors.textMuted, marginBottom: 8 },
     input: {
