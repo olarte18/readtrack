@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useTheme } from "../contexts/ThemeContext";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
-import { cancelAlarm, ensureChannel, openAlarmSettings, requestAlarmPermission, scheduleAlarm } from "../services/notifications";
+import { cancelAlarm, ensureChannel, markAlarmHintSeen, openAlarmSettings, requestAlarmPermission, scheduleAlarm, shouldShowAlarmHint } from "../services/notifications";
 
 const QUICK_MINUTES = [10, 15, 20, 30, 45, 60];
 
@@ -147,14 +147,23 @@ export default function ActiveSessionScreen({ route, navigation }) {
     }
     if (granted && !alarmHintRef.current) {
       alarmHintRef.current = true;
-      Alert.alert(
-        "Suena como una alarma",
-        "La alarma usa el canal de alarmas del teléfono, así que se escucha incluso en modo silencioso. Para que también suene con el modo No molestar, permite el acceso de la app en los ajustes del sistema.",
-        [
-          { text: "Abrir ajustes", onPress: openAlarmSettings },
-          { text: "Después", style: "cancel" },
-        ]
-      );
+      const show = await shouldShowAlarmHint();
+      if (show) {
+        Alert.alert(
+          "Suena como una alarma",
+          "La alarma usa el canal de alarmas del teléfono, así que se escucha incluso en modo silencioso. Para que también suene con el modo No molestar, permite el acceso de la app en los ajustes del sistema.",
+          [
+            {
+              text: "Abrir ajustes",
+              onPress: () => {
+                openAlarmSettings();
+                markAlarmHintSeen();
+              },
+            },
+            { text: "Después", style: "cancel", onPress: markAlarmHintSeen },
+          ]
+        );
+      }
     }
     return granted;
   };

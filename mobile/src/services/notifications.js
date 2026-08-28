@@ -1,8 +1,10 @@
 import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState, Linking, Platform } from "react-native";
 
 const CHANNEL_ID = "lectura";
 const SOUND_FILE = "alarm.wav";
+const HINT_SEEN_KEY = "alarm_silent_hint_seen";
 
 let appInForeground = true;
 
@@ -73,6 +75,20 @@ export function openAlarmSettings() {
   } catch {}
   try {
     if (Platform.OS === "android") Linking.openSettings();
+  } catch {}
+}
+
+export async function shouldShowAlarmHint() {
+  try {
+    return (await AsyncStorage.getItem(HINT_SEEN_KEY)) !== "1";
+  } catch {
+    return true;
+  }
+}
+
+export async function markAlarmHintSeen() {
+  try {
+    await AsyncStorage.setItem(HINT_SEEN_KEY, "1");
   } catch {}
 }
 
