@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.view.WindowManager
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
@@ -59,6 +60,20 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
       )
       alarmManager.cancel(operation)
       operation.cancel()
+    } catch (_: Exception) {}
+  }
+
+  @ReactMethod
+  fun setKeepAwake(enabled: Boolean) {
+    try {
+      val activity = reactContext.currentActivity ?: return
+      activity.runOnUiThread {
+        if (enabled) {
+          activity.window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+          activity.window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        }
+      }
     } catch (_: Exception) {}
   }
 

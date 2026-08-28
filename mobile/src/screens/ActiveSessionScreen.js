@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState, ActivityIndicator, Modal } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useTheme } from "../contexts/ThemeContext";
@@ -24,7 +24,10 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const [timeUp, setTimeUp] = useState(false);
   const [saving, setSaving] = useState(false);
   const [finishVisible, setFinishVisible] = useState(false);
+  const [keepAwake, setKeepAwakeState] = useState(false);
   const savingRef = useRef(false);
+
+  const AlarmNative = Platform.OS === "android" ? NativeModules.ReadTrackAlarm : null;
 
   const startPage = book.current_page ?? 0;
   const startTime = useRef(Date.now());
@@ -47,6 +50,14 @@ export default function ActiveSessionScreen({ route, navigation }) {
       if (alarmIdRef.current !== null) cancelAlarm(alarmIdRef.current);
     };
   }, []);
+
+  useEffect(() => {
+    return () => {
+      try {
+        AlarmNative?.setKeepAwake?.(false);
+      } catch {}
+    };
+  }, [AlarmNative]);
 
   useEffect(() => {
     getReadingSpeed(book.id).then((data) => {
@@ -197,6 +208,13 @@ export default function ActiveSessionScreen({ route, navigation }) {
     }
   };
 
+  const toggleKeepAwake = (value) => {
+    setKeepAwakeState(value);
+    try {
+      AlarmNative?.setKeepAwake?.(value);
+    } catch {}
+  };
+
   const pagesRead = Math.max(0, parseInt(endPage || 0) - startPage);
   const hoursElapsed = (isTimer ? (duration ?? 0) - seconds : seconds) / 3600;
   const estimatedPages = avgSpeed && hoursElapsed > 0 ? Math.round(avgSpeed * hoursElapsed) : null;
@@ -292,11 +310,22 @@ export default function ActiveSessionScreen({ route, navigation }) {
     </Modal>
   );
 
+  const blockNotice = (
+    <View style={styles.noticeBox}>
+      <Ionicons name="information-circle-outline" size={18} color={colors.accent} />
+      <Text style={styles.noticeText}>
+        No bloquees ni cierres ReadTrack o tu alarma no sonará
+      </Text>
+    </View>
+  );
+
   if (isTimer && !timerStarted) {
     return (
       <View style={styles.container}>
         <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
         <Text style={styles.subtitle}>Elige cuánto quieres leer</Text>
+
+        {blockNotice}
 
         <View style={styles.chipsRow}>
           {QUICK_MINUTES.map((m) => (
@@ -378,6 +407,22 @@ export default function ActiveSessionScreen({ route, navigation }) {
           </View>
         </TouchableOpacity>
       </View>
+
+      {isTimer && (
+        <>
+          {blockNotice}
+          <View style={styles.toggleRow}>
+            <Ionicons name="sunny-outline" size={18} color={colors.textDim} />
+            <Text style={styles.toggleLabel}>Mantener pantalla encendida</Text>
+            <Switch
+              value={keepAwake}
+              onValueChange={toggleKeepAwake}
+              trackColor={{ true: colors.accent }}
+              thumbColor={keepAwake ? colors.onAccent : undefined}
+            />
+          </View>
+        </>
+      )}
 
       {avgSpeed && (
         <Text style={styles.avgSpeed}>
@@ -462,6 +507,32 @@ const createStyles = (colors) =>
     customInputBox: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 12, borderWidth: 1, borderColor: colors.border, paddingHorizontal: 16 },
     customInput: { fontSize: 24, fontWeight: "bold", color: colors.accent, textAlign: "center", minWidth: 60, paddingVertical: 10 },
     customUnit: { fontSize: 16, color: colors.textDim, marginLeft: 4 },
+    noticeBox: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 24,
+    },
+    noticeText: { flex: 1, color: colors.textDim, fontSize: 12.5, lineHeight: 17 },
+    toggleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginBottom: 24,
+    },
+    toggleLabel: { flex: 1, color: colors.text, fontSize: 14, fontWeight: "bold" },
     backBtn: { marginTop: 12, alignItems: "center", paddingVertical: 12 },
     backBtnText: { color: colors.textDim, fontSize: 15, fontWeight: "bold" },
     pagesContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 30, gap: 12 },
