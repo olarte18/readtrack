@@ -80,6 +80,18 @@ export function openAlarmSettings() {
   } catch {}
 }
 
+export function openFullScreenIntentSettings() {
+  try {
+    if (Platform.OS === "android" && Platform.Version >= 34 && typeof Linking.sendIntent === "function") {
+      Linking.sendIntent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT");
+      return;
+    }
+  } catch {}
+  try {
+    if (Platform.OS === "android") Linking.openSettings();
+  } catch {}
+}
+
 export async function shouldShowAlarmHint() {
   try {
     return (await AsyncStorage.getItem(HINT_SEEN_KEY)) !== "1";

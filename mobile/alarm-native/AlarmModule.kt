@@ -4,6 +4,7 @@ import android.app.AlarmManager
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.util.Log
 import android.view.WindowManager
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
@@ -42,8 +43,10 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
         AlarmManager.AlarmClockInfo(triggerAtMillis, showIntent),
         operation
       )
+      Log.d(TAG, "alarma programada para $triggerAtMillis")
       promise.resolve(true)
     } catch (e: Exception) {
+      Log.e(TAG, "schedule fallo", e)
       promise.reject("ALARM_SCHEDULE_FAILED", e)
     }
   }
@@ -60,7 +63,10 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
       )
       alarmManager.cancel(operation)
       operation.cancel()
-    } catch (_: Exception) {}
+      Log.d(TAG, "alarma cancelada")
+    } catch (e: Exception) {
+      Log.e(TAG, "cancel fallo", e)
+    }
   }
 
   @ReactMethod
@@ -83,5 +89,6 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
     const val REQUEST_CODE_SHOW = 8101
     const val NOTIFICATION_ID = 8001
     const val TRIGGER_CHANNEL_ID = "alarm_invasiva"
+    private const val TAG = "ReadTrackAlarm"
   }
 }

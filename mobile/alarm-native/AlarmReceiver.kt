@@ -1,32 +1,53 @@
 package com.alejandro.readtrack.alarm
 
 import android.app.AlarmManager
-import android.app.PendingIntent
+import android.app.KeyguardManager
 import android.app.NotificationChannel
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
-import android.app.KeyguardManager
 import android.content.Intent
 import android.os.Build
 import android.os.PowerManager
+import android.util.Log
 import androidx.core.app.NotificationCompat
+
+private const val TAG = "ReadTrackAlarm"
 
 class AlarmReceiver : BroadcastReceiver() {
 
   override fun onReceive(context: Context, intent: Intent) {
-    if (intent.action != AlarmModule.ACTION_ALARM_FIRE) return
-    if (AlarmForegroundTracker.isForeground) return
-
-    createTriggerChannel(context)
-    postTriggerNotification(context)
-
-    val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
-    val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
-    val screenOn = powerManager.isInteractive
-    val locked = keyguardManager.isKeyguardLocked
-    if (screenOn && !locked) {
-      startAlarmActivity(context)
+    if (intent.action != AlarmModule.ACTION_ALARM_FIRE) {
+      Log.d(TAG, "intent con action distinta: ${intent.action}")
+      return
+    }
+    if (AlarmForegroundTracker.isForeground) {
+      Log.d(TAG, "alarma disparada en primer plano, se omite")
+      return
+    }
+    Log.d(TAG, "alarma disparada en segundo plano")
+    try {
+      createTriggerChannel(context)
+    } catch (e: Exception) {
+      Log.e(TAG, "createTriggerChannel fallo", e)
+    }
+    try {
+      postTriggerNotification(context)
+    } catch (e: Exception) {
+      Log.e(TAG, "postTriggerNotification fallo", e)
+    }
+    try {
+      val powerManager = context.getSystemService(Context.POWER_SERVICE) as PowerManager
+      val keyguardManager = context.getSystemService(Context.KEYGUARD_SERVICE) as KeyguardManager
+      if (powerManager.isInteractive && !keyguardManager.isKeyguardLocked) {
+        Log.d(TAG, "pantalla encendida y desbloqueada, abriendo actividad")
+        startAlarmActivity(context)
+      } else {
+        Log.d(TAG, "pantalla apagada/bloqueada, se depende del full-screen intent")
+      }
+    } catch (e: Exception) {
+      Log.e(TAG, "chequeo de pantalla fallo", e)
     }
   }
 
@@ -55,12 +76,10 @@ class AlarmReceiver : BroadcastReceiver() {
         ),
         PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
       )
-      val icon = context.applicationInfo.icon.takeIf { it != 0 }
-        ?: android.R.drawable.ic_popup_reminder
       val notification = NotificationCompat.Builder(context, AlarmModule.TRIGGER_CHANNEL_ID)
         .setContentTitle("Tiempo cumplido")
         .setContentText("Tu sesión de lectura terminó")
-        .setSmallIcon(icon)
+        .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
         .setPriority(NotificationCompat.PRIORITY_MAX)
         .setCategory(NotificationCompat.CATEGORY_ALARM)
         .setFullScreenIntent(activityIntent, true)

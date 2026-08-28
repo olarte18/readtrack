@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { useTheme } from "../contexts/ThemeContext";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
-import { cancelAlarm, ensureChannel, markAlarmHintSeen, openAlarmSettings, requestAlarmPermission, scheduleAlarm, shouldShowAlarmHint } from "../services/notifications";
+import { cancelAlarm, ensureChannel, markAlarmHintSeen, openAlarmSettings, openFullScreenIntentSettings, requestAlarmPermission, scheduleAlarm, shouldShowAlarmHint } from "../services/notifications";
 
 const QUICK_MINUTES = [10, 15, 20, 30, 45, 60];
 
@@ -75,6 +75,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
           const elapsed = Math.floor((Date.now() - backgroundTime.current) / 1000);
           setSeconds((s) => (isTimer ? Math.max(0, s - elapsed) : s + elapsed));
         }
+        if (isTimer && alarmFiredRef.current) setTimeUp(true);
       }
       appState.current = nextState;
     });
@@ -97,7 +98,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     if (!isTimer || !timerStarted || seconds > 0 || alarmFiredRef.current) return;
     alarmFiredRef.current = true;
     setRunning(false);
-    cancelTimerAlarm();
+    if (appState.current !== "active") return;
     alarm.loop = true;
     alarm.play();
     Alert.alert(
@@ -109,6 +110,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
           onPress: () => {
             alarm.pause();
             alarm.seekTo(0);
+            cancelTimerAlarm();
             setTimeUp(true);
           },
         },
@@ -327,6 +329,15 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
         {blockNotice}
 
+        {Platform.Version >= 34 && (
+          <TouchableOpacity style={styles.fsiBtn} onPress={openFullScreenIntentSettings}>
+            <Ionicons name="expand-outline" size={16} color={colors.accent} />
+            <Text style={styles.fsiBtnText}>
+              ¿No salta a pantalla completa? Permite "Alarmas y recordatorios"
+            </Text>
+          </TouchableOpacity>
+        )}
+
         <View style={styles.chipsRow}>
           {QUICK_MINUTES.map((m) => (
             <TouchableOpacity
@@ -520,6 +531,15 @@ const createStyles = (colors) =>
       marginBottom: 24,
     },
     noticeText: { flex: 1, color: colors.textDim, fontSize: 12.5, lineHeight: 17 },
+    fsiBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      paddingVertical: 12,
+      marginBottom: 24,
+    },
+    fsiBtnText: { color: colors.accent, fontSize: 13, fontWeight: "bold", flexShrink: 1, textAlign: "center" },
     toggleRow: {
       flexDirection: "row",
       alignItems: "center",
