@@ -10,6 +10,7 @@ class AlarmPackage : ReactPackage {
   override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> =
     listOf(AlarmModule(reactContext))
 
-  override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> =
-    emptyList()
+  override fun createViewManagers(
+    reactContext: ReactApplicationContext
+  ): List<ViewManager<in Nothing, in Nothing>> = emptyList()
 }
