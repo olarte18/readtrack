@@ -3,10 +3,7 @@
 export const RELEASE_NOTES = {
   title: "¡Novedades de ReadTrack!",
   items: [
-    { icon: "download", text: "Importa tu respaldo de Bookmory con todo tu historial, sesiones y notas" },
-    { icon: "document-text", text: "Nueva sección de Notas para verlas todas en un solo lugar" },
-    { icon: "flame", text: "Tu racha ahora vive en Leyendo, al centro de la app" },
-    { icon: "time", text: "Tiempo restante estimado en tus libros en curso" },
-    { icon: "speedometer", text: "Tu velocidad de lectura ahora se mide en páginas por hora" },
+    { icon: "create", text: "Agrega libros manualmente cuando no aparecen en la búsqueda: solo necesitas título y páginas" },
+    { icon: "pencil", text: "Edita la ficha de cualquier libro de tu biblioteca: portada con vista previa, autor, editorial y más" },
   ],
 };
