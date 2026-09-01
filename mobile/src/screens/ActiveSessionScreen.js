@@ -476,7 +476,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     <View style={styles.container}>
       {book.cover && (
         <>
-          <ImageBackground source={{ uri: book.cover }} style={styles.bgImage} blurRadius={24} resizeMode="cover" />
+          <ImageBackground source={{ uri: book.cover }} style={styles.bgImage} resizeMode="cover" />
           <View style={styles.bgOverlay} />
         </>
       )}
@@ -582,7 +582,7 @@ const createStyles = (colors) =>
     container: { flex: 1, backgroundColor: colors.background, paddingTop: 44, paddingHorizontal: 24, overflow: "hidden" },
     bookTitle: { fontSize: 18, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 12 },
     bgImage: { ...StyleSheet.absoluteFillObject },
-    bgOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.background, opacity: 0.82 },
+    bgOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.background, opacity: 0.74 },
     header: { alignItems: "center", marginBottom: 20 },
     subtitle: { fontSize: 15, color: colors.textDim, textAlign: "center", marginBottom: 24 },
     timerContainer: { alignItems: "center", marginBottom: 18 },
