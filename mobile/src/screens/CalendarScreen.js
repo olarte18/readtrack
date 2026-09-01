@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { getCalendar, getReadingSessions, updateReadingSession } from "../services/api";
 
 const MONTH_NAMES = [
@@ -57,7 +58,7 @@ export default function CalendarScreen() {
         minutesStr: String(Math.round((s.duration_seconds ?? 0) / 60)),
       })));
     } catch {
-      Alert.alert("Error", "No se pudieron cargar las sesiones");
+      AppAlert.alert("Error", "No se pudieron cargar las sesiones");
       setEditBook(null);
     } finally {
       setSessionsLoading(false);
@@ -71,9 +72,9 @@ export default function CalendarScreen() {
     const page = parseInt(s.pageStr, 10);
     const minutes = parseInt(s.minutesStr, 10);
     const pagesRead = parseInt(s.readStr, 10);
-    if (isNaN(page) || page < 0) return Alert.alert("Error", "Página inválida");
-    if (isNaN(minutes) || minutes < 0 || minutes > 1440) return Alert.alert("Error", "Minutos inválidos");
-    if (isNaN(pagesRead) || pagesRead < 0) return Alert.alert("Error", "Páginas leídas inválidas");
+    if (isNaN(page) || page < 0) return AppAlert.alert("Error", "Página inválida");
+    if (isNaN(minutes) || minutes < 0 || minutes > 1440) return AppAlert.alert("Error", "Minutos inválidos");
+    if (isNaN(pagesRead) || pagesRead < 0) return AppAlert.alert("Error", "Páginas leídas inválidas");
 
     setSavingId(s.id);
     try {
@@ -83,10 +84,10 @@ export default function CalendarScreen() {
         pages_read: pagesRead,
       });
       await refreshMonth();
-      Alert.alert("Guardado", "Sesión actualizada");
+      AppAlert.alert("Guardado", "Sesión actualizada");
       setEditBook(null);
     } catch {
-      Alert.alert("Error", "No se pudo guardar la sesión");
+      AppAlert.alert("Error", "No se pudo guardar la sesión");
     } finally {
       setSavingId(null);
     }

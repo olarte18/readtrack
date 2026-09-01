@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, Alert, TextInput } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { getGoals, saveGoal } from "../services/api";
 import { isWhatsNewVisible } from "../utils/whatsNew";
 import { Ionicons } from "@expo/vector-icons";
@@ -30,13 +31,13 @@ export default function ProfileScreen({ navigation }) {
 
   const handleSaveGoal = async () => {
     const g = parseInt(goalInput);
-    if (isNaN(g) || g <= 0) return Alert.alert("Error", "Ingresa una meta válida");
+    if (isNaN(g) || g <= 0) return AppAlert.alert("Error", "Ingresa una meta válida");
     try {
       await saveGoal("annual", "books", g);
       setGoalData((prev) => ({ ...prev, value: g }));
       setEditingGoal(false);
     } catch {
-      Alert.alert("Error", "No se pudo guardar la meta");
+      AppAlert.alert("Error", "No se pudo guardar la meta");
     }
   };
 

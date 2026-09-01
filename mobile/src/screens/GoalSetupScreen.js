@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { useAuth } from "../contexts/AuthContext";
 import { saveGoal } from "../services/api";
 
@@ -26,14 +27,14 @@ export default function GoalSetupScreen() {
   const [customs, setCustoms] = useState({});
 
   const selectGoal = async (type, metric, value) => {
-    if (!value || value <= 0) return Alert.alert("Error", "Ingresa un valor válido");
+    if (!value || value <= 0) return AppAlert.alert("Error", "Ingresa un valor válido");
     setBusyType(type);
     try {
       await saveGoal(type, metric, value);
       setValues((v) => ({ ...v, [type]: { metric, value } }));
       setSaved((s) => ({ ...s, [type]: true }));
     } catch {
-      Alert.alert("Error", "No se pudo guardar la meta");
+      AppAlert.alert("Error", "No se pudo guardar la meta");
     } finally {
       setBusyType(null);
     }

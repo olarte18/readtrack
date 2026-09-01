@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 
 export default function RegisterScreen({ navigation }) {
   const { register } = useAuth();
@@ -13,12 +14,12 @@ export default function RegisterScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleRegister = async () => {
-    if (!username || !email || !password) return Alert.alert("Error", "Completa todos los campos");
+    if (!username || !email || !password) return AppAlert.alert("Error", "Completa todos los campos");
     setLoading(true);
     try {
       await register(username, email, password);
     } catch (error) {
-      Alert.alert("Error", error.message);
+      AppAlert.alert("Error", error.message);
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { getGoals, saveGoal } from "../services/api";
 
 const GOAL_TYPES = [
@@ -51,13 +52,13 @@ if (type === "weekly") return data.progress.weekly;
 
   const handleSave = async (type) => {
     const v = parseInt(editValue);
-    if (isNaN(v) || v <= 0) return Alert.alert("Error", "Ingresa un valor válido");
+    if (isNaN(v) || v <= 0) return AppAlert.alert("Error", "Ingresa un valor válido");
     try {
       await saveGoal(type, editMetric, v);
       await fetchGoals();
       setEditing(null);
     } catch {
-      Alert.alert("Error", "No se pudo guardar la meta");
+      AppAlert.alert("Error", "No se pudo guardar la meta");
     }
   };
 

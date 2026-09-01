@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { addBook } from "../services/api";
 
 const STATUS_OPTIONS = [
@@ -37,10 +38,10 @@ export default function ManualAddBookScreen({ navigation }) {
   const [saving, setSaving] = useState(false);
 
   const handleSave = async () => {
-    if (!title.trim()) return Alert.alert("Error", "El título es obligatorio");
+    if (!title.trim()) return AppAlert.alert("Error", "El título es obligatorio");
     const pageCount = parseInt(pages, 10);
     if (isNaN(pageCount) || pageCount <= 0) {
-      return Alert.alert("Error", "Ingresa un número de páginas válido");
+      return AppAlert.alert("Error", "Ingresa un número de páginas válido");
     }
 
     setSaving(true);
@@ -58,11 +59,11 @@ export default function ManualAddBookScreen({ navigation }) {
         description: description.trim() || undefined,
       };
       await addBook(payload, status);
-      Alert.alert("Listo", `"${title.trim()}" agregado a tu biblioteca`, [
+      AppAlert.alert("Listo", `"${title.trim()}" agregado a tu biblioteca`, [
         { text: "OK", onPress: () => navigation.goBack() },
       ]);
     } catch {
-      Alert.alert("Error", "No se pudo guardar el libro");
+      AppAlert.alert("Error", "No se pudo guardar el libro");
     } finally {
       setSaving(false);
     }

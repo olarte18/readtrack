@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, Alert, ActivityIndicator, TextInput } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, updateBookPages } from "../services/api";
 import { getBookDescription } from "../services/openLibrary";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -72,10 +73,10 @@ useEffect(() => {
       const result = await addBook({ ...book, google_id: book.id }, status);
       setLibraryEntry({ id: result.id, status });
       if (result.book_id) setBookDbId(result.book_id);
-      Alert.alert("Listo", `"${book.title}" agregado a tu biblioteca`);
+      AppAlert.alert("Listo", `"${book.title}" agregado a tu biblioteca`);
       onGoBack?.();
     } catch (error) {
-      Alert.alert("Error", "No se pudo agregar el libro");
+      AppAlert.alert("Error", "No se pudo agregar el libro");
     } finally {
       setLoading(false);
     }
@@ -96,7 +97,7 @@ await updateBook(id, updates);
       setLibraryEntry((prev) => ({ ...prev, status }));
       onGoBack?.();
     } catch (error) {
-      Alert.alert("Error", "No se pudo actualizar el estado");
+      AppAlert.alert("Error", "No se pudo actualizar el estado");
     } finally {
       setLoading(false);
     }
@@ -104,8 +105,8 @@ await updateBook(id, updates);
 
   const handleSavePage = async () => {
     const page = parseInt(currentPage);
-    if (isNaN(page) || page < 0) return Alert.alert("Error", "Ingresa una página válida");
-    if (book.pages && page > book.pages) return Alert.alert("Error", `El libro tiene ${book.pages} páginas`);
+    if (isNaN(page) || page < 0) return AppAlert.alert("Error", "Ingresa una página válida");
+    if (book.pages && page > book.pages) return AppAlert.alert("Error", `El libro tiene ${book.pages} páginas`);
 
     try {
       // Auto-completar si llegó a la última página
@@ -113,14 +114,14 @@ await updateBook(id, updates);
         await updateBook(entryId, { current_page: page, status: "completed" });
         setSelectedStatus("completed");
         setLibraryEntry((prev) => ({ ...prev, status: "completed" }));
-        Alert.alert("¡Felicidades!", `Terminaste "${book.title}"`);
+        AppAlert.alert("¡Felicidades!", `Terminaste "${book.title}"`);
       } else {
         await updateBook(entryId, { current_page: page });
-        Alert.alert("Guardado", `Página ${page} guardada`);
+        AppAlert.alert("Guardado", `Página ${page} guardada`);
       }
       onGoBack?.();
     } catch {
-      Alert.alert("Error", "No se pudo guardar la página");
+      AppAlert.alert("Error", "No se pudo guardar la página");
     }
   };
 
@@ -129,7 +130,7 @@ await updateBook(id, updates);
     try {
       await updateBook(entryId, { rating: stars });
     } catch {
-      Alert.alert("Error", "No se pudo guardar el rating");
+      AppAlert.alert("Error", "No se pudo guardar el rating");
     }
   };
 const handleDateChange = async (field, date) => {
@@ -140,11 +141,11 @@ const handleDateChange = async (field, date) => {
   try {
     await updateBook(entryId, { [field]: iso });
   } catch {
-    Alert.alert("Error", "No se pudo guardar la fecha");
+    AppAlert.alert("Error", "No se pudo guardar la fecha");
   }
 };
   const handleDelete = () => {
-    Alert.alert(
+    AppAlert.alert(
       "Eliminar libro",
       `¿Quitar "${book.title}" de tu biblioteca?`,
       [
@@ -158,7 +159,7 @@ const handleDateChange = async (field, date) => {
               onGoBack?.();
               navigation.goBack();
             } catch {
-              Alert.alert("Error", "No se pudo eliminar el libro");
+              AppAlert.alert("Error", "No se pudo eliminar el libro");
             }
           }
         }
@@ -166,19 +167,19 @@ const handleDateChange = async (field, date) => {
     );
   };
 const handleAddNote = async () => {
-  if (!newNote.trim()) return Alert.alert("Error", "Escribe algo en la nota");
+  if (!newNote.trim()) return AppAlert.alert("Error", "Escribe algo en la nota");
   try {
     const note = await addNote(bookDbId, newNote.trim(), notePage ? parseInt(notePage) : null);
     setNotes((prev) => [note, ...prev]);
     setNewNote("");
     setNotePage("");
   } catch {
-    Alert.alert("Error", "No se pudo guardar la nota");
+    AppAlert.alert("Error", "No se pudo guardar la nota");
   }
 };
 
 const handleDeleteNote = (id) => {
-  Alert.alert("Eliminar nota", "¿Eliminar esta nota?", [
+  AppAlert.alert("Eliminar nota", "¿Eliminar esta nota?", [
     { text: "Cancelar", style: "cancel" },
     {
       text: "Eliminar", style: "destructive",
@@ -251,12 +252,12 @@ const handleDeleteNote = (id) => {
               style={styles.pageBtn}
               onPress={async () => {
                 const p = parseInt(totalPages);
-                if (isNaN(p) || p <= 0) return Alert.alert("Error", "Ingresa un número válido");
+                if (isNaN(p) || p <= 0) return AppAlert.alert("Error", "Ingresa un número válido");
                 try {
                   await updateBookPages(book.google_id ?? book.db_id ?? book.id, p);
-                  Alert.alert("Guardado", `${p} páginas guardadas`);
+                  AppAlert.alert("Guardado", `${p} páginas guardadas`);
                 } catch {
-                  Alert.alert("Error", "No se pudo guardar");
+                  AppAlert.alert("Error", "No se pudo guardar");
                 }
               }}
             >

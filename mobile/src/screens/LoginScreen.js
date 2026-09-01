@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, Alert, ActivityIndicator, Image } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 
 export default function LoginScreen({ navigation }) {
   const { login } = useAuth();
@@ -12,12 +13,12 @@ export default function LoginScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
-    if (!email || !password) return Alert.alert("Error", "Completa todos los campos");
+    if (!email || !password) return AppAlert.alert("Error", "Completa todos los campos");
     setLoading(true);
     try {
       await login(email, password);
     } catch (error) {
-      Alert.alert("Error", error.message);
+      AppAlert.alert("Error", error.message);
     } finally {
       setLoading(false);
     }

@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { usePreventRemove } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
 import { cancelAlarm, ensureChannel, markAlarmHintSeen, openAlarmSettings, openFullScreenIntentSettings, requestAlarmPermission, scheduleAlarm, shouldShowAlarmHint } from "../services/notifications";
 
@@ -102,7 +103,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     if (appState.current !== "active") return;
     alarm.loop = true;
     alarm.play();
-    Alert.alert(
+    AppAlert.alert(
       "Tiempo cumplido",
       `¡Terminaste tu sesión de ${Math.round(duration / 60)} minutos!`,
       [
@@ -154,7 +155,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     const { granted, available } = await requestAlarmPermission();
     if (available && !granted && !permissionWarnedRef.current) {
       permissionWarnedRef.current = true;
-      Alert.alert(
+      AppAlert.alert(
         "Alarma con la pantalla apagada",
         "Permite las notificaciones de ReadTrack para que la alarma del temporizador suene aunque dejes la app en segundo plano."
       );
@@ -163,7 +164,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
       alarmHintRef.current = true;
       const show = await shouldShowAlarmHint();
       if (show) {
-        Alert.alert(
+        AppAlert.alert(
           "Suena como una alarma",
           "La alarma usa el canal de alarmas del teléfono, así que se escucha incluso en modo silencioso. Para que también suene con el modo No molestar, permite el acceso de la app en los ajustes del sistema.",
           [
@@ -185,7 +186,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const startTimer = () => {
     const min = parseInt(minutesInput, 10);
     if (isNaN(min) || min <= 0 || min > 600) {
-      return Alert.alert("Error", "Elige un tiempo válido entre 1 y 600 minutos");
+      return AppAlert.alert("Error", "Elige un tiempo válido entre 1 y 600 minutos");
     }
     alarmFiredRef.current = false;
     setDuration(min * 60);
@@ -255,7 +256,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         streakInfo: saved?.first_today ? { days: saved.streak ?? 1 } : null,
       });
     } catch {
-      Alert.alert("Error", "No se pudo guardar la sesión");
+      AppAlert.alert("Error", "No se pudo guardar la sesión");
     } finally {
       savingRef.current = false;
       setSaving(false);
@@ -269,7 +270,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   // temporizador ni el momento del guardado, que navega con replace.
   const shouldPreventLeave = !(isTimer && !timerStarted) && !saving;
   usePreventRemove(shouldPreventLeave, ({ data }) => {
-    Alert.alert(
+    AppAlert.alert(
       "¿Seguro que quieres salir?",
       "Dejarás tu sesión de lectura y tu avance se perderá si no guardas.",
       [
@@ -287,7 +288,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const confirmSave = () => {
     const page = parseInt(endPage);
     if (isNaN(page) || page < startPage) {
-      return Alert.alert("Error", "La página final debe ser mayor o igual a la inicial");
+      return AppAlert.alert("Error", "La página final debe ser mayor o igual a la inicial");
     }
     setFinishVisible(false);
     saveSession({ page, pages: Math.max(0, page - startPage) });

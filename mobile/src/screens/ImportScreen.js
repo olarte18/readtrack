@@ -1,6 +1,7 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { AppAlert } from "../components/AppAlert";
 import * as DocumentPicker from "expo-document-picker";
 import { File } from "expo-file-system";
 import { useTheme } from "../contexts/ThemeContext";
@@ -58,7 +59,7 @@ export default function ImportScreen({ navigation }) {
           setPreview(data);
         } catch (e) {
           setPreview(null);
-          Alert.alert("Error", e.message || "No se pudo leer el archivo de Bookmory");
+          AppAlert.alert("Error", e.message || "No se pudo leer el archivo de Bookmory");
         } finally {
           setLoading(false);
         }
@@ -74,13 +75,13 @@ export default function ImportScreen({ navigation }) {
           setPreview(data);
         } catch (e) {
           setPreview(null);
-          Alert.alert("Error", e.message || "No se pudo leer el archivo CSV");
+          AppAlert.alert("Error", e.message || "No se pudo leer el archivo CSV");
         } finally {
           setLoading(false);
         }
       }
     } catch {
-      Alert.alert("Error", "No se pudo abrir el archivo");
+      AppAlert.alert("Error", "No se pudo abrir el archivo");
     } finally {
       setPicking(false);
     }
@@ -92,7 +93,7 @@ export default function ImportScreen({ navigation }) {
       const res = mode === "bookmory" ? await importBookmory(fileBase64) : await importBooks(csv);
       setResult(res);
     } catch (e) {
-      Alert.alert("Error", e.message || "No se pudo importar");
+      AppAlert.alert("Error", e.message || "No se pudo importar");
     } finally {
       setImporting(false);
     }

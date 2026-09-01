@@ -1,8 +1,9 @@
 import { useState } from "react";
-import { View, Text, TextInput, Image, StyleSheet, ScrollView, TouchableOpacity, Alert, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useDebouncedCallback } from "use-debounce";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { updateBookFicha } from "../services/api";
 
 const BOOK_TYPES = [
@@ -41,12 +42,12 @@ export default function EditBookScreen({ route, navigation }) {
   };
 
   const handleSave = async () => {
-    if (!title.trim()) return Alert.alert("Error", "El título no puede quedar vacío");
+    if (!title.trim()) return AppAlert.alert("Error", "El título no puede quedar vacío");
     let pageCount = null;
     if (pages.trim()) {
       pageCount = parseInt(pages, 10);
       if (isNaN(pageCount) || pageCount <= 0) {
-        return Alert.alert("Error", "Ingresa un número de páginas válido");
+        return AppAlert.alert("Error", "Ingresa un número de páginas válido");
       }
     }
 
@@ -78,7 +79,7 @@ export default function EditBookScreen({ route, navigation }) {
         publisher: publisher.trim() || null,
         book_type: bookType,
       };
-      Alert.alert("Guardado", "Ficha del libro actualizada", [
+      AppAlert.alert("Guardado", "Ficha del libro actualizada", [
         {
           text: "OK",
           onPress: () =>
@@ -90,7 +91,7 @@ export default function EditBookScreen({ route, navigation }) {
         },
       ]);
     } catch {
-      Alert.alert("Error", "No se pudo actualizar la ficha");
+      AppAlert.alert("Error", "No se pudo actualizar la ficha");
     } finally {
       setSaving(false);
     }

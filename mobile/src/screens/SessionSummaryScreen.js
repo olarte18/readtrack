@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated, Alert } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+import { AppAlert } from "../components/AppAlert";
 import { updateBook } from "../services/api";
 
 const formatTime = (s) => {
@@ -29,7 +30,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
     try {
       await updateBook(book.id, { rating: stars });
     } catch {
-      Alert.alert("Error", "No se pudo guardar la calificación");
+      AppAlert.alert("Error", "No se pudo guardar la calificación");
     }
   };
 

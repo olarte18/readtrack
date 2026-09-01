@@ -27,6 +27,7 @@ import ImportScreen from "./src/screens/ImportScreen";
 import NotesScreen from "./src/screens/NotesScreen";
 import WhatsNewScreen from "./src/screens/WhatsNewScreen";
 import WhatsNewPopup from "./src/components/WhatsNewPopup";
+import { AppAlertHost } from "./src/components/AppAlert";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
 import { warmup } from "./src/services/api";
@@ -149,6 +150,7 @@ export default function App() {
     <AuthProvider>
       <ThemeProvider>
         <Navigation />
+        <AppAlertHost />
       </ThemeProvider>
     </AuthProvider>
   );
