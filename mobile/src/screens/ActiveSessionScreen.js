@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { usePreventRemove } from "@react-navigation/native";
@@ -27,6 +27,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const [saving, setSaving] = useState(false);
   const [finishVisible, setFinishVisible] = useState(false);
   const [keepAwake, setKeepAwakeState] = useState(false);
+  const [simpleMode, setSimpleMode] = useState(false);
+  const [now, setNow] = useState(() => new Date());
   const savingRef = useRef(false);
 
   const AlarmNative = Platform.OS === "android" ? NativeModules.ReadTrackAlarm : null;
@@ -95,6 +97,11 @@ export default function ActiveSessionScreen({ route, navigation }) {
     }
     return () => clearInterval(intervalRef.current);
   }, [running, isTimer]);
+
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     if (!isTimer || !timerStarted || seconds > 0 || alarmFiredRef.current) return;
@@ -217,6 +224,26 @@ export default function ActiveSessionScreen({ route, navigation }) {
     try {
       AlarmNative?.setKeepAwake?.(value);
     } catch {}
+  };
+
+  const enterSimpleMode = () => {
+    setSimpleMode(true);
+    try {
+      AlarmNative?.setKeepAwake?.(true);
+    } catch {}
+  };
+
+  const exitSimpleMode = () => {
+    setSimpleMode(false);
+    try {
+      AlarmNative?.setKeepAwake?.(keepAwake);
+    } catch {}
+  };
+
+  const clockText = () => {
+    const h = now.getHours();
+    const m = now.getMinutes();
+    return `${h}:${String(m).padStart(2, "0")}`;
   };
 
   const pagesRead = Math.max(0, parseInt(endPage || 0) - startPage);
@@ -426,9 +453,35 @@ export default function ActiveSessionScreen({ route, navigation }) {
     );
   }
 
+  if (simpleMode) {
+    return (
+      <TouchableOpacity style={styles.simpleContainer} activeOpacity={1} onPress={exitSimpleMode}>
+        <Text style={styles.simpleClock}>{clockText()}</Text>
+        <Text style={styles.simpleDate}>{now.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}</Text>
+        {book.cover ? (
+          <Image source={{ uri: book.cover }} style={styles.simpleCover} resizeMode="cover" />
+        ) : (
+          <View style={[styles.simpleCover, styles.simpleCoverNoImg]}>
+            <Ionicons name="book" size={36} color="#444" />
+          </View>
+        )}
+        <Text style={styles.simpleBookTitle} numberOfLines={1}>{book.title}</Text>
+        <Text style={styles.simpleTimer}>{isTimer ? "Tiempo restante" : "Tiempo transcurrido"} · {formatTime(seconds)}</Text>
+        <Text style={styles.simpleHint}>Toca la pantalla para volver</Text>
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <View style={styles.container}>
-      <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+      {book.cover ? (
+        <View style={styles.hero}>
+          <Image source={{ uri: book.cover }} style={styles.heroCover} resizeMode="cover" />
+          <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+        </View>
+      ) : (
+        <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+      )}
 
       <View style={styles.timerContainer}>
         <Text style={styles.timerLabel}>{isTimer ? "Tiempo restante" : "Tiempo transcurrido"}</Text>
@@ -505,6 +558,11 @@ export default function ActiveSessionScreen({ route, navigation }) {
           </View>
         </View>
       )}
+
+      <TouchableOpacity style={styles.simpleBtn} onPress={enterSimpleMode}>
+        <Ionicons name="moon-outline" size={16} color={colors.accent} />
+        <Text style={styles.simpleBtnText}>Modo simple</Text>
+      </TouchableOpacity>
 
       <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
         {saving ? (
@@ -613,4 +671,33 @@ const createStyles = (colors) =>
     modalBtn: { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 28 },
     modalBtnCancel: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
     modalBtnCancelText: { color: colors.textDim, fontSize: 15, fontWeight: "bold" },
+    hero: { alignItems: "center", marginBottom: 30 },
+    heroCover: { width: 76, height: 114, borderRadius: 10, marginBottom: 14, backgroundColor: colors.surfaceAlt },
+    simpleBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 6,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 12,
+      paddingVertical: 14,
+      marginBottom: 12,
+    },
+    simpleBtnText: { color: colors.accent, fontSize: 15, fontWeight: "bold" },
+    simpleContainer: {
+      flex: 1,
+      backgroundColor: "#000",
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: 32,
+    },
+    simpleClock: { fontSize: 92, fontWeight: "200", color: "#fff", fontVariant: ["tabular-nums"], letterSpacing: 2 },
+    simpleDate: { fontSize: 14, color: "#777", marginTop: 4, textTransform: "capitalize", marginBottom: 36 },
+    simpleCover: { width: 130, height: 195, borderRadius: 12, marginBottom: 22 },
+    simpleCoverNoImg: { backgroundColor: "#16161f", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#2a2a3e" },
+    simpleBookTitle: { color: "#fff", fontSize: 15, fontWeight: "bold", width: "70%", textAlign: "center", marginBottom: 10 },
+    simpleTimer: { color: "#999", fontSize: 14, marginBottom: 10 },
+    simpleHint: { color: "#555", fontSize: 12, position: "absolute", bottom: 40 },
   });
