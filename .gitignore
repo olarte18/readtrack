@@ -10,6 +10,9 @@ api/.env
 # General
 *.log
 .DS_Store
+
+# Guía de asistentes: solo local, no se sube a GitHub
+AGENTS.md
 mobile/.env
 mobile/.env
 

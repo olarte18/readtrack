@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform, Image } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform, Image, ImageBackground } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { usePreventRemove } from "@react-navigation/native";
@@ -474,14 +474,19 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   return (
     <View style={styles.container}>
-      {book.cover ? (
-        <View style={styles.hero}>
-          <Image source={{ uri: book.cover }} style={styles.heroCover} resizeMode="cover" />
-          <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-        </View>
-      ) : (
-        <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+      {book.cover && (
+        <>
+          <ImageBackground source={{ uri: book.cover }} style={styles.bgImage} blurRadius={24} resizeMode="cover" />
+          <View style={styles.bgOverlay} />
+        </>
       )}
+      <View style={styles.header}>
+        <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
+        <TouchableOpacity style={styles.simpleBtn} onPress={enterSimpleMode}>
+          <Ionicons name="moon-outline" size={14} color={colors.accent} />
+          <Text style={styles.simpleBtnText}>Modo simple</Text>
+        </TouchableOpacity>
+      </View>
 
       <View style={styles.timerContainer}>
         <Text style={styles.timerLabel}>{isTimer ? "Tiempo restante" : "Tiempo transcurrido"}</Text>
@@ -559,11 +564,6 @@ export default function ActiveSessionScreen({ route, navigation }) {
         </View>
       )}
 
-      <TouchableOpacity style={styles.simpleBtn} onPress={enterSimpleMode}>
-        <Ionicons name="moon-outline" size={16} color={colors.accent} />
-        <Text style={styles.simpleBtnText}>Modo simple</Text>
-      </TouchableOpacity>
-
       <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
         {saving ? (
           <ActivityIndicator color={colors.onAccent} />
@@ -579,13 +579,16 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
 const createStyles = (colors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, paddingTop: 60, paddingHorizontal: 24 },
-    bookTitle: { fontSize: 18, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 30 },
+    container: { flex: 1, backgroundColor: colors.background, paddingTop: 44, paddingHorizontal: 24, overflow: "hidden" },
+    bookTitle: { fontSize: 18, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 12 },
+    bgImage: { ...StyleSheet.absoluteFillObject },
+    bgOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.background, opacity: 0.82 },
+    header: { alignItems: "center", marginBottom: 20 },
     subtitle: { fontSize: 15, color: colors.textDim, textAlign: "center", marginBottom: 24 },
-    timerContainer: { alignItems: "center", marginBottom: 30 },
+    timerContainer: { alignItems: "center", marginBottom: 18 },
     timerLabel: { fontSize: 13, color: colors.textDim, marginBottom: 4 },
     timer: { fontSize: 64, fontWeight: "bold", color: colors.accent, fontVariant: ["tabular-nums"] },
-    pauseBtn: { backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 40, paddingVertical: 19, marginTop: 20 },
+    pauseBtn: { backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 36, paddingVertical: 14, marginTop: 14 },
     pauseBtnRow: { flexDirection: "row", alignItems: "center", gap: 8 },
     pauseBtnText: { color: colors.accent, fontSize: 20, fontWeight: "bold" },
     chipsRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 10, marginBottom: 24 },
@@ -607,8 +610,8 @@ const createStyles = (colors) =>
       borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 14,
-      paddingVertical: 12,
-      marginBottom: 24,
+      paddingVertical: 10,
+      marginBottom: 16,
     },
     noticeText: { flex: 1, color: colors.textDim, fontSize: 12.5, lineHeight: 17 },
     fsiBtn: {
@@ -629,27 +632,27 @@ const createStyles = (colors) =>
       borderColor: colors.border,
       borderRadius: 12,
       paddingHorizontal: 14,
-      paddingVertical: 10,
-      marginBottom: 24,
+      paddingVertical: 9,
+      marginBottom: 16,
     },
     toggleLabel: { flex: 1, color: colors.text, fontSize: 14, fontWeight: "bold" },
     backBtn: { marginTop: 12, alignItems: "center", paddingVertical: 12 },
     backBtnText: { color: colors.textDim, fontSize: 15, fontWeight: "bold" },
-    pagesContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 30, gap: 12 },
-    pageBox: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, alignItems: "center", minWidth: 100 },
-    pageBoxLabel: { color: colors.textDim, fontSize: 12, marginBottom: 8 },
-    pageBoxValue: { color: colors.text, fontSize: 28, fontWeight: "bold" },
-    statsContainer: { flexDirection: "row", justifyContent: "space-around", backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 24 },
+    pagesContainer: { flexDirection: "row", alignItems: "center", justifyContent: "center", marginBottom: 18, gap: 12 },
+    pageBox: { backgroundColor: colors.surface, borderRadius: 12, padding: 12, alignItems: "center", minWidth: 96 },
+    pageBoxLabel: { color: colors.textDim, fontSize: 11, marginBottom: 6 },
+    pageBoxValue: { color: colors.text, fontSize: 26, fontWeight: "bold" },
+    statsContainer: { flexDirection: "row", justifyContent: "space-around", backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginBottom: 18 },
     statItem: { alignItems: "center" },
     statValue: { fontSize: 22, fontWeight: "bold", color: colors.accent },
     statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
-    progressSection: { marginBottom: 30 },
+    progressSection: { marginBottom: 18 },
     progressLabel: { color: colors.textMuted, fontSize: 13, marginBottom: 8, textAlign: "center" },
     progressContainer: { height: 8, backgroundColor: colors.surfaceAlt, borderRadius: 4, overflow: "hidden" },
     progressBar: { height: 8, backgroundColor: colors.accent, borderRadius: 4 },
-    finishBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: "center" },
+    finishBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 14, alignItems: "center" },
     finishBtnText: { color: colors.onAccent, fontSize: 16, fontWeight: "bold" },
-    avgSpeed: { color: colors.textDim, fontSize: 12, textAlign: "center", marginBottom: 16 },
+    avgSpeed: { color: colors.textDim, fontSize: 12, textAlign: "center", marginBottom: 10 },
     completedBox: { alignItems: "center", marginBottom: 32, marginTop: 24 },
     completedTitle: { fontSize: 22, fontWeight: "bold", color: colors.text, marginTop: 12 },
     completedSub: { fontSize: 14, color: colors.textDim, marginTop: 6 },
@@ -671,8 +674,6 @@ const createStyles = (colors) =>
     modalBtn: { borderRadius: 12, paddingVertical: 14, paddingHorizontal: 28 },
     modalBtnCancel: { backgroundColor: colors.surfaceAlt, borderWidth: 1, borderColor: colors.border },
     modalBtnCancelText: { color: colors.textDim, fontSize: 15, fontWeight: "bold" },
-    hero: { alignItems: "center", marginBottom: 30 },
-    heroCover: { width: 76, height: 114, borderRadius: 10, marginBottom: 14, backgroundColor: colors.surfaceAlt },
     simpleBtn: {
       flexDirection: "row",
       alignItems: "center",
@@ -681,11 +682,12 @@ const createStyles = (colors) =>
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 12,
-      paddingVertical: 14,
-      marginBottom: 12,
+      borderRadius: 20,
+      paddingHorizontal: 18,
+      paddingVertical: 7,
+      alignSelf: "center",
     },
-    simpleBtnText: { color: colors.accent, fontSize: 15, fontWeight: "bold" },
+    simpleBtnText: { color: colors.accent, fontSize: 13, fontWeight: "bold" },
     simpleContainer: {
       flex: 1,
       backgroundColor: "#000",
