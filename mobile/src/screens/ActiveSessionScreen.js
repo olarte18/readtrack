@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Alert, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
+import { usePreventRemove } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
 import { cancelAlarm, ensureChannel, markAlarmHintSeen, openAlarmSettings, openFullScreenIntentSettings, requestAlarmPermission, scheduleAlarm, shouldShowAlarmHint } from "../services/notifications";
@@ -262,6 +263,26 @@ export default function ActiveSessionScreen({ route, navigation }) {
   };
 
   const handleFinish = () => setFinishVisible(true);
+
+  // Cualquier intento de salir de la sesión (botón/gesto atrás en Android e iOS)
+  // pide confirmación. No protege la pantalla previa de configurar el
+  // temporizador ni el momento del guardado, que navega con replace.
+  const shouldPreventLeave = !(isTimer && !timerStarted) && !saving;
+  usePreventRemove(shouldPreventLeave, ({ data }) => {
+    Alert.alert(
+      "¿Seguro que quieres salir?",
+      "Dejarás tu sesión de lectura y tu avance se perderá si no guardas.",
+      [
+        { text: "Seguir leyendo", style: "cancel" },
+        { text: "Guardar y salir", onPress: () => setFinishVisible(true) },
+        {
+          text: "Salir sin guardar",
+          style: "destructive",
+          onPress: () => navigation.dispatch(data.action),
+        },
+      ]
+    );
+  });
 
   const confirmSave = () => {
     const page = parseInt(endPage);
