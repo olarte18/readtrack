@@ -93,17 +93,24 @@ export default function ProfileScreen({ navigation }) {
         <Text style={styles.sectionTitle}>Tema de la app</Text>
         <View style={styles.themeRow}>
           <TouchableOpacity
+            style={[styles.themeBtn, theme === "system" && styles.themeBtnActive]}
+            onPress={() => setTheme("system")}
+          >
+            <Ionicons name="contrast" size={16} color={theme === "system" ? colors.onAccent : colors.textMuted} />
+            <Text style={[styles.themeBtnText, theme === "system" && styles.themeBtnTextActive]}>Sistema</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
             style={[styles.themeBtn, theme === "light" && styles.themeBtnActive]}
             onPress={() => setTheme("light")}
           >
-            <Ionicons name="sunny" size={18} color={theme === "light" ? colors.onAccent : colors.textMuted} />
+            <Ionicons name="sunny" size={16} color={theme === "light" ? colors.onAccent : colors.textMuted} />
             <Text style={[styles.themeBtnText, theme === "light" && styles.themeBtnTextActive]}>Claro</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.themeBtn, theme === "dark" && styles.themeBtnActive]}
             onPress={() => setTheme("dark")}
           >
-            <Ionicons name="moon" size={18} color={theme === "dark" ? colors.onAccent : colors.textMuted} />
+            <Ionicons name="moon" size={16} color={theme === "dark" ? colors.onAccent : colors.textMuted} />
             <Text style={[styles.themeBtnText, theme === "dark" && styles.themeBtnTextActive]}>Oscuro</Text>
           </TouchableOpacity>
         </View>

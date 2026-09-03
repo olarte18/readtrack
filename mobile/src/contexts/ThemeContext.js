@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect } from "react";
+import { useColorScheme } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { DarkTheme, DefaultTheme } from "@react-navigation/native";
 
@@ -75,24 +76,26 @@ const ThemeContext = createContext();
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(null);
   const [ready, setReady] = useState(false);
+  const systemScheme = useColorScheme();
 
   useEffect(() => {
     AsyncStorage.getItem(THEME_KEY).then((saved) => {
-      if (saved === "light" || saved === "dark") setTheme(saved);
+      if (saved === "light" || saved === "dark" || saved === "system") setTheme(saved);
       setReady(true);
     });
   }, []);
 
   const applyTheme = async (mode) => {
-    if (mode !== "light" && mode !== "dark") return;
+    if (mode !== "light" && mode !== "dark" && mode !== "system") return;
     setTheme(mode);
     await AsyncStorage.setItem(THEME_KEY, mode);
   };
 
-  const isDark = theme === "dark";
   const isPicked = theme !== null;
-  const colors = palettes[theme ?? "dark"];
-  const navigationTheme = navThemes[theme ?? "dark"];
+  const resolved = theme === "system" ? (systemScheme === "dark" ? "dark" : "light") : theme;
+  const colors = palettes[resolved ?? "dark"];
+  const navigationTheme = navThemes[resolved ?? "dark"];
+  const isDark = resolved === "dark";
 
   return (
     <ThemeContext.Provider

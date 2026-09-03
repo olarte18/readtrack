@@ -3,7 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 
 export default function ThemePickerScreen() {
-  const { colors, setTheme } = useTheme();
+  const { colors, theme, setTheme } = useTheme();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
@@ -14,6 +14,25 @@ export default function ThemePickerScreen() {
       <Text style={[styles.subtitle, { color: colors.textMuted }]}>
         Podrás cambiarlo más tarde desde tu perfil
       </Text>
+
+      <TouchableOpacity
+        style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        onPress={() => setTheme("system")}
+        activeOpacity={0.8}
+      >
+        <View style={[styles.swatch, { backgroundColor: "#2a2a3e", borderColor: "#444466" }]}>
+          <Ionicons name="contrast" size={26} color="#cba6f7" />
+        </View>
+        <View style={styles.optionText}>
+          <Text style={[styles.optionTitle, { color: colors.text }]}>Sistema</Text>
+          <Text style={[styles.optionDesc, { color: colors.textMuted }]}>
+            Usa el tema de tu teléfono
+          </Text>
+        </View>
+        {theme === "system"
+          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} />}
+      </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border }]}
@@ -29,7 +48,9 @@ export default function ThemePickerScreen() {
             Fondos claros y texto oscuro
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.textDim} />
+        {theme === "light"
+          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} />}
       </TouchableOpacity>
 
       <TouchableOpacity
@@ -46,7 +67,9 @@ export default function ThemePickerScreen() {
             Fondos oscuros y texto claro
           </Text>
         </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.textDim} />
+        {theme === "dark"
+          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
+          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} />}
       </TouchableOpacity>
     </View>
   );
