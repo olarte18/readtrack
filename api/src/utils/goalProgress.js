@@ -1,18 +1,21 @@
 const pool = require("../db/connection");
 
+const BOGOTA_TZ = "America/Bogota";
+const bogotaYear = () => Number(new Intl.DateTimeFormat("en-CA", { timeZone: BOGOTA_TZ, year: "numeric" }).format(new Date()));
+
 // Devuelve solo las metas que se superaron JUSTO con la sesión que se acaba de
 // guardar: compara el progreso actual contra el progreso anterior (sin esta
 // sesión ni el libro terminado en este guardado).
 async function getGoalCompletion(userId, opts = {}) {
   const { excludeSeconds = 0, bookCompleted = false } = opts;
-  const year = new Date().getFullYear();
+  const year = bogotaYear();
   const { rows: goals } = await pool.query(
     "SELECT type, metric, value FROM reading_goals WHERE user_id = $1 AND year = $2",
     [userId, year]
   );
   if (goals.length === 0) return [];
 
-  const now = await computeProgress(userId, year);
+  const now = await computeProgress(userId);
   const before = subtractProgress(now, excludeSeconds, bookCompleted);
 
   const completed = [];
@@ -58,19 +61,22 @@ function goalCurrent(goal, progress) {
   }
 }
 
-async function computeProgress(userId, year) {
+async function computeProgress(userId) {
   const result = {};
 
   const { rows: books } = await pool.query(
     `SELECT
-       COUNT(*) FILTER (WHERE EXTRACT(YEAR FROM finished_at) = $2) AS annual,
        COUNT(*) FILTER (
-         WHERE EXTRACT(YEAR FROM finished_at) = $2
-           AND EXTRACT(MONTH FROM finished_at) = $3
+         WHERE finished_at >= date_trunc('year', NOW() AT TIME ZONE $2)::date
+           AND finished_at < (date_trunc('year', NOW() AT TIME ZONE $2) + INTERVAL '1 year')::date
+       ) AS annual,
+       COUNT(*) FILTER (
+         WHERE finished_at >= date_trunc('month', NOW() AT TIME ZONE $2)::date
+           AND finished_at < (date_trunc('month', NOW() AT TIME ZONE $2) + INTERVAL '1 month')::date
        ) AS monthly_books
      FROM user_books
      WHERE user_id = $1 AND status = 'completed'`,
-    [userId, year, new Date().getMonth() + 1]
+    [userId, BOGOTA_TZ]
   );
   result.annual = parseInt(books[0].annual);
   result.monthly_books = parseInt(books[0].monthly_books);

@@ -8,12 +8,14 @@ const cache = require("../utils/cache");
 
 const TYPES = ["annual", "monthly", "weekly", "daily"];
 const METRICS = ["books", "minutes", "hours"];
+const BOGOTA_TZ = "America/Bogota";
+const bogotaYear = () => Number(new Intl.DateTimeFormat("en-CA", { timeZone: BOGOTA_TZ, year: "numeric" }).format(new Date()));
 
 router.use(authMiddleware);
 
 // GET /goals — obtener todas las metas del año actual
 router.get("/", async (req, res) => {
-  const year = new Date().getFullYear();
+  const year = bogotaYear();
   const cacheKey = `goals:${req.userId}:${year}`;
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
@@ -27,8 +29,9 @@ router.get("/", async (req, res) => {
     `SELECT COUNT(*) AS books
      FROM user_books
      WHERE user_id = $1 AND status = 'completed'
-     AND EXTRACT(YEAR FROM finished_at) = $2`,
-    [req.userId, year]
+       AND finished_at >= date_trunc('year', NOW() AT TIME ZONE $2)::date
+       AND finished_at < (date_trunc('year', NOW() AT TIME ZONE $2) + INTERVAL '1 year')::date`,
+    [req.userId, BOGOTA_TZ]
   );
 
   const { rows: weeklyProgress } = await pool.query(
@@ -53,9 +56,9 @@ router.get("/", async (req, res) => {
     `SELECT COUNT(*) AS books
      FROM user_books
      WHERE user_id = $1 AND status = 'completed'
-     AND EXTRACT(YEAR FROM finished_at) = $2
-     AND EXTRACT(MONTH FROM finished_at) = $3`,
-    [req.userId, year, new Date().getMonth() + 1]
+       AND finished_at >= date_trunc('month', NOW() AT TIME ZONE $2)::date
+       AND finished_at < (date_trunc('month', NOW() AT TIME ZONE $2) + INTERVAL '1 month')::date`,
+    [req.userId, BOGOTA_TZ]
   );
 
   const { rows: monthlyMinutesProgress } = await pool.query(
@@ -104,7 +107,7 @@ router.post("/", async (req, res) => {
     metric: { required: true, type: "string", enum: METRICS },
     value: { required: true, type: "integer", min: 1 },
   });
-  const year = new Date().getFullYear();
+  const year = bogotaYear();
 
   const { rows } = await pool.query(
     `INSERT INTO reading_goals (user_id, type, metric, value, year)

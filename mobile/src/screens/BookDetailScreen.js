@@ -16,6 +16,20 @@ const STATUS_OPTIONS = [
   { key: "abandoned", label: "Abandonado" },
 ];
 
+function toLocalDateString(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function parseLocalDate(str) {
+  if (!str) return null;
+  const [y, m, d] = str.split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Date(y, m - 1, d);
+}
+
 export default function BookDetailScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -34,8 +48,8 @@ export default function BookDetailScreen({ route, navigation }) {
   const [notes, setNotes] = useState([]);
 const [newNote, setNewNote] = useState("");
 const [notePage, setNotePage] = useState("");
-const [startedAt, setStartedAt] = useState(book.started_at ? new Date(book.started_at) : null);
-const [finishedAt, setFinishedAt] = useState(book.finished_at ? new Date(book.finished_at) : null);
+const [startedAt, setStartedAt] = useState(book.started_at ? parseLocalDate(book.started_at) : null);
+const [finishedAt, setFinishedAt] = useState(book.finished_at ? parseLocalDate(book.finished_at) : null);
 const [showStartPicker, setShowStartPicker] = useState(false);
 const [showEndPicker, setShowEndPicker] = useState(false);
   const [description, setDescription] = useState(book.description ?? null);
@@ -88,10 +102,10 @@ useEffect(() => {
     try {
       const updates = { status };
 if (status === "reading" && !libraryEntry?.started_at) {
-  updates.started_at = new Date().toISOString().split("T")[0];
+  updates.started_at = toLocalDateString(new Date());
 }
 if (status === "completed") {
-  updates.finished_at = new Date().toISOString().split("T")[0];
+  updates.finished_at = toLocalDateString(new Date());
 }
 await updateBook(id, updates);
       setLibraryEntry((prev) => ({ ...prev, status }));
@@ -135,7 +149,7 @@ await updateBook(id, updates);
   };
 const handleDateChange = async (field, date) => {
   if (!date) return;
-  const iso = date.toISOString().split("T")[0];
+  const iso = toLocalDateString(date);
   if (field === "started_at") setStartedAt(date);
   else setFinishedAt(date);
   try {
@@ -272,14 +286,14 @@ const handleDeleteNote = (id) => {
     <TouchableOpacity style={styles.dateRow} onPress={() => setShowStartPicker(true)}>
       <Text style={styles.dateLabel}>Inicio</Text>
       <Text style={styles.dateValue}>
-        {startedAt ? startedAt.toISOString().split("T")[0] : "Toca para agregar"}
+        {startedAt ? toLocalDateString(startedAt) : "Toca para agregar"}
       </Text>
     </TouchableOpacity>
     {selectedStatus === "completed" && (
   <TouchableOpacity style={styles.dateRow} onPress={() => setShowEndPicker(true)}>
     <Text style={styles.dateLabel}>Fin</Text>
     <Text style={styles.dateValue}>
-      {finishedAt ? finishedAt.toISOString().split("T")[0] : "Toca para agregar"}
+      {finishedAt ? toLocalDateString(finishedAt) : "Toca para agregar"}
     </Text>
   </TouchableOpacity>
 )}
