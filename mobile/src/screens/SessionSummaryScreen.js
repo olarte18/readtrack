@@ -19,10 +19,26 @@ const formatMinutes = (min) => {
   return `${Math.round(min)}min`;
 };
 
+const GOAL_LABELS = {
+  daily: "hoy",
+  weekly: "esta semana",
+  monthly: "este mes",
+  annual: "este año",
+};
+
+const goalDescription = (goal) => {
+  const { type, metric, value } = goal;
+  if (metric === "books") {
+    return `${value} ${value === 1 ? "libro" : "libros"} ${GOAL_LABELS[type]}`;
+  }
+  const unit = metric === "hours" ? "horas" : "minutos";
+  return `${value} ${unit} de lectura ${GOAL_LABELS[type]}`;
+};
+
 export default function SessionSummaryScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const { book, pagesRead, readSeconds, endPage, speed, streakInfo, completed } = route.params;
+  const { book, pagesRead, readSeconds, endPage, speed, streakInfo, completed, goalJustCompleted = [] } = route.params;
   const [rating, setRating] = useState(0);
 
   const handleRate = async (stars) => {
@@ -35,8 +51,12 @@ export default function SessionSummaryScreen({ route, navigation }) {
   };
 
   const [streakVisible, setStreakVisible] = useState(!!streakInfo);
+  const [goalVisible, setGoalVisible] = useState(false);
+  const goalShown = useRef(false);
   const flameScale = useRef(new Animated.Value(0)).current;
   const flameRotate = useRef(new Animated.Value(0)).current;
+  const goalScale = useRef(new Animated.Value(0)).current;
+  const goalRotate = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     if (!streakInfo) return;
@@ -53,6 +73,37 @@ export default function SessionSummaryScreen({ route, navigation }) {
       ),
     ]).start();
   }, [streakInfo]);
+
+  useEffect(() => {
+    if (!goalVisible) return;
+    Animated.sequence([
+      Animated.parallel([
+        Animated.spring(goalScale, { toValue: 1, friction: 4, useNativeDriver: true }),
+        Animated.timing(goalRotate, { toValue: 1, duration: 600, useNativeDriver: true }),
+      ]),
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(goalScale, { toValue: 1.12, duration: 650, useNativeDriver: true }),
+          Animated.timing(goalScale, { toValue: 1, duration: 650, useNativeDriver: true }),
+        ])
+      ),
+    ]).start();
+  }, [goalVisible]);
+
+  const closeStreak = () => {
+    setStreakVisible(false);
+    if (goalJustCompleted.length > 0 && !goalShown.current) {
+      goalShown.current = true;
+      setGoalVisible(true);
+    }
+  };
+
+  useEffect(() => {
+    if (goalShown.current || streakVisible || goalJustCompleted.length === 0) return;
+    goalShown.current = true;
+    const t = setTimeout(() => setGoalVisible(true), 450);
+    return () => clearTimeout(t);
+  }, [streakVisible, goalJustCompleted.length]);
 
   const pagesLeft = book.pages ? Math.max(0, book.pages - endPage) : null;
   const hoursLeft = speed > 0 && pagesLeft !== null ? pagesLeft / speed : null;
@@ -173,8 +224,45 @@ export default function SessionSummaryScreen({ route, navigation }) {
                 ? "El fuego está encendido, no lo dejes apagar 🔥"
                 : "Sigue así, el fuego crece cada día más 🔥"}
             </Text>
-            <TouchableOpacity style={styles.streakBtn} onPress={() => setStreakVisible(false)}>
+            <TouchableOpacity style={styles.streakBtn} onPress={closeStreak}>
               <Text style={styles.streakBtnText}>¡Vamos!</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={goalVisible} transparent animationType="fade">
+        <View style={styles.streakOverlay}>
+          <View style={styles.streakCard}>
+            <Animated.View
+              style={{
+                transform: [
+                  { scale: goalScale },
+                  {
+                    rotate: goalRotate.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: ["-10deg", "10deg"],
+                    }),
+                  },
+                ],
+              }}
+            >
+              <Ionicons name="trophy" size={96} color={colors.star} />
+            </Animated.View>
+            <Text style={styles.streakTitle}>¡Meta cumplida!</Text>
+            <Text style={styles.goalSubtitle}>Alcanzaste tu meta de lectura</Text>
+            <View style={styles.goalList}>
+              {goalJustCompleted.map((goal, idx) => (
+                <Text key={idx} style={styles.goalItem} numberOfLines={2}>
+                  {goalDescription(goal)}
+                </Text>
+              ))}
+            </View>
+            <Text style={styles.streakCheer}>
+              Sigue así, estás logrando grandes cosas 🏆
+            </Text>
+            <TouchableOpacity style={styles.streakBtn} onPress={() => setGoalVisible(false)}>
+              <Text style={styles.streakBtnText}>¡Genial!</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -219,6 +307,9 @@ const createStyles = (colors) =>
       borderColor: colors.accent + "55",
     },
     streakTitle: { fontSize: 22, fontWeight: "bold", color: colors.text, marginTop: 12 },
+    goalSubtitle: { fontSize: 14, color: colors.textMuted, marginTop: 4, marginBottom: 12 },
+    goalList: { marginBottom: 12, alignItems: "center" },
+    goalItem: { fontSize: 16, fontWeight: "600", color: colors.accent, textAlign: "center", marginVertical: 3 },
     streakNumber: { fontSize: 64, fontWeight: "bold", color: colors.star, lineHeight: 72 },
     streakDays: { fontSize: 15, color: colors.textMuted, marginBottom: 10 },
     streakCheer: { fontSize: 13, color: colors.textDim, textAlign: "center", marginBottom: 24 },

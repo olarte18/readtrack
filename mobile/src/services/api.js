@@ -1,6 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-
-const API_URL = process.env.EXPO_PUBLIC_API_URL || "http://192.168.1.10:3000";
+import { API_URL } from "../utils/config";
 
 const getHeaders = async () => {
   const token = await AsyncStorage.getItem("token");
@@ -128,10 +127,10 @@ export const getStreak = async () => request("/stats/streak");
 
 export const getAllNotes = async () => request("/notes");
 
-export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read) =>
+export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read, book_completed) =>
   request("/reading-sessions", {
     method: "POST",
-    body: JSON.stringify({ user_book_id, page, duration_seconds, pages_read }),
+    body: JSON.stringify({ user_book_id, page, duration_seconds, pages_read, book_completed }),
   });
 
 export const getReadingSessions = async (user_book_id, date) =>

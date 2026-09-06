@@ -6,6 +6,7 @@ const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
+const { getGoalCompletion } = require("../utils/goalProgress");
 
 router.use(authMiddleware);
 
@@ -45,7 +46,12 @@ router.post("/", async (req, res) => {
     streak = computeStreaks(dates.map((r) => r.date)).current;
   }
 
-  res.status(201).json({ ...rows[0], first_today: prior[0].n === 0, streak });
+  const goalJustCompleted = await getGoalCompletion(req.userId, {
+    excludeSeconds: data.duration_seconds || 0,
+    bookCompleted: !!req.body.book_completed,
+  });
+
+  res.status(201).json({ ...rows[0], first_today: prior[0].n === 0, streak, goalJustCompleted });
 });
 
 router.patch("/:id", async (req, res) => {

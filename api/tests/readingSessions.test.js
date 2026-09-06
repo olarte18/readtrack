@@ -168,3 +168,97 @@ describe("GET /reading-sessions/:user_book_id", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("POST /reading-sessions — cumplimiento de metas", () => {
+  test("devuelve goalJustCompleted cuando se alcanza una meta diaria", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+
+    await request(app)
+      .post("/goals")
+      .set(authHeader(token))
+      .send({ type: "daily", metric: "minutes", value: 5 });
+
+    const res = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, duration_seconds: 360, pages_read: 10 });
+
+    expect(res.status).toBe(201);
+    const daily = (res.body.goalJustCompleted ?? []).find((g) => g.type === "daily");
+    expect(daily).toBeDefined();
+    expect(daily.metric).toBe("minutes");
+    expect(daily.value).toBe(5);
+  });
+
+  test("no devuelve metas si no se alcanzó ninguna", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    await request(app)
+      .post("/goals")
+      .set(authHeader(token))
+      .send({ type: "weekly", metric: "hours", value: 20 });
+
+    const res = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, duration_seconds: 600, pages_read: 10 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.goalJustCompleted).toEqual([]);
+  });
+
+  test("devuelve meta anual de libros al completar un libro", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    await request(app)
+      .post("/goals")
+      .set(authHeader(token))
+      .send({ type: "annual", metric: "books", value: 1 });
+
+    // Marca el libro como completo para cumplir la meta anual
+    await request(app)
+      .patch(`/user-books/${book.id}`)
+      .set(authHeader(token))
+      .send({ status: "completed", finished_at: new Date().toISOString().slice(0, 10) });
+
+    const res = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, duration_seconds: 60, pages_read: 10, book_completed: true });
+
+    expect(res.status).toBe(201);
+    const annual = (res.body.goalJustCompleted ?? []).find((g) => g.type === "annual");
+    expect(annual).toBeDefined();
+    expect(annual.metric).toBe("books");
+    expect(annual.value).toBe(1);
+  });
+
+  test("no repite una meta diaria ya cumplida en sesiones posteriores", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    await request(app)
+      .post("/goals")
+      .set(authHeader(token))
+      .send({ type: "daily", metric: "minutes", value: 5 });
+
+    const first = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, duration_seconds: 360, pages_read: 10 });
+    expect(first.status).toBe(201);
+    const firstDaily = (first.body.goalJustCompleted ?? []).find((g) => g.type === "daily");
+    expect(firstDaily).toBeDefined();
+
+    const second = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 20, duration_seconds: 600, pages_read: 10 });
+    expect(second.status).toBe(201);
+    const secondDaily = (second.body.goalJustCompleted ?? []).find((g) => g.type === "daily");
+    expect(secondDaily).toBeUndefined();
+  });
+});

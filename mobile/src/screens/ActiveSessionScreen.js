@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { usePreventRemove } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
+import { getHiResCover } from "../utils/covers";
 import { AppAlert } from "../components/AppAlert";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
 import { cancelAlarm, ensureChannel, markAlarmHintSeen, openAlarmSettings, openFullScreenIntentSettings, requestAlarmPermission, scheduleAlarm, shouldShowAlarmHint } from "../services/notifications";
@@ -11,8 +12,8 @@ import { cancelAlarm, ensureChannel, markAlarmHintSeen, openAlarmSettings, openF
 const QUICK_MINUTES = [10, 15, 20, 30, 45, 60];
 
 export default function ActiveSessionScreen({ route, navigation }) {
-  const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const { colors, isDark } = useTheme();
+  const styles = createStyles(colors, isDark);
   const { book, mode = "stopwatch" } = route.params;
   const isTimer = mode === "timer";
 
@@ -272,7 +273,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         updates.finished_at = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
       }
       await updateBook(book.id, updates);
-      const saved = await addReadingSession(book.id, page, readSeconds, pages);
+      const saved = await addReadingSession(book.id, page, readSeconds, pages, completed);
       navigation.replace("SessionSummary", {
         book,
         pagesRead: pages,
@@ -281,6 +282,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         speed: pagesPerHour,
         completed,
         streakInfo: saved?.first_today ? { days: saved.streak ?? 1 } : null,
+        goalJustCompleted: saved?.goalJustCompleted ?? [],
       });
     } catch {
       AppAlert.alert("Error", "No se pudo guardar la sesión");
@@ -476,7 +478,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     <View style={styles.container}>
       {book.cover && (
         <>
-          <ImageBackground source={{ uri: book.cover }} style={styles.bgImage} resizeMode="cover" />
+          <ImageBackground source={{ uri: getHiResCover(book.cover) }} style={styles.bgImage} resizeMode="cover" blurRadius={1} />
           <View style={styles.bgOverlay} />
         </>
       )}
@@ -577,12 +579,12 @@ export default function ActiveSessionScreen({ route, navigation }) {
   );
 }
 
-const createStyles = (colors) =>
+const createStyles = (colors, isDark) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background, paddingTop: 44, paddingHorizontal: 24, overflow: "hidden" },
     bookTitle: { fontSize: 18, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 12 },
     bgImage: { ...StyleSheet.absoluteFillObject },
-    bgOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: colors.background, opacity: 0.74 },
+    bgOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: isDark ? "#13131f" : "#3a3a4a", opacity: 0.74 },
     header: { alignItems: "center", marginBottom: 20 },
     subtitle: { fontSize: 15, color: colors.textDim, textAlign: "center", marginBottom: 24 },
     timerContainer: { alignItems: "center", marginBottom: 18 },
