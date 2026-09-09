@@ -11,6 +11,14 @@ const MONTH_NAMES = [
 ];
 const WEEK_DAYS = ["L", "M", "X", "J", "V", "S", "D"];
 
+const todayString = () =>
+  new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Bogota",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(new Date());
+
 export default function CalendarScreen() {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -19,7 +27,7 @@ export default function CalendarScreen() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [selectedDate, setSelectedDate] = useState(null);
+  const [selectedDate, setSelectedDate] = useState(todayString);
   const [editBook, setEditBook] = useState(null);
   const [sessions, setSessions] = useState(null);
   const [sessionsLoading, setSessionsLoading] = useState(false);
@@ -28,7 +36,8 @@ export default function CalendarScreen() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    setSelectedDate(null);
+    const t = todayString().split("-");
+    setSelectedDate(year === Number(t[0]) && month === Number(t[1]) ? todayString() : null);
     getCalendar(year, month)
       .then((res) => { if (!cancelled) setData(res); })
       .catch((e) => console.error(e))
@@ -106,8 +115,7 @@ export default function CalendarScreen() {
   };
 
   const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1;
-  const n = new Date();
-  const todayStr = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+  const todayStr = todayString();
 
   const daysInMonth = new Date(year, month, 0).getDate();
   const firstWeekday = (new Date(year, month - 1, 1).getDay() + 6) % 7;
