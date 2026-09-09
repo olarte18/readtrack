@@ -26,6 +26,7 @@ import ThemePickerScreen from "./src/screens/ThemePickerScreen";
 import ImportScreen from "./src/screens/ImportScreen";
 import NotesScreen from "./src/screens/NotesScreen";
 import WhatsNewScreen from "./src/screens/WhatsNewScreen";
+import AlarmDeepLinkScreen from "./src/screens/AlarmDeepLinkScreen";
 import WhatsNewPopup from "./src/components/WhatsNewPopup";
 import { AppAlertHost } from "./src/components/AppAlert";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
@@ -35,6 +36,15 @@ import { configureNotifications } from "./src/services/notifications";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+const linking = {
+  prefixes: ["readtrack://"],
+  config: {
+    screens: {
+      AlarmLink: "session",
+    },
+  },
+};
 
 function HomeTabs() {
   const { colors } = useTheme();
@@ -90,6 +100,7 @@ function AppStack() {
       <Stack.Screen name="Goals" component={GoalsScreen} />
       <Stack.Screen name="Notes" component={NotesScreen} />
       <Stack.Screen name="WhatsNew" component={WhatsNewScreen} />
+      <Stack.Screen name="AlarmLink" component={AlarmDeepLinkScreen} />
     </Stack.Navigator>
   );
 }
@@ -129,7 +140,7 @@ function RootNavigator() {
 function Navigation() {
   const { navigationTheme, isDark } = useTheme();
   return (
-    <NavigationContainer theme={navigationTheme}>
+    <NavigationContainer theme={navigationTheme} linking={linking}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <RootNavigator />
     </NavigationContainer>

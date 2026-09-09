@@ -2,6 +2,7 @@
   "expo": {
     "name": "ReadTrack",
     "slug": "ReadTrack",
+    "scheme": "readtrack",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

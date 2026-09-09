@@ -2,14 +2,18 @@ package com.alejandro.readtrack.alarm
 
 import android.app.AlarmManager
 import android.app.PendingIntent
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.util.Log
 import android.view.WindowManager
+import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule
 import com.facebook.react.bridge.ReactMethod
+import com.facebook.react.bridge.ReadableMap
 
 class AlarmModule(private val reactContext: ReactApplicationContext) :
   ReactContextBaseJavaModule(reactContext) {
@@ -81,6 +85,84 @@ class AlarmModule(private val reactContext: ReactApplicationContext) :
         }
       }
     } catch (_: Exception) {}
+  }
+
+  /**
+   * Arranca el servicio en primer plano de la sesión (temporizador o
+   * cronómetro) y deja la alarma exacta programada para el fin del
+   * temporizador. Los datos de la sesión quedan en prefs para la notificación
+   * de bloqueo, la alarma y el deep-link de vuelta a la app.
+   */
+  @ReactMethod
+  fun startAlarmSession(options: ReadableMap, promise: Promise) {
+    try {
+      val mode = options.getString("mode") ?: AlarmSessionState.MODE_TIMER
+      val durationMs = if (options.hasKey("durationMs")) options.getDouble("durationMs").toLong() else 0L
+      val bookId = options.getString("bookId") ?: ""
+      val bookTitle = options.getString("bookTitle") ?: ""
+      val startPage = if (options.hasKey("startPage")) options.getDouble("startPage").toInt() else 0
+      AlarmSessionState.begin(reactContext, mode, durationMs, bookId, bookTitle, startPage)
+      val intent = Intent(reactContext, AlarmSessionService::class.java)
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+        reactContext.startForegroundService(intent)
+      } else {
+        reactContext.startService(intent)
+      }
+      Log.d(TAG, "sesión iniciada ($mode, ${durationMs}ms)")
+      promise.resolve(true)
+    } catch (e: Exception) {
+      Log.e(TAG, "startAlarmSession fallo", e)
+      promise.reject("SESSION_START_FAILED", e)
+    }
+  }
+
+  @ReactMethod
+  fun setSessionPaused(paused: Boolean) {
+    try {
+      if (paused) {
+        AlarmSessionState.pause(reactContext)
+        AlarmSessionService.cancelExactAlarm(reactContext)
+      } else {
+        AlarmSessionState.resume(reactContext)
+        AlarmSessionService.scheduleExactAlarm(reactContext)
+      }
+      AlarmSessionService.refreshNotification(reactContext)
+    } catch (e: Exception) {
+      Log.e(TAG, "setSessionPaused fallo", e)
+    }
+  }
+
+  @ReactMethod
+  fun stopAlarmSession() {
+    try {
+      AlarmSessionService.cancelExactAlarm(reactContext)
+      AlarmSessionState.clear(reactContext)
+      try {
+        val notificationManager =
+          reactContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.cancel(AlarmSessionService.SESSION_NOTIFICATION_ID)
+      } catch (_: Exception) {}
+      reactContext.stopService(Intent(reactContext, AlarmSessionService::class.java))
+    } catch (e: Exception) {
+      Log.e(TAG, "stopAlarmSession fallo", e)
+    }
+  }
+
+  @ReactMethod
+  fun getSessionState(promise: Promise) {
+    try {
+      val map = Arguments.createMap()
+      map.putBoolean("active", AlarmSessionState.isActive(reactContext))
+      map.putBoolean("paused", AlarmSessionState.isPaused(reactContext))
+      map.putBoolean("fired", AlarmSessionState.isFired(reactContext))
+      map.putString("mode", AlarmSessionState.mode(reactContext))
+      map.putDouble("seconds", AlarmSessionState.currentSeconds(reactContext).toDouble())
+      map.putDouble("durationMs", AlarmSessionState.durationMs(reactContext).toDouble())
+      map.putString("bookId", AlarmSessionState.bookId(reactContext))
+      promise.resolve(map)
+    } catch (e: Exception) {
+      promise.reject("GET_SESSION_STATE_FAILED", e)
+    }
   }
 
   companion object {

@@ -3,7 +3,8 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndi
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
-import { getLibrary, getReadingSpeed, getStreak } from "../services/api";
+import { getLibrary, getReadingSpeed, getStreak, getGoals } from "../services/api";
+import ProgressRing from "../components/ProgressRing";
 
 const formatRemaining = (minutes) => {
   if (!minutes || minutes <= 0) return null;
@@ -20,6 +21,7 @@ export default function ReadingScreen({ navigation }) {
   const [books, setBooks] = useState([]);
   const [speeds, setSpeeds] = useState({});
   const [streak, setStreak] = useState(null);
+  const [goals, setGoals] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchReading = async () => {
@@ -49,8 +51,13 @@ export default function ReadingScreen({ navigation }) {
     useCallback(() => {
       fetchReading();
       getStreak().then(setStreak).catch(console.error);
+      getGoals().then(setGoals).catch(console.error);
     }, [])
   );
+
+  const dailyGoal = goals?.goals?.find((g) => g.type === "daily");
+  const dailyPct =
+    dailyGoal?.value > 0 ? Math.min(100, Math.round(((goals?.progress?.daily ?? 0) / dailyGoal.value) * 100)) : null;
 
   return (
     <View style={styles.container}>
@@ -76,6 +83,32 @@ export default function ReadingScreen({ navigation }) {
           data={books}
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={{ paddingBottom: 30 }}
+          ListFooterComponent={
+            dailyPct != null ? (
+              <View style={styles.goalCard}>
+                <Text style={styles.goalTitle}>Meta diaria</Text>
+                <TouchableOpacity
+                  onPress={() => navigation.navigate("Main", { screen: "Calendar" })}
+                  activeOpacity={0.8}
+                  hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                >
+                  <ProgressRing
+                    percent={dailyPct}
+                    radius={40}
+                    borderWidth={8}
+                    color={colors.accent}
+                    trackColor={colors.surfaceAlt}
+                    bgColor={colors.surface}
+                  >
+                    <Text style={styles.goalPct}>{dailyPct}%</Text>
+                  </ProgressRing>
+                </TouchableOpacity>
+                <Text style={styles.goalDetail}>
+                  {goals.progress.daily} de {dailyGoal.value} min hoy
+                </Text>
+              </View>
+            ) : null
+          }
           renderItem={({ item }) => {
             const pagesLeft = item.pages ? Math.max(0, item.pages - (item.current_page || 0)) : null;
             const perHour = speeds[item.id];
@@ -221,4 +254,16 @@ const createStyles = (colors) =>
     },
     continueBtnLabel: { color: colors.onAccent, fontSize: 12, fontWeight: "bold" },
     empty: { color: colors.textDim, textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
+    goalCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      marginHorizontal: 16,
+      marginVertical: 16,
+      padding: 20,
+      alignItems: "center",
+      gap: 12,
+    },
+    goalTitle: { fontSize: 16, fontWeight: "bold", color: colors.text },
+    goalPct: { fontSize: 20, fontWeight: "bold", color: colors.accent },
+    goalDetail: { fontSize: 13, color: colors.textMuted },
   });

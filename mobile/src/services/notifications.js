@@ -7,6 +7,7 @@ const SOUND_FILE = "alarm.wav";
 const HINT_SEEN_KEY = "alarm_silent_hint_seen";
 
 const AlarmNative = Platform.OS === "android" ? NativeModules.ReadTrackAlarm : null;
+const NATIVE_AVAILABLE = Platform.OS === "android" && !!AlarmNative;
 
 let appInForeground = true;
 
@@ -145,4 +146,62 @@ export async function cancelAlarm(id) {
       await Notifications.cancelScheduledNotificationAsync(id);
     }
   } catch {}
+}
+
+/**
+ * Sesión de lectura activa (temporizador o cronómetro). En Android con el
+ * módulo nativo arranca el foreground service con notificación de bloqueo y
+ * Pausar/Reanudar; en el resto (Expo Go, iOS, web) usa expo-notifications.
+ * Devuelve "native" o el id de la notificación fallback.
+ */
+export async function startAlarmSession({ mode, durationMs, book }) {
+  if (NATIVE_AVAILABLE) {
+    try {
+      await AlarmNative.startAlarmSession({
+        mode,
+        durationMs: mode === "timer" ? durationMs : 0,
+        bookId: String(book.id),
+        bookTitle: book.title,
+        startPage: Number(book.current_page ?? 0),
+      });
+      return "native";
+    } catch {
+      return null;
+    }
+  }
+  if (mode !== "timer") return null;
+  try {
+    return await scheduleAlarm(durationMs, {
+      title: "Tiempo cumplido",
+      body: `¡Terminaste tu sesión de ${Math.max(1, Math.round(durationMs / 60000))} minutos!`,
+    });
+  } catch {
+    return null;
+  }
+}
+
+export async function cancelAlarmSession(id) {
+  if (NATIVE_AVAILABLE) {
+    try {
+      AlarmNative.stopAlarmSession();
+    } catch {}
+    return;
+  }
+  await cancelAlarm(id);
+}
+
+export async function setAlarmSessionPaused(paused) {
+  if (!NATIVE_AVAILABLE) return;
+  try {
+    AlarmNative.setSessionPaused(!!paused);
+  } catch {}
+}
+
+export async function getAlarmSessionState() {
+  if (!NATIVE_AVAILABLE) return null;
+  try {
+    return await AlarmNative.getSessionState();
+  } catch {
+    return null;
+  }
 }

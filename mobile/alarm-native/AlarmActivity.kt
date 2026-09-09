@@ -3,6 +3,7 @@ package com.alejandro.readtrack.alarm
 import android.app.Activity
 import android.app.NotificationManager
 import android.content.Context
+import android.content.Intent
 import android.graphics.Color
 import android.graphics.Typeface
 import android.media.AudioAttributes
@@ -77,6 +78,16 @@ class AlarmActivity : Activity() {
     stopButton.textSize = 22f
     stopButton.setOnClickListener {
       AlarmRing.stop()
+      AlarmSessionService.cancelExactAlarm(this)
+      finish()
+    }
+
+    val resumeButton = Button(this)
+    resumeButton.text = "Ver resumen"
+    resumeButton.textSize = 18f
+    resumeButton.setOnClickListener {
+      AlarmRing.stop()
+      startActivity(resumeIntent())
       finish()
     }
 
@@ -90,11 +101,30 @@ class AlarmActivity : Activity() {
     subtitleParams.topMargin = margin
     subtitleParams.bottomMargin = margin
     container.addView(subtitle, subtitleParams)
-    container.addView(
-      stopButton,
+    val stopParams =
       LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
-    )
+    container.addView(stopButton, stopParams)
+    val resumeParams =
+      LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT)
+    resumeParams.topMargin = margin
+    container.addView(resumeButton, resumeParams)
     return container
+  }
+
+  /**
+   * Reabre la app en el flujo "Tiempo cumplido" para guardar la sesión (o a la
+   * raíz si no hay datos). El esquema `readtrack://` está declarado en app.json
+   * y la MainActivity de Expo tiene la intent-filter de VIEW.
+   */
+  private fun resumeIntent(): Intent {
+    val id = AlarmSessionState.bookId(this)
+    val url = if (!id.isNullOrEmpty()) {
+      val seconds = AlarmSessionState.durationMs(this) / 1000L
+      "readtrack://session?bookId=${Uri.encode(id)}&seconds=${seconds}"
+    } else {
+      "readtrack://"
+    }
+    return Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
   }
 }
 

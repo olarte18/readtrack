@@ -25,6 +25,7 @@ function ensureMainApplicationChildren(manifest) {
   const app = AndroidConfig.Manifest.getMainApplicationOrThrow(manifest);
   app.receiver = app.receiver || [];
   app.activity = app.activity || [];
+  app.service = app.service || [];
 
   const receiverExists = app.receiver.some(
     (r) => r.$["android:name"] === ".alarm.AlarmReceiver"
@@ -34,6 +35,31 @@ function ensureMainApplicationChildren(manifest) {
       $: {
         "android:name": ".alarm.AlarmReceiver",
         "android:exported": "false",
+      },
+    });
+  }
+
+  const actionReceiverExists = app.receiver.some(
+    (r) => r.$["android:name"] === ".alarm.AlarmActionReceiver"
+  );
+  if (!actionReceiverExists) {
+    app.receiver.push({
+      $: {
+        "android:name": ".alarm.AlarmActionReceiver",
+        "android:exported": "false",
+      },
+    });
+  }
+
+  const serviceExists = app.service.some(
+    (s) => s.$["android:name"] === ".alarm.AlarmSessionService"
+  );
+  if (!serviceExists) {
+    app.service.push({
+      $: {
+        "android:name": ".alarm.AlarmSessionService",
+        "android:exported": "false",
+        "android:foregroundServiceType": "specialUse",
       },
     });
   }
@@ -110,6 +136,8 @@ module.exports = function withAlarm(config) {
   config = withAndroidManifest(config, (config) => {
     const manifest = config.modResults;
     ensurePermission(manifest, "android.permission.USE_FULL_SCREEN_INTENT");
+    ensurePermission(manifest, "android.permission.FOREGROUND_SERVICE");
+    ensurePermission(manifest, "android.permission.FOREGROUND_SERVICE_SPECIAL_USE");
     ensureMainApplicationChildren(manifest);
     return config;
   });

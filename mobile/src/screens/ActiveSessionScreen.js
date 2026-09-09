@@ -3,11 +3,27 @@ import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, Activity
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { usePreventRemove } from "@react-navigation/native";
+import * as Haptics from "expo-haptics";
+import * as Brightness from "expo-brightness";
+import { BlurView } from "expo-blur";
 import { useTheme } from "../contexts/ThemeContext";
 import { getHiResCover } from "../utils/covers";
 import { AppAlert } from "../components/AppAlert";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
-import { cancelAlarm, ensureChannel, markAlarmHintSeen, openAlarmSettings, openFullScreenIntentSettings, requestAlarmPermission, scheduleAlarm, shouldShowAlarmHint } from "../services/notifications";
+import {
+  cancelAlarm,
+  cancelAlarmSession,
+  ensureChannel,
+  getAlarmSessionState,
+  markAlarmHintSeen,
+  openAlarmSettings,
+  openFullScreenIntentSettings,
+  requestAlarmPermission,
+  scheduleAlarm,
+  setAlarmSessionPaused,
+  shouldShowAlarmHint,
+  startAlarmSession,
+} from "../services/notifications";
 
 const QUICK_MINUTES = [10, 15, 20, 30, 45, 60];
 
@@ -33,6 +49,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const savingRef = useRef(false);
 
   const AlarmNative = Platform.OS === "android" ? NativeModules.ReadTrackAlarm : null;
+  const hasNative = !!AlarmNative;
 
   const startPage = book.current_page ?? 0;
   const startTime = useRef(Date.now());
@@ -43,6 +60,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const alarmIdRef = useRef(null);
   const permissionWarnedRef = useRef(false);
   const alarmHintRef = useRef(false);
+  const brightnessRef = useRef(null);
 
   const alarm = useAudioPlayer(require("../../assets/alarm.wav"));
 
@@ -52,8 +70,34 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   useEffect(() => {
     return () => {
-      if (alarmIdRef.current !== null) cancelAlarm(alarmIdRef.current);
+      if (hasNative) {
+        cancelAlarmSession();
+      } else if (alarmIdRef.current !== null) {
+        cancelAlarm(alarmIdRef.current);
+      }
+      if (Platform.OS === "android" && brightnessRef.current != null) {
+        Brightness.setBrightnessAsync(brightnessRef.current).catch(() => {});
+      }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    // Deep-link de la alarma (botón "Ver resumen"): reanuda la sesión directo
+    // en el estado "¡Tiempo cumplido!" para guardar.
+    if (route.params?.fromAlarm) {
+      setDuration(Number(route.params.alarmSeconds) || 0);
+      setSeconds(0);
+      setRunning(false);
+      setTimeUp(true);
+      if (hasNative) cancelAlarmSession();
+      return;
+    }
+    // Cronómetro: servicio en primer plano + notificación de bloqueo desde ya.
+    if (!isTimer && hasNative) {
+      startAlarmSession({ mode: "stopwatch", durationMs: 0, book });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -76,7 +120,19 @@ export default function ActiveSessionScreen({ route, navigation }) {
         backgroundTime.current = Date.now();
       }
       if (appState.current.match(/inactive|background/) && nextState === "active") {
-        if (backgroundTime.current && running) {
+        if (hasNative) {
+          // El servicio de primer plano es la fuente de verdad mientras la app
+          // estuvo en segundo plano; reconcilia para no acumular drift.
+          getAlarmSessionState()
+            .then((s) => {
+              if (s?.active) {
+                setRunning(!s.paused);
+                setSeconds(Math.max(0, Math.round(Number(s.seconds))));
+                if (isTimer && s.fired) setTimeUp(true);
+              }
+            })
+            .catch(() => {});
+        } else if (backgroundTime.current && running) {
           const elapsed = Math.floor((Date.now() - backgroundTime.current) / 1000);
           setSeconds((s) => (isTimer ? Math.max(0, s - elapsed) : s + elapsed));
         }
@@ -109,25 +165,47 @@ export default function ActiveSessionScreen({ route, navigation }) {
     alarmFiredRef.current = true;
     setRunning(false);
     if (appState.current !== "active") return;
-    alarm.loop = true;
-    alarm.play();
-    AppAlert.alert(
-      "Tiempo cumplido",
-      `¡Terminaste tu sesión de ${Math.round(duration / 60)} minutos!`,
-      [
-        {
-          text: "Detener alarma",
-          onPress: () => {
-            alarm.pause();
-            alarm.seekTo(0);
-            cancelTimerAlarm();
-            setTimeUp(true);
+    (async () => {
+      // Si la alarma nativa ya sonó (app estaba en segundo plano y volvió),
+      // no repetir el timbre aquí: solo reanudar el flujo de guardado.
+      const st = hasNative ? await getAlarmSessionState().catch(() => null) : null;
+      if (st?.fired) {
+        cancelAlarmSession();
+        setTimeUp(true);
+        return;
+      }
+      cancelSessionAlarm();
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
+      alarm.loop = true;
+      alarm.play();
+      AppAlert.alert(
+        "Tiempo cumplido",
+        `¡Terminaste tu sesión de ${Math.round(duration / 60)} minutos!`,
+        [
+          {
+            text: "Detener alarma",
+            onPress: () => {
+              alarm.pause();
+              alarm.seekTo(0);
+              cancelSessionAlarm();
+              setTimeUp(true);
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [seconds, isTimer, timerStarted, duration]);
+
+  const cancelSessionAlarm = () => {
+    if (hasNative) {
+      cancelAlarmSession();
+    } else {
+      cancelTimerAlarm();
+    }
+  };
 
   const formatTime = (s) => {
     const h = Math.floor(s / 3600);
@@ -202,20 +280,36 @@ export default function ActiveSessionScreen({ route, navigation }) {
     setTimerStarted(true);
     setRunning(true);
     requestTimerPermission();
-    scheduleTimerAlarm(min * 60000);
+    try {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    } catch {}
+    if (hasNative) {
+      startAlarmSession({ mode: "timer", durationMs: min * 60000, book });
+    } else {
+      scheduleTimerAlarm(min * 60000);
+    }
   };
 
   const togglePause = () => {
     if (!isTimer) {
       setRunning((r) => !r);
+      if (hasNative) setAlarmSessionPaused(running);
       return;
     }
     if (running) {
-      cancelTimerAlarm();
+      if (hasNative) {
+        setAlarmSessionPaused(true);
+      } else {
+        cancelTimerAlarm();
+      }
       setRunning(false);
     } else {
       requestTimerPermission();
-      scheduleTimerAlarm(seconds * 1000);
+      if (hasNative) {
+        setAlarmSessionPaused(false);
+      } else {
+        scheduleTimerAlarm(seconds * 1000);
+      }
       setRunning(true);
     }
   };
@@ -232,6 +326,15 @@ export default function ActiveSessionScreen({ route, navigation }) {
     try {
       AlarmNative?.setKeepAwake?.(true);
     } catch {}
+    if (Platform.OS === "android") {
+      (async () => {
+        try {
+          const current = await Brightness.getBrightnessAsync();
+          brightnessRef.current = current;
+          await Brightness.setBrightnessAsync(0.08);
+        } catch {}
+      })();
+    }
   };
 
   const exitSimpleMode = () => {
@@ -239,6 +342,14 @@ export default function ActiveSessionScreen({ route, navigation }) {
     try {
       AlarmNative?.setKeepAwake?.(keepAwake);
     } catch {}
+    if (Platform.OS === "android" && brightnessRef.current != null) {
+      (async () => {
+        try {
+          await Brightness.setBrightnessAsync(brightnessRef.current);
+          brightnessRef.current = null;
+        } catch {}
+      })();
+    }
   };
 
   const clockText = () => {
@@ -262,7 +373,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     setSaving(true);
     setRunning(false);
     stopAlarm();
-    cancelTimerAlarm();
+    cancelSessionAlarm();
     const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
     try {
       const completed = !!book.pages && page >= book.pages;
@@ -274,6 +385,9 @@ export default function ActiveSessionScreen({ route, navigation }) {
       }
       await updateBook(book.id, updates);
       const saved = await addReadingSession(book.id, page, readSeconds, pages, completed);
+      try {
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      } catch {}
       navigation.replace("SessionSummary", {
         book,
         pagesRead: pages,
@@ -367,7 +481,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     <View style={styles.noticeBox}>
       <Ionicons name="information-circle-outline" size={18} color={colors.accent} />
       <Text style={styles.noticeText}>
-        No bloquees ni cierres ReadTrack o tu alarma no sonará
+        Si bloqueas o cierras ReadTrack, la alarma puede no sonar
       </Text>
     </View>
   );
@@ -478,7 +592,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
     <View style={styles.container}>
       {book.cover && (
         <>
-          <ImageBackground source={{ uri: getHiResCover(book.cover) }} style={styles.bgImage} resizeMode="cover" blurRadius={1} />
+          <ImageBackground source={{ uri: getHiResCover(book.cover) }} style={styles.bgImage} resizeMode="cover" />
+          <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFillObject} />
           <View style={styles.bgOverlay} />
         </>
       )}
