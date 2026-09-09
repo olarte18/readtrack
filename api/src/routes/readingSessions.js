@@ -117,6 +117,7 @@ router.get("/:user_book_id", async (req, res) => {
   }
   const { rows } = await pool.query(
     `SELECT rs.id, rs.page, rs.pages_read, rs.duration_seconds,
+            TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date_bogota,
             TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'HH24:MI') AS time_bogota
      FROM reading_sessions rs
      WHERE rs.user_book_id = $1 AND rs.user_id = $2 ${dateFilter}

@@ -21,6 +21,8 @@ import ActiveSessionScreen from "./src/screens/ActiveSessionScreen";
 import ReadingModeScreen from "./src/screens/ReadingModeScreen";
 import SessionSummaryScreen from "./src/screens/SessionSummaryScreen";
 import GoalsScreen from "./src/screens/GoalsScreen";
+import GoalDetailScreen from "./src/screens/GoalDetailScreen";
+import BookSessionsScreen from "./src/screens/BookSessionsScreen";
 import CalendarScreen from "./src/screens/CalendarScreen";
 import ThemePickerScreen from "./src/screens/ThemePickerScreen";
 import ImportScreen from "./src/screens/ImportScreen";
@@ -98,6 +100,8 @@ function AppStack() {
       <Stack.Screen name="SessionSummary" component={SessionSummaryScreen} />
       <Stack.Screen name="Import" component={ImportScreen} />
       <Stack.Screen name="Goals" component={GoalsScreen} />
+      <Stack.Screen name="GoalDetail" component={GoalDetailScreen} />
+      <Stack.Screen name="BookSessions" component={BookSessionsScreen} />
       <Stack.Screen name="Notes" component={NotesScreen} />
       <Stack.Screen name="WhatsNew" component={WhatsNewScreen} />
       <Stack.Screen name="AlarmLink" component={AlarmDeepLinkScreen} />

@@ -125,6 +125,7 @@ describe("GET /reading-sessions/:user_book_id", () => {
     });
     expect(typeof res.body[0].id).toBe("number");
     expect(res.body[0].time_bogota).toMatch(/^\d{2}:\d{2}$/);
+    expect(res.body[0].date_bogota).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   test("filtra por fecha (hora Bogotá)", async () => {

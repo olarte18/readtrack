@@ -100,6 +100,87 @@ router.get("/", async (req, res) => {
   res.json(payload);
 });
 
+// GET /goals/detail?type=annual|monthly|weekly&metric=books|hours
+// Desglose de la meta: libros completados en el periodo (books) o
+// minutos por libro leídos en el periodo (hours).
+router.get("/detail", async (req, res) => {
+  const data = validate(req.query, {
+    type: { required: true, type: "string", enum: ["annual", "monthly", "weekly"] },
+    metric: { required: true, type: "string", enum: ["books", "hours"] },
+  });
+
+  const cacheKey = `goals:${req.userId}:detail:${data.type}:${data.metric}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  let startExpr;
+  let intervalUnit;
+  let label;
+  if (data.type === "annual") {
+    startExpr = "date_trunc('year', NOW() AT TIME ZONE 'America/Bogota')";
+    intervalUnit = "year";
+    label = "este año";
+  } else if (data.type === "monthly") {
+    startExpr = "date_trunc('month', NOW() AT TIME ZONE 'America/Bogota')";
+    intervalUnit = "month";
+    label = "este mes";
+  } else {
+    startExpr = "date_trunc('week', NOW() AT TIME ZONE 'America/Bogota')";
+    intervalUnit = "week";
+    label = "esta semana";
+  }
+
+  let books = [];
+  let progress = 0;
+
+  if (data.metric === "books") {
+    const { rows: completed } = await pool.query(
+      `SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at,
+              b.id AS db_id, b.title, b.author, b.cover, b.pages
+       FROM user_books ub
+       JOIN books b ON b.id = ub.book_id
+       WHERE ub.user_id = $1 AND ub.status = 'completed'
+         AND ub.finished_at >= ${startExpr}::date
+         AND ub.finished_at < (${startExpr} + INTERVAL '1 ${intervalUnit}')::date
+       ORDER BY ub.finished_at DESC`,
+      [req.userId]
+    );
+    books = completed.map((r) => ({ ...r, minutes: null }));
+    progress = books.length;
+  } else {
+    const { rows: byBook } = await pool.query(
+      `SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at,
+              b.id AS db_id, b.title, b.author, b.cover, b.pages,
+              COALESCE(SUM(rs.duration_seconds), 0) / 60 AS minutes,
+              COALESCE(SUM(rs.pages_read), 0) AS pages_read
+       FROM reading_sessions rs
+       JOIN user_books ub ON ub.id = rs.user_book_id
+       JOIN books b ON b.id = ub.book_id
+       WHERE rs.user_id = $1
+         AND rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota' >= ${startExpr}
+       GROUP BY ub.id, b.id
+       ORDER BY minutes DESC`,
+      [req.userId]
+    );
+    books = byBook.map((r) => ({
+      ...r,
+      minutes: parseInt(r.minutes),
+      pages_read: parseInt(r.pages_read),
+    }));
+    progress = books.reduce((acc, b) => acc + b.minutes, 0);
+  }
+
+  const payload = {
+    type: data.type,
+    metric: data.metric,
+    period: label,
+    progress,
+    books,
+  };
+  cache.set(cacheKey, payload, 60000);
+  res.json(payload);
+});
+
 // POST /goals — crear o actualizar meta
 router.post("/", async (req, res) => {
   const data = validate(req.body, {

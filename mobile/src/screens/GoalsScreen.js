@@ -14,7 +14,7 @@ const GOAL_TYPES = [
 
 const METRIC_LABELS = { books: "libros", hours: "horas", minutes: "minutos" };
 
-export default function GoalsScreen() {
+export default function GoalsScreen({ navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const [data, setData] = useState(null);
@@ -62,6 +62,14 @@ if (type === "weekly") return data.progress.weekly;
     }
   };
 
+  const openGoalDetail = (type, metric) => {
+    if (type === "daily" && metric === "minutes") {
+      navigation.navigate("Main", { screen: "Calendar" });
+      return;
+    }
+    navigation.navigate("GoalDetail", { type, metric });
+  };
+
   if (loading) return (
     <View style={styles.centered}>
       <ActivityIndicator color={colors.accent} size="large" />
@@ -103,6 +111,13 @@ if (type === "weekly") return data.progress.weekly;
                 <Text style={styles.goalPercent}>
                   {Math.round((progress / goal.value) * 100)}% completado
                 </Text>
+                <TouchableOpacity style={styles.detailLink} onPress={() => openGoalDetail(type.key, goal.metric)}>
+                  <Ionicons name={type.key === "daily" ? "calendar-outline" : "list-outline"} size={16} color={colors.accent} />
+                  <Text style={styles.detailLinkText}>
+                    {type.key === "daily" ? "Ver hoy en el calendario" : "Ver detalle"}
+                  </Text>
+                  <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+                </TouchableOpacity>
               </>
             ) : (
               <Text style={styles.noGoal}>{type.description} — sin meta configurada</Text>
@@ -164,6 +179,8 @@ const createStyles = (colors) =>
   progressFill: { height: 8, backgroundColor: colors.accent, borderRadius: 4 },
   goalPercent: { color: colors.textDim, fontSize: 12 },
   noGoal: { color: colors.textDim, fontSize: 13 },
+  detailLink: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
+  detailLinkText: { color: colors.accent, fontSize: 13 },
   editContainer: { marginTop: 12 },
   metricRow: { flexDirection: "row", gap: 8, marginBottom: 8 },
   metricBtn: { backgroundColor: colors.surfaceAlt, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 6 },

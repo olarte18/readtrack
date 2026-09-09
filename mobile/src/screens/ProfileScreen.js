@@ -65,6 +65,16 @@ export default function ProfileScreen({ navigation }) {
               <View style={[styles.goalProgressFill, { width: `${Math.min((goalData.completed / goalData.value) * 100, 100)}%` }]} />
             </View>
             <Text style={styles.goalPercent}>{Math.round((goalData.completed / goalData.value) * 100)}% completado</Text>
+            {goalData.completed > 0 && (
+              <TouchableOpacity
+                style={styles.goalLink}
+                onPress={() => navigation.navigate("GoalDetail", { type: "annual", metric: "books" })}
+              >
+                <Ionicons name="library-outline" size={16} color={colors.accent} />
+                <Text style={styles.goalLinkText}>Libros que cumplieron esta meta</Text>
+                <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+              </TouchableOpacity>
+            )}
           </>
         ) : (
           <Text style={styles.goalEmpty}>No has configurado una meta aún</Text>
@@ -174,6 +184,8 @@ const createStyles = (colors) =>
   goalProgressBar: { height: 8, backgroundColor: colors.surfaceAlt, borderRadius: 4, overflow: "hidden", marginBottom: 6 },
   goalProgressFill: { height: 8, backgroundColor: colors.accent, borderRadius: 4 },
   goalPercent: { color: colors.textDim, fontSize: 12 },
+  goalLink: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
+  goalLinkText: { color: colors.accent, fontSize: 13 },
   goalEmpty: { color: colors.textDim, fontSize: 13 },
   goalInputRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 12 },
   goalInput: { flex: 1, backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
