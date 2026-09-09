@@ -147,7 +147,7 @@ class AlarmSessionService : Service() {
           return
         }
       }
-      refreshNotification()
+      refreshNotification(this@AlarmSessionService)
       handler.postDelayed(this, 1000L)
     }
   }
@@ -170,7 +170,7 @@ class AlarmSessionService : Service() {
     if (AlarmSessionState.isTimer(this) && !AlarmSessionState.isPaused(this)) {
       scheduleExactAlarm(this)
     }
-    refreshNotification()
+    refreshNotification(this)
     handler.removeCallbacks(tick)
     handler.postDelayed(tick, 1000L)
     return START_STICKY
@@ -198,7 +198,7 @@ class AlarmSessionService : Service() {
     Log.d(TAG, "temporizador llegó a 0 en el servicio")
     if (AlarmForegroundTracker.isForeground) {
       // App en primer plano: el flujo JS ya disparó su aviso; solo refresca.
-      refreshNotification()
+      refreshNotification(this)
       handler.postDelayed(tick, 1000L)
       return
     }
