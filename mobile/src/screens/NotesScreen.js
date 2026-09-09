@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, FlatList, StyleSheet, Image, ActivityIndicator } from "react-native";
+import { View, Text, FlatList, StyleSheet, Image, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
@@ -11,7 +11,7 @@ const formatDate = (iso) => {
   return d.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
 };
 
-export default function NotesScreen() {
+export default function NotesScreen({ navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const [notes, setNotes] = useState([]);
@@ -31,7 +31,12 @@ export default function NotesScreen() {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Notas</Text>
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Notas</Text>
+      </View>
       {loading ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
       ) : (
@@ -75,7 +80,16 @@ export default function NotesScreen() {
 const createStyles = (colors) =>
   StyleSheet.create({
     container: { flex: 1, backgroundColor: colors.background },
-    title: { fontSize: 24, fontWeight: "bold", color: colors.text, padding: 20, paddingTop: 50 },
+    header: {
+      flexDirection: "row",
+      alignItems: "center",
+      paddingHorizontal: 16,
+      paddingTop: 50,
+      marginBottom: 12,
+      gap: 12,
+    },
+    title: { fontSize: 24, fontWeight: "bold", color: colors.text },
+    backBtn: { backgroundColor: colors.surface, borderRadius: 10, padding: 8 },
     card: {
       backgroundColor: colors.surface,
       borderRadius: 12,

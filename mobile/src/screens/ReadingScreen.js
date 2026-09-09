@@ -58,7 +58,7 @@ export default function ReadingScreen({ navigation }) {
         <Text style={styles.title}>Leyendo</Text>
         <TouchableOpacity
           style={styles.streakChip}
-          onPress={() => navigation.navigate("Calendar")}
+          onPress={() => navigation.navigate("Main", { screen: "Calendar" })}
           activeOpacity={0.7}
         >
           <Ionicons name="flame" size={20} color={colors.star} />
