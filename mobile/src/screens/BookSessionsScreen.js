@@ -23,9 +23,14 @@ function formatDate(str) {
 function sessionPageLabel(s) {
   const page = s.page ?? 0;
   const read = s.pages_read ?? 0;
-  if (read <= 0) return `Página ${page}`;
-  const start = Math.max(0, page - read);
-  return `Págs. ${start}-${page} · ${read} ${read === 1 ? "página" : "páginas"} leídas`;
+  const storedStart = s.start_page;
+  const dur = s.duration_seconds ?? 0;
+  if (read <= 0) {
+    return dur > 0 ? "Sesión registrada" : "—";
+  }
+  const start = storedStart !== undefined && storedStart !== null ? storedStart : Math.max(0, page - read);
+  const validStart = start < page ? start : Math.max(0, page - read);
+  return `Págs. ${validStart}-${page} · ${read} ${read === 1 ? "página" : "páginas"} leídas`;
 }
 
 export default function BookSessionsScreen({ route, navigation }) {

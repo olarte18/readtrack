@@ -14,13 +14,14 @@ router.post("/", async (req, res) => {
   const data = validate(req.body, {
     user_book_id: { required: true, type: "integer", min: 1 },
     page: { required: true, type: "integer", min: 0 },
+    start_page: { type: "integer", min: 0 },
     duration_seconds: { type: "integer", min: 0 },
     pages_read: { type: "integer", min: 0 },
   });
 
   const { rows } = await pool.query(
-    "INSERT INTO reading_sessions (user_book_id, user_id, page, duration_seconds, pages_read) VALUES ($1, $2, $3, $4, $5) RETURNING *",
-    [data.user_book_id, req.userId, data.page, data.duration_seconds, data.pages_read]
+    "INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
+    [data.user_book_id, req.userId, data.page, data.start_page, data.duration_seconds, data.pages_read]
   );
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
@@ -57,6 +58,7 @@ router.post("/", async (req, res) => {
 router.patch("/:id", async (req, res) => {
   const data = validate(req.body, {
     page: { type: "integer", min: 0 },
+    start_page: { type: "integer", min: 0 },
     duration_seconds: { type: "integer", min: 0 },
     pages_read: { type: "integer", min: 0 },
   });
@@ -116,7 +118,7 @@ router.get("/:user_book_id", async (req, res) => {
     params.push(req.query.date);
   }
   const { rows } = await pool.query(
-    `SELECT rs.id, rs.page, rs.pages_read, rs.duration_seconds,
+    `SELECT rs.id, rs.page, rs.start_page, rs.pages_read, rs.duration_seconds,
             TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date_bogota,
             TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'HH24:MI') AS time_bogota
      FROM reading_sessions rs

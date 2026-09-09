@@ -263,3 +263,42 @@ describe("POST /reading-sessions — cumplimiento de metas", () => {
     expect(secondDaily).toBeUndefined();
   });
 });
+
+describe("start_page column", () => {
+  test("POST guarda start_page y GET lo devuelve", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    const res = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 50, start_page: 40, duration_seconds: 1800, pages_read: 10 });
+
+    expect(res.status).toBe(201);
+    expect(res.body.start_page).toBe(40);
+    expect(res.body.page).toBe(50);
+    expect(res.body.pages_read).toBe(10);
+
+    const getRes = await request(app)
+      .get(`/reading-sessions/${book.id}`)
+      .set(authHeader(token));
+    expect(getRes.status).toBe(200);
+    expect(getRes.body[0].start_page).toBe(40);
+  });
+
+  test("PATCH permite actualizar start_page", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+    const session = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 50, duration_seconds: 1800, pages_read: 10 });
+
+    const patchRes = await request(app)
+      .patch(`/reading-sessions/${session.body.id}`)
+      .set(authHeader(token))
+      .send({ start_page: 35 });
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body.start_page).toBe(35);
+  });
+});

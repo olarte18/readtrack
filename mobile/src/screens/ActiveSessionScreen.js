@@ -384,7 +384,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         updates.finished_at = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
       }
       await updateBook(book.id, updates);
-      const saved = await addReadingSession(book.id, page, readSeconds, pages, completed);
+      const saved = await addReadingSession(book.id, page, readSeconds, pages, completed, startPage);
       try {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       } catch {}

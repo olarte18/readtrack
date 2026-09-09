@@ -31,6 +31,7 @@ CREATE TABLE IF NOT EXISTS books (
 -- Para bases creadas antes de estas columnas
 ALTER TABLE books ADD COLUMN IF NOT EXISTS publisher VARCHAR(120);
 ALTER TABLE books ADD COLUMN IF NOT EXISTS book_type   VARCHAR(20);
+ALTER TABLE reading_sessions ADD COLUMN IF NOT EXISTS start_page INTEGER;
 
 -- Libros creados manualmente no tienen google_id
 ALTER TABLE books ALTER COLUMN google_id DROP NOT NULL;
@@ -89,6 +90,7 @@ CREATE TABLE IF NOT EXISTS reading_sessions (
   user_book_id     INTEGER NOT NULL REFERENCES user_books(id) ON DELETE CASCADE,
   user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   page             INTEGER NOT NULL,
+  start_page       INTEGER,
   duration_seconds INTEGER,
   pages_read       INTEGER,
   created_at       TIMESTAMP DEFAULT NOW()

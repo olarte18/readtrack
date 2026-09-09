@@ -127,10 +127,10 @@ export const getStreak = async () => request("/stats/streak");
 
 export const getAllNotes = async () => request("/notes");
 
-export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read, book_completed) =>
+export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read, book_completed, start_page) =>
   request("/reading-sessions", {
     method: "POST",
-    body: JSON.stringify({ user_book_id, page, duration_seconds, pages_read, book_completed }),
+    body: JSON.stringify({ user_book_id, page, start_page, duration_seconds, pages_read, book_completed }),
   });
 
 export const getReadingSessions = async (user_book_id, date) =>
