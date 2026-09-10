@@ -64,12 +64,15 @@ export default function ReadingScreen({ navigation }) {
       <View style={styles.header}>
         <Text style={styles.title}>Leyendo</Text>
         <TouchableOpacity
-          style={styles.streakChip}
+          style={[
+            styles.streakChip,
+            { borderColor: streak?.current > 0 ? colors.star + "55" : colors.border }
+          ]}
           onPress={() => navigation.navigate("Main", { screen: "Calendar" })}
           activeOpacity={0.7}
         >
-          <Ionicons name="flame" size={20} color={colors.star} />
-          <Text style={styles.streakValue}>{streak?.current ?? 0}</Text>
+          <Ionicons name="flame" size={20} color={streak?.current > 0 ? colors.star : colors.textMuted} />
+          <Text style={[styles.streakValue, { color: streak?.current > 0 ? colors.text : colors.textMuted }]}>{streak?.current ?? 0}</Text>
           <View style={styles.streakDivider} />
           <Ionicons name="trophy" size={14} color={colors.textMuted} />
           <Text style={styles.streakBest}>{streak?.best ?? 0}</Text>

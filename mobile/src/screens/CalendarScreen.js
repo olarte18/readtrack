@@ -140,8 +140,8 @@ export default function CalendarScreen() {
 
       <View style={styles.streakCard}>
         <View style={styles.streakItem}>
-          <Ionicons name="flame" size={28} color={colors.accent} />
-          <Text style={styles.streakNumber}>{data?.streak?.current ?? 0}</Text>
+          <Ionicons name="flame" size={28} color={data?.streak?.current > 0 ? colors.accent : colors.textMuted} />
+          <Text style={[styles.streakNumber, { color: data?.streak?.current > 0 ? colors.text : colors.textMuted }]}>{data?.streak?.current ?? 0}</Text>
           <Text style={styles.streakLabel}>días de racha</Text>
         </View>
         <View style={styles.streakDivider} />
