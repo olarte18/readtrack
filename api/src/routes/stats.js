@@ -20,8 +20,22 @@ router.get("/streak", async (req, res) => {
     [req.userId]
   );
   const streak = computeStreaks(rows.map((r) => r.date));
-  cache.set(cacheKey, streak, 60000);
-  res.json(streak);
+
+  // ¿Hubo al menos una sesión hoy (hora Bogotá)? No depende de los minutos
+  // (una sesión corta de <1 min iba a dar 0 minutos y apagaba la racha).
+  const { rows: todaySessions } = await pool.query(
+    `SELECT COUNT(*)::int AS n
+     FROM reading_sessions
+     WHERE user_id = $1
+       AND created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
+         >= date_trunc('day', NOW() AT TIME ZONE 'America/Bogota')`,
+    [req.userId]
+  );
+  const hasSessionToday = todaySessions[0].n > 0;
+
+  const payload = { ...streak, hasSessionToday };
+  cache.set(cacheKey, payload, 60000);
+  res.json(payload);
 });
 
 // GET /stats

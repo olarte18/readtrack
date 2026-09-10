@@ -302,3 +302,26 @@ describe("start_page column", () => {
     expect(patchRes.body.start_page).toBe(35);
   });
 });
+
+describe("GET /stats/streak — hasSessionToday", () => {
+  test("es false sin sesiones hoy", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).get("/stats/streak").set(authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.hasSessionToday).toBe(false);
+  });
+
+  test("es true tras una sesión corta de hoy (< 1 min)", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 2, duration_seconds: 14, pages_read: 1 });
+
+    const res = await request(app).get("/stats/streak").set(authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.hasSessionToday).toBe(true);
+  });
+});

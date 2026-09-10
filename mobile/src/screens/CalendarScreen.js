@@ -127,6 +127,7 @@ export default function CalendarScreen() {
   const dayMap = {};
   (data?.days ?? []).forEach((d) => { dayMap[d.date] = d; });
   const selectedDay = selectedDate ? dayMap[selectedDate] : null;
+  const hasSessionToday = !!dayMap[todayStr];
 
   const dayStyleFor = (day) => {
     const info = dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`];
@@ -140,8 +141,8 @@ export default function CalendarScreen() {
 
       <View style={styles.streakCard}>
         <View style={styles.streakItem}>
-          <Ionicons name="flame" size={28} color={data?.streak?.current > 0 ? colors.accent : colors.textMuted} />
-          <Text style={[styles.streakNumber, { color: data?.streak?.current > 0 ? colors.text : colors.textMuted }]}>{data?.streak?.current ?? 0}</Text>
+          <Ionicons name="flame" size={28} color={hasSessionToday ? colors.accent : colors.textMuted} />
+          <Text style={[styles.streakNumber, { color: hasSessionToday ? colors.text : colors.textMuted }]}>{data?.streak?.current ?? 0}</Text>
           <Text style={styles.streakLabel}>días de racha</Text>
         </View>
         <View style={styles.streakDivider} />
