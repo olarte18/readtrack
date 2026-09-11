@@ -184,7 +184,7 @@ export default function CalendarScreen() {
                 day === null ? (
                   <View key={`blank-${i}`} style={styles.dayCell} />
                 ) : (
-                  <TouchableOpacity key={day} style={styles.dayCellWrapper} onPress={() => setSelectedDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}>
+                  <TouchableOpacity key={day} style={styles.dayCellWrapper} accessibilityLabel={`Día ${day}`} onPress={() => setSelectedDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}>
                     <View
                       style={[
                         styles.dayCell,
@@ -193,15 +193,16 @@ export default function CalendarScreen() {
                         selectedDate === `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}` && styles.dayCellSelected,
                       ]}
                     >
-                      <Text
-                        style={[
-                          styles.dayText,
-                          dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`] && styles.dayTextActive,
-                          dayStyleFor(day) === styles.dayCellComplete && styles.dayTextComplete,
-                        ]}
-                      >
-                        {day}
-                      </Text>
+                      {dayStyleFor(day) !== styles.dayCellComplete && (
+                        <Text
+                          style={[
+                            styles.dayText,
+                            dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`] && styles.dayTextActive,
+                          ]}
+                        >
+                          {day}
+                        </Text>
+                      )}
                     </View>
                   </TouchableOpacity>
                 )
@@ -384,7 +385,6 @@ const createStyles = (colors) =>
   dayCellSelected: { borderWidth: 2, borderColor: colors.text },
   dayText: { fontSize: 13, color: colors.textDim },
   dayTextActive: { color: "#fff", fontWeight: "bold" },
-  dayTextComplete: { color: "#13131f", fontWeight: "bold" },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
   legendSwatch: { width: 10, height: 10, borderRadius: 3 },
   legendText: { fontSize: 11, color: colors.textDim, marginRight: 10 },
