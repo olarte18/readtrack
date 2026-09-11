@@ -143,3 +143,32 @@ describe("GET /goals — monthly_books con zona Bogotá", () => {
     expect(res.body.progress.annual).toBe(2);
   });
 });
+
+describe("GET /goals/status", () => {
+  test("hasGoals false sin metas guardadas", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).get("/goals/status").set(authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.hasGoals).toBe(false);
+  });
+
+  test("hasGoals true tras guardar una meta", async () => {
+    const { token } = await registerUser();
+    await request(app).post("/goals").set(authHeader(token)).send({ type: "annual", metric: "books", value: 20 });
+    const res = await request(app).get("/goals/status").set(authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.hasGoals).toBe(true);
+  });
+
+  test("hasGoals true con meta de un año anterior", async () => {
+    const { user, token } = await registerUser();
+    await pool.query(
+      `INSERT INTO reading_goals (user_id, type, metric, value, year)
+       VALUES ($1, 'annual', 'books', 12, $2)`,
+      [user.id, new Date().getFullYear() - 1]
+    );
+    const res = await request(app).get("/goals/status").set(authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body.hasGoals).toBe(true);
+  });
+});

@@ -1,6 +1,7 @@
 import { createContext, useContext, useState, useEffect } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../utils/config";
+import { getGoalsStatus } from "../services/api";
 
 const AuthContext = createContext();
 
@@ -30,11 +31,30 @@ export function AuthProvider({ children }) {
       return;
     }
     let mounted = true;
-    AsyncStorage.getItem(`onboarding:${user.id}`).then((v) => {
-      if (!mounted) return;
-      setSetupDone(v === "done");
-      setSetupReady(true);
-    });
+    (async () => {
+      try {
+        const local = await AsyncStorage.getItem(`onboarding:${user.id}`);
+        let done = local === "done";
+        if (!done) {
+          try {
+            const { hasGoals } = await getGoalsStatus();
+            if (hasGoals) {
+              await AsyncStorage.setItem(`onboarding:${user.id}`, "done");
+              done = true;
+            }
+          } catch {
+            done = true; // sin red: no volver a insistir; se revalida al próximo arranque online
+          }
+        }
+        if (!mounted) return;
+        setSetupDone(done);
+        setSetupReady(true);
+      } catch {
+        if (!mounted) return;
+        setSetupDone(false);
+        setSetupReady(true);
+      }
+    })();
     return () => {
       mounted = false;
     };

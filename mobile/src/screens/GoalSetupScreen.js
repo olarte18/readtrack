@@ -52,6 +52,9 @@ export default function GoalSetupScreen() {
   return (
     <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
       <View style={styles.header}>
+        <TouchableOpacity style={styles.laterLink} onPress={finishSetup} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <Text style={styles.laterLinkText}>Más tarde</Text>
+        </TouchableOpacity>
         <Ionicons name="trophy" size={48} color={colors.accent} />
         <Text style={styles.title}>¡Bienvenido!</Text>
         <Text style={styles.subtitle}>
@@ -163,10 +166,6 @@ export default function GoalSetupScreen() {
       >
         <Text style={styles.continueBtnText}>Continuar</Text>
       </TouchableOpacity>
-
-      <TouchableOpacity style={styles.laterBtn} onPress={finishSetup}>
-        <Text style={styles.laterBtnText}>Más tarde</Text>
-      </TouchableOpacity>
     </ScrollView>
   );
 }
@@ -174,7 +173,9 @@ export default function GoalSetupScreen() {
 const createStyles = (colors) =>
   StyleSheet.create({
     container: { flexGrow: 1, backgroundColor: colors.background, paddingTop: 70, paddingHorizontal: 24, paddingBottom: 40 },
-    header: { alignItems: "center", marginBottom: 28 },
+    header: { alignItems: "center", marginBottom: 28, position: "relative" },
+    laterLink: { position: "absolute", top: -16, right: 0 },
+    laterLinkText: { color: colors.textDim, fontSize: 14, fontWeight: "bold" },
     title: { fontSize: 26, fontWeight: "bold", color: colors.text, marginTop: 12 },
     subtitle: { fontSize: 14, color: colors.textDim, textAlign: "center", marginTop: 8, lineHeight: 20 },
     goalCard: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 14 },
@@ -202,6 +203,4 @@ const createStyles = (colors) =>
     continueBtn: { backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, alignItems: "center", marginTop: 8 },
     continueBtnDisabled: { opacity: 0.4 },
     continueBtnText: { color: colors.onAccent, fontSize: 16, fontWeight: "bold" },
-    laterBtn: { alignItems: "center", paddingVertical: 14, marginTop: 4 },
-    laterBtnText: { color: colors.textDim, fontSize: 15, fontWeight: "bold" },
   });

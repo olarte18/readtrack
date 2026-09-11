@@ -100,6 +100,16 @@ router.get("/", async (req, res) => {
   res.json(payload);
 });
 
+// GET /goals/status — ¿el usuario ha configurado alguna meta (de cualquier año)?
+// Ligero: lo usa el onboarding para no volver a preguntar metas a quien ya las tiene.
+router.get("/status", async (req, res) => {
+  const { rows } = await pool.query(
+    "SELECT EXISTS(SELECT 1 FROM reading_goals WHERE user_id = $1) AS has",
+    [req.userId]
+  );
+  res.json({ hasGoals: rows[0].has });
+});
+
 // GET /goals/detail?type=annual|monthly|weekly&metric=books|hours
 // Desglose de la meta: libros completados en el periodo (books) o
 // minutos por libro leídos en el periodo (hours).

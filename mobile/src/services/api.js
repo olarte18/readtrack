@@ -157,6 +157,8 @@ export const updateReadingGoal = async (goal) =>
 
 export const getGoals = async () => request("/goals");
 
+export const getGoalsStatus = async () => request("/goals/status");
+
 export const getGoalDetail = async (type, metric) =>
   request(`/goals/detail?type=${encodeURIComponent(type)}&metric=${encodeURIComponent(metric)}`);
 
