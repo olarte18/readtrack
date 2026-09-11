@@ -3,7 +3,9 @@ import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndi
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
+import { useAuth } from "../contexts/AuthContext";
 import { getLibrary, getReadingSpeed, getStreak, getGoals } from "../services/api";
+import { reconcileStreakReminder } from "../services/streakReminder";
 import ProgressRing from "../components/ProgressRing";
 
 const formatRemaining = (minutes) => {
@@ -17,6 +19,7 @@ const formatRemaining = (minutes) => {
 
 export default function ReadingScreen({ navigation }) {
   const { colors } = useTheme();
+  const { user } = useAuth();
   const styles = createStyles(colors);
   const [books, setBooks] = useState([]);
   const [speeds, setSpeeds] = useState({});
@@ -50,9 +53,16 @@ export default function ReadingScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       fetchReading();
-      getStreak().then(setStreak).catch(console.error);
+      getStreak()
+        .then((s) => {
+          setStreak(s);
+          if (user) {
+            reconcileStreakReminder(user.id, { hasSessionToday: !!s.hasSessionToday, streak: s.current ?? 0 }).catch(() => {});
+          }
+        })
+        .catch(console.error);
       getGoals().then(setGoals).catch(console.error);
-    }, [])
+    }, [user])
   );
 
   const dailyGoal = goals?.goals?.find((g) => g.type === "daily");

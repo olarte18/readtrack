@@ -33,8 +33,10 @@ import WhatsNewPopup from "./src/components/WhatsNewPopup";
 import { AppAlertHost } from "./src/components/AppAlert";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
-import { warmup } from "./src/services/api";
+import { warmup, getStreak } from "./src/services/api";
 import { configureNotifications } from "./src/services/notifications";
+import StreakReminderModal from "./src/components/StreakReminderModal";
+import { shouldShowStreakPrompt, reconcileStreakReminder } from "./src/services/streakReminder";
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -110,16 +112,39 @@ function AppStack() {
 }
 
 function AppShell() {
+  const { user } = useAuth();
   const [showWhatsNew, setShowWhatsNew] = useState(false);
+  const [showStreakPrompt, setShowStreakPrompt] = useState(false);
 
   useEffect(() => {
     shouldShowWhatsNewPopup().then(setShowWhatsNew);
-  }, []);
+    if (user) shouldShowStreakPrompt(user.id).then(setShowStreakPrompt);
+  }, [user]);
+
+  useEffect(() => {
+    if (!user) return;
+    const doReconcile = () => {
+      getStreak()
+        .then((s) => reconcileStreakReminder(user.id, { hasSessionToday: !!s.hasSessionToday, streak: s.current ?? 0 }))
+        .catch(() => {});
+    };
+    doReconcile();
+    const sub = AppState.addEventListener("change", (next) => {
+      if (next === "active") doReconcile();
+    });
+    return () => sub.remove();
+  }, [user]);
 
   return (
     <>
       <AppStack />
       <WhatsNewPopup visible={showWhatsNew} onClose={() => setShowWhatsNew(false)} />
+      <StreakReminderModal
+        visible={showStreakPrompt}
+        onClose={() => setShowStreakPrompt(false)}
+        userId={user?.id}
+        mode="invite"
+      />
     </>
   );
 }

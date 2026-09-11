@@ -5,6 +5,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { getGoals, saveGoal } from "../services/api";
 import { isWhatsNewVisible } from "../utils/whatsNew";
+import StreakReminderModal from "../components/StreakReminderModal";
 import { Ionicons } from "@expo/vector-icons";
 
 export default function ProfileScreen({ navigation }) {
@@ -15,6 +16,7 @@ export default function ProfileScreen({ navigation }) {
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const [whatsNewVisible, setWhatsNewVisible] = useState(false);
+  const [streakReminderOpen, setStreakReminderOpen] = useState(false);
 
   useEffect(() => {
     isWhatsNewVisible().then(setWhatsNewVisible);
@@ -159,7 +161,19 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.menuLabel}>Metas</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => setStreakReminderOpen(true)}>
+          <Ionicons name="notifications-outline" size={22} color={colors.accent} />
+          <Text style={styles.menuLabel}>Notificaciones de racha</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+        </TouchableOpacity>
       </View>
+
+      <StreakReminderModal
+        visible={streakReminderOpen}
+        onClose={() => setStreakReminderOpen(false)}
+        userId={user?.id}
+        mode="settings"
+      />
 
       <TouchableOpacity style={styles.logoutButton} onPress={logout}>
         <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
