@@ -14,11 +14,44 @@ const RETRY_DELAYS = [1500, 3000];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+let refreshingPromise = null;
+
+const clearAuth = () =>
+  AsyncStorage.multiRemove(["token", "refreshToken"]).catch(() => {});
+
+const refreshAccessToken = async () => {
+  if (!refreshingPromise) {
+    refreshingPromise = (async () => {
+      const refreshToken = await AsyncStorage.getItem("refreshToken");
+      if (!refreshToken) throw new Error("Sin refresh token");
+      const res = await fetch(`${API_URL}/auth/refresh`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ refreshToken }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Sesión expirada");
+      await AsyncStorage.multiSet([
+        ["token", data.token],
+        ["refreshToken", data.refreshToken],
+      ]);
+      return data.token;
+    })().catch(async (err) => {
+      await clearAuth();
+      throw err;
+    }).finally(() => {
+      refreshingPromise = null;
+    });
+  }
+  return refreshingPromise;
+};
+
 const request = async (path, options = {}) => {
   const { timeout = DEFAULT_TIMEOUT, retry, retries, ...fetchOptions } = options;
   const isGet = (fetchOptions.method || "GET") === "GET";
   const maxRetries = retry === false ? 0 : (retries ?? (isGet ? 2 : 0));
   let attempt = 0;
+  let refreshTried = false;
 
   while (true) {
     const controller = new AbortController();
@@ -32,8 +65,16 @@ const request = async (path, options = {}) => {
       clearTimeout(timer);
       const data = await res.json().catch(() => ({}));
       if (res.status === 401) {
-        // Token de una cuenta eliminada o sesión inválida: forzar re-login
-        await AsyncStorage.removeItem("token");
+        // Token expirado: intentar renovar una vez con el refresh token
+        if (!refreshTried) {
+          refreshTried = true;
+          const refreshed = await refreshAccessToken();
+          if (refreshed) {
+            attempt = 0;
+            continue;
+          }
+        }
+        await clearAuth();
         throw new Error(data.error || "Tu sesión expiró. Inicia sesión de nuevo.");
       }
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);

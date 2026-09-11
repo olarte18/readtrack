@@ -5,6 +5,9 @@ const authMiddleware = require("../middleware/auth");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
 
+const BOGOTA_TZ = "America/Bogota";
+const bogotaYear = () => Number(new Intl.DateTimeFormat("en-CA", { timeZone: BOGOTA_TZ, year: "numeric" }).format(new Date()));
+
 router.use(authMiddleware);
 
 // GET /calendar/:year/:month — actividad diaria del mes con detalle por libro
@@ -43,6 +46,11 @@ router.get("/:year/:month", async (req, res) => {
     [req.userId]
   );
 
+  const { rows: dailyGoalRows } = await pool.query(
+    "SELECT value FROM reading_goals WHERE user_id = $1 AND year = $2 AND type = 'daily'",
+    [req.userId, bogotaYear()]
+  );
+
   const dayMap = new Map();
   for (const row of rows) {
     if (!dayMap.has(row.date)) {
@@ -67,6 +75,7 @@ router.get("/:year/:month", async (req, res) => {
     year,
     month,
     days: [...dayMap.values()],
+    daily_goal_minutes: dailyGoalRows[0]?.value ?? null,
     streak: computeStreaks(sessionDates.map((r) => r.date)),
   };
   cache.set(cacheKey, payload, 60000);

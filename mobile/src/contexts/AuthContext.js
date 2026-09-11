@@ -75,7 +75,11 @@ export function AuthProvider({ children }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
-    await AsyncStorage.multiSet([["user", JSON.stringify(data.user)], ["token", data.token]]);
+    await AsyncStorage.multiSet([
+      ["user", JSON.stringify(data.user)],
+      ["token", data.token],
+      ["refreshToken", data.refreshToken],
+    ]);
     setUser(data.user);
     setToken(data.token);
   };
@@ -88,13 +92,27 @@ export function AuthProvider({ children }) {
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);
-    await AsyncStorage.multiSet([["user", JSON.stringify(data.user)], ["token", data.token]]);
+    await AsyncStorage.multiSet([
+      ["user", JSON.stringify(data.user)],
+      ["token", data.token],
+      ["refreshToken", data.refreshToken],
+    ]);
     setUser(data.user);
     setToken(data.token);
   };
 
   const logout = async () => {
-    await AsyncStorage.multiRemove(["user", "token"]);
+    try {
+      const refreshToken = await AsyncStorage.getItem("refreshToken");
+      if (refreshToken) {
+        await fetch(`${API_URL}/auth/logout`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+        }).catch(() => {});
+      }
+    } catch {}
+    await AsyncStorage.multiRemove(["user", "token", "refreshToken"]);
     setUser(null);
     setToken(null);
   };

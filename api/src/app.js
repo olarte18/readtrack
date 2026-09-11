@@ -21,7 +21,10 @@ if (!process.env.JWT_SECRET) {
 const app = express();
 
 app.use(helmet());
-app.use(cors());
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()) || false,
+  credentials: true,
+}));
 app.use(express.json({ limit: "15mb" }));
 app.use("/stats", statsRouter);
 app.use("/auth", authRouter);

@@ -132,7 +132,9 @@ export default function CalendarScreen() {
   const dayStyleFor = (day) => {
     const info = dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`];
     if (!info) return styles.dayCellIdle;
-    return info.minutes > 30 ? styles.dayCellHigh : styles.dayCellActive;
+    const dailyGoal = data?.daily_goal_minutes ?? 30;
+    if (info.minutes >= dailyGoal) return styles.dayCellComplete;
+    return styles.dayCellActive;
   };
 
   return (
@@ -195,6 +197,7 @@ export default function CalendarScreen() {
                         style={[
                           styles.dayText,
                           dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`] && styles.dayTextActive,
+                          dayStyleFor(day) === styles.dayCellComplete && styles.dayTextComplete,
                         ]}
                       >
                         {day}
@@ -209,8 +212,8 @@ export default function CalendarScreen() {
               <Text style={styles.legendText}>Sin sesión</Text>
               <View style={[styles.legendSwatch, { backgroundColor: colors.calendarMid }]} />
               <Text style={styles.legendText}>Sesión</Text>
-              <View style={[styles.legendSwatch, { backgroundColor: colors.calendarHigh }]} />
-              <Text style={styles.legendText}>+30 min</Text>
+              <View style={[styles.legendSwatch, { backgroundColor: colors.calendarComplete }]} />
+              <Text style={styles.legendText}>Meta cumplida</Text>
             </View>
           </View>
 
@@ -376,11 +379,12 @@ const createStyles = (colors) =>
   },
   dayCellIdle: { backgroundColor: colors.calendarLow },
   dayCellActive: { backgroundColor: colors.calendarMid },
-  dayCellHigh: { backgroundColor: colors.calendarHigh },
+  dayCellComplete: { backgroundColor: colors.calendarComplete },
   dayCellToday: { borderWidth: 2, borderColor: colors.star },
   dayCellSelected: { borderWidth: 2, borderColor: colors.text },
   dayText: { fontSize: 13, color: colors.textDim },
   dayTextActive: { color: "#fff", fontWeight: "bold" },
+  dayTextComplete: { color: "#13131f", fontWeight: "bold" },
   legendRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
   legendSwatch: { width: 10, height: 10, borderRadius: 3 },
   legendText: { fontSize: 11, color: colors.textDim, marginRight: 10 },

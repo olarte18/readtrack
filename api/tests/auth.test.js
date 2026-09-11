@@ -88,6 +88,58 @@ describe("POST /auth/login", () => {
   });
 });
 
+describe("POST /auth/refresh", () => {
+  beforeEach(async () => {
+    await request(app).post("/auth/register").send({
+      username: "juan",
+      email: "juan@example.com",
+      password: "password123",
+    });
+  });
+
+  test("rota el refresh token y devuelve un access token nuevo", async () => {
+    const login = await request(app).post("/auth/login").send({
+      email: "juan@example.com",
+      password: "password123",
+    });
+    const refreshToken = login.body.refreshToken;
+    expect(refreshToken).toBeDefined();
+
+    const res = await request(app).post("/auth/refresh").send({ refreshToken });
+    expect(res.status).toBe(200);
+    expect(res.body.token).toBeDefined();
+    expect(res.body.refreshToken).not.toBe(refreshToken);
+
+    const old = await request(app).post("/auth/refresh").send({ refreshToken });
+    expect(old.status).toBe(401);
+  });
+
+  test("rechaza un refresh token inválido", async () => {
+    const res = await request(app).post("/auth/refresh").send({ refreshToken: "invalido" });
+    expect(res.status).toBe(401);
+  });
+
+  test("rechaza un refresh token reutilizado (rotación)", async () => {
+    const login = await request(app).post("/auth/login").send({
+      email: "juan@example.com",
+      password: "password123",
+    });
+    await request(app).post("/auth/refresh").send({ refreshToken: login.body.refreshToken });
+    const reuse = await request(app).post("/auth/refresh").send({ refreshToken: login.body.refreshToken });
+    expect(reuse.status).toBe(401);
+  });
+
+  test("logout revoca el refresh token", async () => {
+    const login = await request(app).post("/auth/login").send({
+      email: "juan@example.com",
+      password: "password123",
+    });
+    await request(app).post("/auth/logout").send({ refreshToken: login.body.refreshToken });
+    const res = await request(app).post("/auth/refresh").send({ refreshToken: login.body.refreshToken });
+    expect(res.status).toBe(401);
+  });
+});
+
 describe("Protección de rutas", () => {
   test("GET /user-books sin token devuelve 401", async () => {
     const res = await request(app).get("/user-books");

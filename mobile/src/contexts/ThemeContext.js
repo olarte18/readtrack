@@ -22,7 +22,7 @@ const palettes = {
     border: "#2a2a3e",
     calendarLow: "#2a2a3e",
     calendarMid: "#6c5ce7",
-    calendarHigh: "#cba6f7",
+    calendarComplete: "#7ee787",
   },
   light: {
     background: "#f2f2f7",
@@ -40,7 +40,7 @@ const palettes = {
     border: "#e0e0e6",
     calendarLow: "#dcdce4",
     calendarMid: "#6c5ce7",
-    calendarHigh: "#7c5cbf",
+    calendarComplete: "#7ee787",
   },
 };
 

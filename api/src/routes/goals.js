@@ -210,6 +210,7 @@ router.post("/", async (req, res) => {
   );
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`stats:${req.userId}`);
+  cache.delPrefix(`calendar:${req.userId}`);
   res.status(201).json(rows[0]);
 });
 

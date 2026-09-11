@@ -1,16 +1,21 @@
 const fs = require("fs");
 const path = require("path");
+require("dotenv").config();
+const { dbSsl } = require("./ssl");
 
 const schema = fs.readFileSync(path.join(__dirname, "schema.sql"), "utf8");
 
 // Aplica el esquema de forma idempotente (todo usa IF NOT EXISTS / ADD COLUMN
-// IF NOT EXISTS), seguro para ejecutar en cada arranque del servidor.
+// IF NOT EXISTS). Solo debe ejecutarse manualmente vía `npm run db:setup`.
 async function applySchema(pool) {
   await pool.query(schema);
 }
 
 async function main() {
-  require("dotenv").config();
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_SCHEMA_ON_PROD !== "true") {
+    console.error("Refusing to apply schema in production. Set ALLOW_SCHEMA_ON_PROD=true to override.");
+    process.exit(1);
+  }
   const { Pool } = require("pg");
   const pool = new Pool({
     user: process.env.DB_USER,
@@ -18,7 +23,7 @@ async function main() {
     host: process.env.DB_HOST,
     port: process.env.DB_PORT,
     database: process.env.DB_NAME,
-    ssl: process.env.DB_SSL === "true" ? { rejectUnauthorized: false } : undefined,
+    ssl: dbSsl(),
   });
   try {
     await applySchema(pool);

@@ -4,18 +4,17 @@ const fs = require("fs");
 const path = require("path");
 const request = require("supertest");
 
-const pool = new Pool({
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  host: process.env.DB_HOST,
-  port: process.env.DB_PORT,
-  database: process.env.DB_NAME,
-});
+if (!process.env.TEST_DATABASE_URL) {
+  console.error("TEST_DATABASE_URL is required for tests. Refusing to run against any other database.");
+  process.exit(1);
+}
+
+const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
 
 const schema = fs.readFileSync(path.join(__dirname, "..", "src", "db", "schema.sql"), "utf8");
 const app = require("../src/app");
 
-const TABLES = ["verification_codes", "reading_sessions", "reading_goals", "notes", "user_books", "books", "users"];
+const TABLES = ["refresh_tokens", "verification_codes", "reading_sessions", "reading_goals", "notes", "user_books", "books", "users"];
 
 async function initDb() {
   await pool.query(schema);
