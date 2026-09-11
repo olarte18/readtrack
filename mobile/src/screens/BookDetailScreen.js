@@ -3,8 +3,9 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ActivityIn
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
-import { addBook, updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, updateBookPages } from "../services/api";
+import { updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, updateBookPages } from "../services/api";
 import { getBookDescription } from "../services/openLibrary";
+import { formatPoint, isCompleted } from "../utils/progress";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const STATUS_OPTIONS = [
@@ -80,22 +81,6 @@ useEffect(() => {
   const alreadyInLibrary = isInLibrary || !!libraryEntry;
   const entryId = libraryEntry?.id ?? book.id;
 
-  const handleAdd = async (status) => {
-    setSelectedStatus(status);
-    setLoading(true);
-    try {
-      const result = await addBook({ ...book, google_id: book.id }, status);
-      setLibraryEntry({ id: result.id, status });
-      if (result.book_id) setBookDbId(result.book_id);
-      AppAlert.alert("Listo", `"${book.title}" agregado a tu biblioteca`);
-      onGoBack?.();
-    } catch (error) {
-      AppAlert.alert("Error", "No se pudo agregar el libro");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const handleUpdate = async (id, status) => {
     setSelectedStatus(status);
     setLoading(true);
@@ -118,24 +103,30 @@ await updateBook(id, updates);
   };
 
   const handleSavePage = async () => {
-    const page = parseInt(currentPage);
-    if (isNaN(page) || page < 0) return AppAlert.alert("Error", "Ingresa una página válida");
-    if (book.pages && page > book.pages) return AppAlert.alert("Error", `El libro tiene ${book.pages} páginas`);
+    const readingMode = book.reading_mode ?? "page";
+    const unitLabel = readingMode === "percentage" ? "porcentaje" : readingMode === "chapter" ? "capítulo" : "página";
+    const val = parseInt(currentPage);
+    if (isNaN(val) || val < 0) return AppAlert.alert("Error", `Ingresa un ${unitLabel} válido`);
+    if (readingMode === "percentage" && val > 100) return AppAlert.alert("Error", "El porcentaje no puede superar 100");
+    if (readingMode === "chapter" && book.chapters && val > book.chapters)
+      return AppAlert.alert("Error", `El libro tiene ${book.chapters} capítulos`);
+    if (readingMode === "page" && book.pages && val > book.pages)
+      return AppAlert.alert("Error", `El libro tiene ${book.pages} páginas`);
 
     try {
-      // Auto-completar si llegó a la última página
-      if (book.pages && page === book.pages) {
-        await updateBook(entryId, { current_page: page, status: "completed" });
+      const completed = isCompleted(book, val);
+      if (completed) {
+        await updateBook(entryId, { current_page: val, status: "completed" });
         setSelectedStatus("completed");
         setLibraryEntry((prev) => ({ ...prev, status: "completed" }));
         AppAlert.alert("¡Felicidades!", `Terminaste "${book.title}"`);
       } else {
-        await updateBook(entryId, { current_page: page });
-        AppAlert.alert("Guardado", `Página ${page} guardada`);
+        await updateBook(entryId, { current_page: val });
+        AppAlert.alert("Guardado", `${formatPoint(book, val)} guardado`);
       }
       onGoBack?.();
     } catch {
-      AppAlert.alert("Error", "No se pudo guardar la página");
+      AppAlert.alert("Error", "No se pudo guardar");
     }
   };
 
@@ -308,39 +299,66 @@ const handleDeleteNote = (id) => {
   </View>
 )}
       <View style={styles.section}>
-        <Text style={styles.sectionTitle}>
-          {alreadyInLibrary ? "Cambiar estado" : "Agregar a biblioteca"}
-        </Text>
-        {loading ? (
-          <ActivityIndicator color={colors.accent} />
+        {alreadyInLibrary ? (
+          <>
+            <Text style={styles.sectionTitle}>Cambiar estado</Text>
+            {loading ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : (
+              <View style={styles.statusRow}>
+                {STATUS_OPTIONS.map((opt) => (
+                  <TouchableOpacity
+                    key={opt.key}
+                    style={[styles.statusBtn, selectedStatus === opt.key && styles.statusBtnActive]}
+                    onPress={() => handleUpdate(entryId, opt.key)}
+                  >
+                    <Text style={[styles.statusBtnText, selectedStatus === opt.key && styles.statusBtnTextActive]}>
+                      {opt.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
+          </>
         ) : (
-          <View style={styles.statusRow}>
-            {STATUS_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.key}
-                style={[styles.statusBtn, selectedStatus === opt.key && styles.statusBtnActive]}
-                onPress={() => alreadyInLibrary
-                  ? handleUpdate(entryId, opt.key)
-                  : handleAdd(opt.key)}
-              >
-                <Text style={[styles.statusBtnText, selectedStatus === opt.key && styles.statusBtnTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+          <TouchableOpacity
+            style={styles.addBtn}
+            onPress={() =>
+              navigation.navigate("EditBook", {
+                book: { ...book, google_id: book.id },
+                mode: "create",
+                onGoBack,
+              })
+            }
+          >
+            <Ionicons name="add-circle-outline" size={20} color={colors.onAccent} />
+            <Text style={styles.addBtnText}>Agregar a mi biblioteca</Text>
+          </TouchableOpacity>
         )}
       </View>
 
       {selectedStatus === "reading" && (
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Página actual</Text>
+          <Text style={styles.sectionTitle}>
+            {(book.reading_mode ?? "page") === "percentage"
+              ? "Porcentaje actual"
+              : (book.reading_mode ?? "page") === "chapter"
+                ? "Capítulo actual"
+                : "Página actual"}
+          </Text>
           <View style={styles.pageRow}>
             <TextInput
               style={styles.pageInput}
-              placeholder="¿En qué página vas?"
+              placeholder={
+                (book.reading_mode ?? "page") === "percentage"
+                  ? "¿Qué porcentaje llevas?"
+                  : (book.reading_mode ?? "page") === "chapter"
+                    ? "¿En qué capítulo vas?"
+                    : "¿En qué página vas?"
+              }
               placeholderTextColor={colors.placeholder}
               keyboardType="numeric"
+              maxLength={(book.reading_mode ?? "page") === "page" ? undefined : 3}
               value={currentPage}
               onChangeText={setCurrentPage}
             />
@@ -402,7 +420,7 @@ const handleDeleteNote = (id) => {
     </View>
     {notes.map((note) => (
       <TouchableOpacity key={note.id} style={styles.noteCard} onLongPress={() => handleDeleteNote(note.id)}>
-        {note.page && <Text style={styles.notePage}>Página {note.page}</Text>}
+        {note.page && <Text style={styles.notePage}>{formatPoint(book, note.page)}</Text>}
         <Text style={styles.noteContent}>{note.content}</Text>
       </TouchableOpacity>
     ))}
@@ -417,6 +435,7 @@ const handleDeleteNote = (id) => {
                 navigation.navigate("EditBook", {
                   book,
                   dbId: bookDbId ?? book.db_id,
+                  ubId: entryId,
                   onGoBack,
                 })
               }
@@ -480,6 +499,8 @@ const createStyles = (colors) =>
     marginBottom: 10,
   },
   editBtnText: { color: colors.accent, fontWeight: "bold", fontSize: 15 },
+  addBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
+  addBtnText: { color: colors.onAccent, fontWeight: "bold", fontSize: 15 },
   deleteBtn: { backgroundColor: colors.danger + "22", borderRadius: 10, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 40 },
   deleteBtnText: { color: colors.danger, fontWeight: "bold", fontSize: 15 },
 noteInputRow: { marginBottom: 8 },

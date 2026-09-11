@@ -94,8 +94,14 @@ router.patch("/:id", async (req, res) => {
       await pool.query(
         `UPDATE user_books ub
          SET current_page = $1,
-             status = CASE WHEN b.pages IS NOT NULL AND $1 >= b.pages THEN 'completed' ELSE ub.status END,
-             finished_at = CASE WHEN b.pages IS NOT NULL AND $1 >= b.pages THEN (NOW() AT TIME ZONE 'America/Bogota')::date ELSE ub.finished_at END
+             status = CASE WHEN ub.reading_mode = 'percentage' AND $1 >= 100
+                              OR ub.reading_mode = 'chapter' AND b.chapters IS NOT NULL AND $1 >= b.chapters
+                              OR ub.reading_mode = 'page' AND b.pages IS NOT NULL AND $1 >= b.pages
+                           THEN 'completed' ELSE ub.status END,
+             finished_at = CASE WHEN ub.reading_mode = 'percentage' AND $1 >= 100
+                                 OR ub.reading_mode = 'chapter' AND b.chapters IS NOT NULL AND $1 >= b.chapters
+                                 OR ub.reading_mode = 'page' AND b.pages IS NOT NULL AND $1 >= b.pages
+                              THEN (NOW() AT TIME ZONE 'America/Bogota')::date ELSE ub.finished_at END
          FROM books b
          WHERE ub.id = $2 AND ub.user_id = $3 AND b.id = ub.book_id`,
         [data.page, rows[0].user_book_id, req.userId]

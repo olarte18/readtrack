@@ -24,8 +24,9 @@ router.get("/", async (req, res) => {
 
   const { rows } = await pool.query(`
     SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.review,
+           ub.reading_mode,
            b.id AS db_id,
-           b.title, b.author, b.cover, b.pages, b.year, b.genre, b.google_id, b.publisher, b.book_type,
+           b.title, b.author, b.cover, b.pages, b.chapters, b.year, b.genre, b.google_id, b.publisher, b.book_type,
            (
              SELECT json_agg(json_build_object('name', bc.name, 'is_primary', bc.is_primary) ORDER BY bc.position)
              FROM book_categories bc WHERE bc.book_id = b.id
@@ -47,12 +48,14 @@ router.post("/", async (req, res) => {
     author: { type: "string", max: 300 },
     cover: { type: "string", max: 1000 },
     pages: { type: "integer", min: 1 },
+    chapters: { type: "integer", min: 1 },
     year: { type: "integer", min: 1, max: 2100 },
     genre: { type: "string", max: 100 },
     isbn: { type: "string", max: 50 },
     description: { type: "string", max: 5000 },
     publisher: { type: "string", max: 120 },
     book_type: { type: "string", enum: ["physical", "ebook", "audio"] },
+    reading_mode: { type: "string", enum: ["page", "chapter", "percentage"] },
     status: { type: "string", enum: STATUSES },
   });
 
@@ -60,11 +63,11 @@ router.post("/", async (req, res) => {
   // Con google_id presente, ON CONFLICT evita duplicar; si no devuelve fila,
   // significa que el libro ya existía y hay que recuperar su id por google_id.
   const inserted = await pool.query(`
-    INSERT INTO books (google_id, title, author, cover, pages, year, genre, isbn, description, publisher, book_type)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+    INSERT INTO books (google_id, title, author, cover, pages, chapters, year, genre, isbn, description, publisher, book_type)
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)
     ON CONFLICT (google_id) DO NOTHING
     RETURNING id
-  `, [data.google_id, data.title, data.author, data.cover, data.pages,
+  `, [data.google_id, data.title, data.author, data.cover, data.pages, data.chapters,
        data.year ? String(data.year) : null, data.genre, data.isbn,
        data.description, data.publisher, data.book_type]);
 
@@ -77,10 +80,10 @@ router.post("/", async (req, res) => {
   }
 
   const { rows } = await pool.query(`
-    INSERT INTO user_books (book_id, user_id, status)
-    VALUES ($1, $2, $3)
+    INSERT INTO user_books (book_id, user_id, status, reading_mode)
+    VALUES ($1, $2, $3, $4)
     RETURNING *
-  `, [book_id, req.userId, data.status ?? "pending"]);
+  `, [book_id, req.userId, data.status ?? "pending", data.reading_mode ?? "page"]);
 
   invalidateUserData(req.userId);
   res.status(201).json(rows[0]);
@@ -92,6 +95,7 @@ router.patch("/:id", async (req, res) => {
     status: { type: "string", enum: STATUSES },
     current_page: { type: "integer", min: 0 },
     rating: { type: "integer", min: 1, max: 5 },
+    reading_mode: { type: "string", enum: ["page", "chapter", "percentage"] },
   });
 
   const { rows } = await pool.query(`
@@ -100,11 +104,12 @@ router.patch("/:id", async (req, res) => {
         current_page = COALESCE($2, current_page),
         rating = COALESCE($3, rating),
         started_at = COALESCE($4, started_at),
-        finished_at = COALESCE($5, finished_at)
-    WHERE id = $6 AND user_id = $7
+        finished_at = COALESCE($5, finished_at),
+        reading_mode = COALESCE($6, reading_mode)
+    WHERE id = $7 AND user_id = $8
     RETURNING *
   `, [data.status, data.current_page, data.rating, req.body.started_at, req.body.finished_at,
-       req.params.id, req.userId]);
+       data.reading_mode, req.params.id, req.userId]);
 
   if (rows.length === 0) throw httpError(404, "No encontrado");
   invalidateUserData(req.userId);
@@ -114,14 +119,14 @@ router.patch("/:id", async (req, res) => {
 // GET /user-books/check/:google_id
 router.get("/check/:google_id", async (req, res) => {
   const { rows } = await pool.query(`
-    SELECT ub.id, ub.status, ub.started_at, ub.finished_at, b.id AS book_db_id
+    SELECT ub.id, ub.status, ub.started_at, ub.finished_at, ub.reading_mode, b.id AS book_db_id
     FROM user_books ub
     JOIN books b ON b.id = ub.book_id
     WHERE b.google_id = $1 AND ub.user_id = $2
   `, [req.params.google_id, req.userId]);
 
   if (rows.length > 0) {
-    return res.json({ exists: true, status: rows[0].status, id: rows[0].id, book_db_id: rows[0].book_db_id });
+    return res.json({ exists: true, status: rows[0].status, reading_mode: rows[0].reading_mode, id: rows[0].id, book_db_id: rows[0].book_db_id });
   }
   res.json({ exists: false });
 });

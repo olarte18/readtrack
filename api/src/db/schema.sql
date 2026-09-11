@@ -19,8 +19,9 @@ CREATE TABLE IF NOT EXISTS books (
   author      VARCHAR(255),
   cover       TEXT,
   pages       INTEGER,
+  chapters    INTEGER,
   year        VARCHAR(10),
-  isbn        VARCHAR(20),
+  isbn        VARCHAR(50),
   description TEXT,
   created_at  TIMESTAMP DEFAULT NOW(),
   genre       VARCHAR(100),
@@ -31,7 +32,19 @@ CREATE TABLE IF NOT EXISTS books (
 -- Para bases creadas antes de estas columnas
 ALTER TABLE books ADD COLUMN IF NOT EXISTS publisher VARCHAR(120);
 ALTER TABLE books ADD COLUMN IF NOT EXISTS book_type   VARCHAR(20);
+ALTER TABLE books ADD COLUMN IF NOT EXISTS chapters    INTEGER;
+ALTER TABLE books ALTER COLUMN isbn TYPE VARCHAR(50);
 ALTER TABLE reading_sessions ADD COLUMN IF NOT EXISTS start_page INTEGER;
+ALTER TABLE user_books ADD COLUMN IF NOT EXISTS reading_mode VARCHAR(20) DEFAULT 'page';
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'user_books_reading_mode_check'
+  ) THEN
+    ALTER TABLE user_books ADD CONSTRAINT user_books_reading_mode_check
+      CHECK (reading_mode IN ('page', 'chapter', 'percentage'));
+  END IF;
+END $$;
 
 -- Libros creados manualmente no tienen google_id
 ALTER TABLE books ALTER COLUMN google_id DROP NOT NULL;
@@ -70,6 +83,8 @@ CREATE TABLE IF NOT EXISTS user_books (
   finished_at  DATE,
   created_at   TIMESTAMP DEFAULT NOW(),
   review       TEXT,
+  reading_mode VARCHAR(20) DEFAULT 'page',
+  CONSTRAINT user_books_reading_mode_check CHECK (reading_mode IN ('page', 'chapter', 'percentage')),
   CONSTRAINT user_books_rating_check CHECK (rating >= 1 AND rating <= 5),
   CONSTRAINT user_books_status_check CHECK (status IN (
     'reading', 'completed', 'pending', 'abandoned', 'wishlist', 'paused'

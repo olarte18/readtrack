@@ -4,6 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { updateBook } from "../services/api";
+import { formatPoint, deltaLabel, progressFraction, completionBound, pagesLeftEquivalent } from "../utils/progress";
 
 const formatTime = (s) => {
   const h = Math.floor(s / 3600);
@@ -38,7 +39,7 @@ const goalDescription = (goal) => {
 export default function SessionSummaryScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const { book, pagesRead, readSeconds, endPage, speed, streakInfo, completed, goalJustCompleted = [] } = route.params;
+  const { book, readSeconds, endPage, speed, streakInfo, completed, goalJustCompleted = [], delta } = route.params;
   const [rating, setRating] = useState(0);
 
   const handleRate = async (stars) => {
@@ -105,9 +106,12 @@ export default function SessionSummaryScreen({ route, navigation }) {
     return () => clearTimeout(t);
   }, [streakVisible, goalJustCompleted.length]);
 
-  const pagesLeft = book.pages ? Math.max(0, book.pages - endPage) : null;
-  const hoursLeft = speed > 0 && pagesLeft !== null ? pagesLeft / speed : null;
-  const progress = book.pages ? Math.min((endPage / book.pages) * 100, 100) : 0;
+  const frac = progressFraction(book, endPage);
+  const remainingValue =
+    frac != null && completionBound(book) != null ? Math.max(0, completionBound(book) - Number(endPage || 0)) : null;
+  const remainingEqPages = pagesLeftEquivalent(book, endPage);
+  const hoursLeft = speed > 0 && remainingEqPages !== null ? remainingEqPages / speed : null;
+  const progress = frac != null ? Math.round(frac * 100) : 0;
 
   return (
     <View style={styles.container}>
@@ -152,7 +156,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
           <Ionicons name="book" size={20} color={colors.accent} />
           <View style={styles.rowInfo}>
             <Text style={styles.rowLabel}>Estás en</Text>
-            <Text style={styles.rowValue}>Página {endPage}</Text>
+            <Text style={styles.rowValue}>{formatPoint(book, endPage)}</Text>
           </View>
         </View>
         <View style={styles.divider} />
@@ -160,7 +164,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
           <Ionicons name="time" size={20} color={colors.accent} />
           <View style={styles.rowInfo}>
             <Text style={styles.rowLabel}>Leíste</Text>
-            <Text style={styles.rowValue}>{pagesRead} páginas · {formatTime(readSeconds)}</Text>
+            <Text style={styles.rowValue}>{deltaLabel(book, delta)} · {formatTime(readSeconds)}</Text>
           </View>
         </View>
         <View style={styles.divider} />
@@ -173,10 +177,10 @@ export default function SessionSummaryScreen({ route, navigation }) {
         </View>
       </View>
 
-      {!completed && pagesLeft !== null && (
+      {!completed && remainingValue !== null && (
         <View style={styles.card}>
           <Text style={styles.leftText}>
-            Te faltan <Text style={styles.leftHighlight}>{pagesLeft} páginas</Text> para terminar
+            Te faltan <Text style={styles.leftHighlight}>{deltaLabel(book, remainingValue)}</Text> para terminar
           </Text>
           {hoursLeft !== null && hoursLeft > 0 ? (
             <Text style={styles.leftEstimate}>

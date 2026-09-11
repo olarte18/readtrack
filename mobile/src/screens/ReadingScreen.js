@@ -6,6 +6,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
 import { getLibrary, getReadingSpeed, getStreak, getGoals } from "../services/api";
 import { reconcileStreakReminder } from "../services/streakReminder";
+import { formatPoint, progressFraction, pagesLeftEquivalent } from "../utils/progress";
 import ProgressRing from "../components/ProgressRing";
 
 const formatRemaining = (minutes) => {
@@ -124,12 +125,19 @@ export default function ReadingScreen({ navigation }) {
             ) : null
           }
           renderItem={({ item }) => {
-            const pagesLeft = item.pages ? Math.max(0, item.pages - (item.current_page || 0)) : null;
             const perHour = speeds[item.id];
+            const pagesLeft = pagesLeftEquivalent(item, item.current_page);
             const remaining =
               pagesLeft != null && perHour > 0 ? formatRemaining(pagesLeft / (perHour / 60)) : null;
-            const progressPct =
-              item.pages ? Math.min(((item.current_page || 0) / item.pages) * 100, 100) : null;
+            const frac = progressFraction(item);
+            const progressPct = frac != null ? Math.round(frac * 100) : null;
+            const pageText = (() => {
+              const mode = item.reading_mode ?? "page";
+              const point = formatPoint(item, item.current_page ?? 0);
+              if (mode === "percentage") return progressPct != null ? `${item.current_page ?? 0}% del libro` : point;
+              if (mode === "chapter") return item.chapters ? `${point} de ${item.chapters}` : point;
+              return item.pages ? `${point} de ${item.pages}${progressPct != null ? ` · ${progressPct}%` : ""}` : point;
+            })();
 
             return (
               <View style={styles.card}>
@@ -154,7 +162,7 @@ export default function ReadingScreen({ navigation }) {
                           <View style={[styles.progressBar, { width: `${progressPct}%` }]} />
                         </View>
                         <Text style={styles.pageText}>
-                          Página {item.current_page ?? 0} de {item.pages} · {Math.round(progressPct)}%
+                          {pageText}
                         </Text>
                       </>
                     )}

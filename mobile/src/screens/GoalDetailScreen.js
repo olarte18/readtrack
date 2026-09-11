@@ -99,6 +99,7 @@ export default function GoalDetailScreen({ route, navigation }) {
                   title: b.title,
                   author: b.author,
                   cover: b.cover,
+                  readingMode: b.reading_mode ?? "page",
                   onGoBack: fetchDetail,
                 })
               }

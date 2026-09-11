@@ -64,6 +64,50 @@ describe("POST /user-books", () => {
       .send({ ...BOOK, google_id: "otro-google" });
     expect(res.status).toBe(201);
   });
+
+  test("default reading_mode es page", async () => {
+    const { token } = await registerUser();
+    const res = await addBook(token);
+    expect(res.status).toBe(201);
+    expect(res.body.reading_mode).toBe("page");
+  });
+
+  test("guarda reading_mode y se refleja en el listado", async () => {
+    const { token } = await registerUser();
+    const res = await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ ...BOOK, reading_mode: "percentage" });
+    expect(res.status).toBe(201);
+    expect(res.body.reading_mode).toBe("percentage");
+
+    const list = await request(app).get("/user-books").set(authHeader(token));
+    expect(list.body[0].reading_mode).toBe("percentage");
+  });
+
+  test("rechaza un reading_mode inválido", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).post("/user-books").set(authHeader(token)).send({ ...BOOK, reading_mode: "capitulos" });
+    expect(res.status).toBe(400);
+  });
+
+  test("guarda chapters del libro y se refleja en el listado", async () => {
+    const { token } = await registerUser();
+    const res = await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ ...BOOK, chapters: 24, reading_mode: "chapter" });
+    expect(res.status).toBe(201);
+
+    const list = await request(app).get("/user-books").set(authHeader(token));
+    expect(list.body[0].chapters).toBe(24);
+  });
+
+  test("rechaza un chapters inválido", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).post("/user-books").set(authHeader(token)).send({ ...BOOK, chapters: 0 });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe("GET /user-books", () => {
@@ -102,6 +146,17 @@ describe("PATCH /user-books/:id", () => {
       .set(authHeader(token))
       .send({ rating: 9 });
     expect(res.status).toBe(400);
+  });
+
+  test("actualiza el reading_mode del libro", async () => {
+    const { token } = await registerUser();
+    const added = await addBook(token);
+    const res = await request(app)
+      .patch(`/user-books/${added.body.id}`)
+      .set(authHeader(token))
+      .send({ reading_mode: "chapter" });
+    expect(res.status).toBe(200);
+    expect(res.body.reading_mode).toBe("chapter");
   });
 
   test("aislamiento: el usuario B no puede modificar el libro de A", async () => {
@@ -187,6 +242,25 @@ describe("PATCH /books/:id (edición global de la ficha)", () => {
 
     const badPages = await request(app).patch(`/books/${dbId}`).set(authHeader(token)).send({ pages: 0 });
     expect(badPages.status).toBe(400);
+  });
+
+  test("actualiza y limpia chapters de la ficha global", async () => {
+    const { token } = await registerUser();
+    const { dbId } = await setupBook(token);
+
+    const withChapters = await request(app)
+      .patch(`/books/${dbId}`)
+      .set(authHeader(token))
+      .send({ chapters: 18 });
+    expect(withChapters.status).toBe(200);
+    expect(withChapters.body.chapters).toBe(18);
+
+    const cleared = await request(app)
+      .patch(`/books/${dbId}`)
+      .set(authHeader(token))
+      .send({ chapters: "" });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.chapters).toBeNull();
   });
 
   test("libro inexistente devuelve 404", async () => {

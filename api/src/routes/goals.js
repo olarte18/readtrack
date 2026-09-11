@@ -145,7 +145,7 @@ router.get("/detail", async (req, res) => {
 
   if (data.metric === "books") {
     const { rows: completed } = await pool.query(
-      `SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at,
+      `SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.reading_mode,
               b.id AS db_id, b.title, b.author, b.cover, b.pages
        FROM user_books ub
        JOIN books b ON b.id = ub.book_id
@@ -159,7 +159,7 @@ router.get("/detail", async (req, res) => {
     progress = books.length;
   } else {
     const { rows: byBook } = await pool.query(
-      `SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at,
+      `SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.reading_mode,
               b.id AS db_id, b.title, b.author, b.cover, b.pages,
               COALESCE(SUM(rs.duration_seconds), 0) / 60 AS minutes,
               COALESCE(SUM(rs.pages_read), 0) AS pages_read

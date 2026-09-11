@@ -20,14 +20,24 @@ function formatDate(str) {
   return `${d}/${m}/${y}`;
 }
 
-function sessionPageLabel(s) {
+function sessionProgressLabel(s, readingMode) {
   const page = s.page ?? 0;
   const read = s.pages_read ?? 0;
   const storedStart = s.start_page;
   const dur = s.duration_seconds ?? 0;
-  if (read <= 0) {
-    return dur > 0 ? "Sesión registrada" : "—";
+  const hasProgress = page > 0 || (storedStart !== undefined && storedStart !== null);
+  if (!hasProgress) return dur > 0 ? "Sesión registrada" : "—";
+  if (readingMode === "percentage") {
+    const start = Math.max(0, storedStart ?? 0);
+    const delta = Math.max(0, page - start);
+    return `${start}% → ${page}% · avance ${delta}%`;
   }
+  if (readingMode === "chapter") {
+    const start = Math.max(0, storedStart ?? 0);
+    const delta = Math.max(0, page - start);
+    return `Caps. ${start}-${page} · ${delta} ${delta === 1 ? "capítulo" : "capítulos"}`;
+  }
+  if (read <= 0) return dur > 0 ? "Sesión registrada" : "—";
   const start = storedStart !== undefined && storedStart !== null ? storedStart : Math.max(0, page - read);
   const validStart = start < page ? start : Math.max(0, page - read);
   return `Págs. ${validStart}-${page} · ${read} ${read === 1 ? "página" : "páginas"} leídas`;
@@ -36,7 +46,7 @@ function sessionPageLabel(s) {
 export default function BookSessionsScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const { id: userBookId, title, author, cover, onGoBack } = route.params;
+  const { id: userBookId, title, author, cover, readingMode = "page", onGoBack } = route.params;
   const [sessions, setSessions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState("date");
@@ -74,6 +84,13 @@ export default function BookSessionsScreen({ route, navigation }) {
 
   const totalSeconds = sorted.reduce((acc, s) => acc + (s.duration_seconds ?? 0), 0);
   const totalPages = sorted.reduce((acc, s) => acc + (s.pages_read ?? 0), 0);
+  const totalDelta = sorted.reduce(
+    (acc, s) => acc + Math.max(0, (s.page ?? 0) - (s.start_page ?? s.page ?? 0)),
+    0
+  );
+  const progressTotal = readingMode === "page" ? totalPages : totalDelta;
+  const progressTotalLabel =
+    readingMode === "page" ? "páginas" : readingMode === "percentage" ? "avance" : "capítulos";
 
   const groups = [];
   if (sortKey === "date") {
@@ -95,7 +112,7 @@ export default function BookSessionsScreen({ route, navigation }) {
   const filters = [
     { key: "date", label: "Fecha" },
     { key: "duration", label: "Duración" },
-    { key: "pages", label: "Páginas" },
+    { key: "pages", label: readingMode === "page" ? "Páginas" : "Avance" },
   ];
 
   return (
@@ -160,8 +177,10 @@ export default function BookSessionsScreen({ route, navigation }) {
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
-                  <Text style={styles.summaryValue}>{totalPages}</Text>
-                  <Text style={styles.summaryLabel}>páginas</Text>
+                  <Text style={styles.summaryValue}>
+                    {progressTotal}{readingMode === "percentage" ? "%" : ""}
+                  </Text>
+                  <Text style={styles.summaryLabel}>{progressTotalLabel}</Text>
                 </View>
                 <View style={styles.summaryDivider} />
                 <View style={styles.summaryItem}>
@@ -181,7 +200,7 @@ export default function BookSessionsScreen({ route, navigation }) {
                         </View>
                         <View style={styles.sessionInfo}>
                           <Text style={styles.sessionMeta}>
-                            {sessionPageLabel(s)}
+                            {sessionProgressLabel(s, readingMode)}
                           </Text>
                           <Text style={styles.sessionDuration}>{formatDuration((s.duration_seconds ?? 0) / 60)}</Text>
                         </View>
@@ -198,7 +217,7 @@ export default function BookSessionsScreen({ route, navigation }) {
                     </View>
                     <View style={styles.sessionInfo}>
                       <Text style={styles.sessionMeta}>
-                        {sessionPageLabel(s)}
+                        {sessionProgressLabel(s, readingMode)}
                       </Text>
                       <Text style={styles.sessionDuration}>{formatDuration((s.duration_seconds ?? 0) / 60)}</Text>
                     </View>

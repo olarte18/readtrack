@@ -54,6 +54,45 @@ describe("PATCH /reading-sessions/:id", () => {
     expect(lib.body[0].current_page).toBe(250);
   });
 
+  test("completa el libro en modo porcentaje al alcanzar 100", async () => {
+    const { token } = await registerUser();
+    const added = await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ ...BOOK, reading_mode: "percentage" });
+    await request(app).patch(`/user-books/${added.body.id}`).set(authHeader(token)).send({ status: "reading" });
+    const session = await addSession(token, added.body.id, { page: 40 });
+
+    await request(app)
+      .patch(`/reading-sessions/${session.id}`)
+      .set(authHeader(token))
+      .send({ page: 100 });
+
+    const lib = await request(app).get("/user-books").set(authHeader(token));
+    expect(lib.body[0].current_page).toBe(100);
+    expect(lib.body[0].status).toBe("completed");
+    expect(lib.body[0].finished_at).not.toBeNull();
+  });
+
+  test("completa el libro en modo capítulo al llegar al último capítulo", async () => {
+    const { token } = await registerUser();
+    const added = await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ ...BOOK, chapters: 12, reading_mode: "chapter" });
+    await request(app).patch(`/user-books/${added.body.id}`).set(authHeader(token)).send({ status: "reading" });
+    const session = await addSession(token, added.body.id, { page: 5 });
+
+    await request(app)
+      .patch(`/reading-sessions/${session.id}`)
+      .set(authHeader(token))
+      .send({ page: 12 });
+
+    const lib = await request(app).get("/user-books").set(authHeader(token));
+    expect(lib.body[0].current_page).toBe(12);
+    expect(lib.body[0].status).toBe("completed");
+  });
+
   test("no sincroniza current_page si la sesión editada no es la última", async () => {
     const { token } = await registerUser();
     const book = await addBook(token);

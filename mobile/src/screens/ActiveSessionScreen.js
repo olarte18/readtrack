@@ -10,6 +10,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { getHiResCover } from "../utils/covers";
 import { AppAlert } from "../components/AppAlert";
 import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
+import { modeLabel, modeUnit, formatPoint, deltaLabel, completionBound, isCompleted, progressFraction, pagesEquivalent, pagesLeftEquivalent } from "../utils/progress";
 import {
   cancelAlarm,
   cancelAlarmSession,
@@ -32,6 +33,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const styles = createStyles(colors, isDark);
   const { book, mode = "stopwatch" } = route.params;
   const isTimer = mode === "timer";
+  const readingMode = book.reading_mode ?? "page";
+  const bound = completionBound(book);
 
   const [seconds, setSeconds] = useState(0);
   const [running, setRunning] = useState(true);
@@ -358,14 +361,26 @@ export default function ActiveSessionScreen({ route, navigation }) {
     return `${h}:${String(m).padStart(2, "0")}`;
   };
 
-  const pagesRead = Math.max(0, parseInt(endPage || 0) - startPage);
+  const modeDelta = Math.max(0, parseInt(endPage || 0) - startPage);
+  const equivalentPages = pagesEquivalent(book, endPage, startPage);
   const hoursElapsed = (isTimer ? (duration ?? 0) - seconds : seconds) / 3600;
-  const estimatedPages = avgSpeed && hoursElapsed > 0 ? Math.round(avgSpeed * hoursElapsed) : null;
-  const currentSpeedH = hoursElapsed > 0 && pagesRead > 0 ? pagesRead / hoursElapsed : 0;
+  const estimatedEqPages = avgSpeed && hoursElapsed > 0 ? Math.round(avgSpeed * hoursElapsed) : null;
+  const currentSpeedH = hoursElapsed > 0 && equivalentPages > 0 ? equivalentPages / hoursElapsed : 0;
   const effectiveSpeed = currentSpeedH > 0 ? (avgSpeed ? (currentSpeedH + avgSpeed) / 2 : currentSpeedH) : (avgSpeed ?? 0);
   const pagesPerHour = effectiveSpeed;
-  const pagesLeft = book.pages ? Math.max(0, book.pages - parseInt(endPage || 0)) : null;
-  const minutesLeft = pagesPerHour > 0 && pagesLeft !== null ? pagesLeft / (pagesPerHour / 60) : null;
+  const remainingEqPages = pagesLeftEquivalent(book, endPage);
+  const minutesLeft = pagesPerHour > 0 && remainingEqPages !== null ? remainingEqPages / (pagesPerHour / 60) : null;
+
+  const readLabel =
+    readingMode === "page" ? "Páginas leídas" : readingMode === "percentage" ? "Avance" : "Capítulos";
+  const readValue =
+    estimatedEqPages == null
+      ? "—"
+      : readingMode === "page"
+        ? String(estimatedEqPages)
+        : readingMode === "percentage"
+          ? book.pages ? `${Math.round((estimatedEqPages / book.pages) * 100)}%` : "—"
+          : book.pages && book.chapters ? String(Math.round((estimatedEqPages / book.pages) * book.chapters)) : "—";
 
   const saveSession = async ({ page, pages }) => {
     if (savingRef.current) return; // toques repetidos se ignoran al instante
@@ -376,7 +391,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     cancelSessionAlarm();
     const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
     try {
-      const completed = !!book.pages && page >= book.pages;
+      const completed = isCompleted(book, page);
       const updates = { current_page: page };
       if (completed) {
         const n = new Date();
@@ -391,6 +406,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
       navigation.replace("SessionSummary", {
         book,
         pagesRead: pages,
+        delta: Math.max(0, page - startPage),
         readSeconds,
         endPage: page,
         speed: pagesPerHour,
@@ -429,33 +445,40 @@ export default function ActiveSessionScreen({ route, navigation }) {
   });
 
   const confirmSave = () => {
-    const page = parseInt(endPage);
-    if (isNaN(page) || page < startPage) {
-      return AppAlert.alert("Error", "La página final debe ser mayor o igual a la inicial");
+    const val = parseInt(endPage);
+    if (isNaN(val) || val < startPage) {
+      return AppAlert.alert("Error", `El ${modeLabel(book)} final debe ser mayor o igual al inicial`);
+    }
+    if (readingMode === "percentage" && val > 100) {
+      return AppAlert.alert("Error", "El porcentaje no puede superar 100");
+    }
+    if (readingMode === "chapter" && book.chapters && val > book.chapters) {
+      return AppAlert.alert("Error", `El libro tiene ${book.chapters} capítulos`);
     }
     setFinishVisible(false);
-    saveSession({ page, pages: Math.max(0, page - startPage) });
+    const delta = Math.max(0, val - startPage);
+    saveSession({ page: val, pages: pagesEquivalent(book, val, startPage), delta });
   };
 
   const finishModal = (
     <Modal visible={finishVisible} transparent animationType="fade" onRequestClose={() => setFinishVisible(false)}>
       <View style={styles.modalOverlay}>
         <View style={styles.modalCard}>
-          <Text style={styles.modalTitle}>¿En qué página quedaste?</Text>
+          <Text style={styles.modalTitle}>¿En qué {modeLabel(book)} quedaste?</Text>
           <View style={styles.customInputBox}>
             <TextInput
               style={styles.customInput}
               value={endPage}
               onChangeText={(t) => setEndPage(t.replace(/[^0-9]/g, ""))}
               keyboardType="numeric"
-              maxLength={4}
+              maxLength={readingMode === "page" ? 4 : 3}
               autoFocus
               selectTextOnFocus
             />
-            <Text style={styles.customUnit}>págs</Text>
+            <Text style={styles.customUnit}>{modeUnit(book)}</Text>
           </View>
           <Text style={styles.pagesEndHint}>
-            Leíste {Math.max(0, parseInt(endPage || 0) - startPage)} páginas
+            Leíste {deltaLabel(book, modeDelta)}
           </Text>
           <View style={styles.modalBtnRow}>
             <TouchableOpacity
@@ -640,15 +663,15 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
       <View style={styles.pagesContainer}>
         <View style={styles.pageBox}>
-          <Text style={styles.pageBoxLabel}>Estás en la página</Text>
-          <Text style={styles.pageBoxValue}>{startPage}</Text>
+          <Text style={styles.pageBoxLabel}>Estás en</Text>
+          <Text style={styles.pageBoxValue}>{formatPoint(book, startPage)}</Text>
         </View>
       </View>
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statValue}>{estimatedPages ?? "—"}</Text>
-          <Text style={styles.statLabel}>Páginas leídas</Text>
+          <Text style={styles.statValue}>{readValue}</Text>
+          <Text style={styles.statLabel}>{readLabel}</Text>
         </View>
         <View style={styles.statItem}>
           <Text style={styles.statValue}>
@@ -668,14 +691,18 @@ export default function ActiveSessionScreen({ route, navigation }) {
         </View>
       </View>
 
-      {book.pages && (
+      {progressFraction(book, endPage) != null && (
         <View style={styles.progressSection}>
           <Text style={styles.progressLabel}>
-            {parseInt(endPage || 0)} de {book.pages} páginas
+            {readingMode === "page"
+              ? `${parseInt(endPage || 0)} de ${book.pages} páginas`
+              : readingMode === "chapter"
+                ? `${parseInt(endPage || 0)} de ${book.chapters} capítulos`
+                : `${parseInt(endPage || 0)}% del libro`}
           </Text>
           <View style={styles.progressContainer}>
             <View style={[styles.progressBar, {
-              width: `${Math.min((parseInt(endPage || 0) / book.pages) * 100, 100)}%`
+              width: `${Math.round(progressFraction(book, endPage) * 100)}%`
             }]} />
           </View>
         </View>

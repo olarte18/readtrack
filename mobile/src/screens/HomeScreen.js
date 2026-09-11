@@ -81,7 +81,7 @@ renderItem={({ item }) => (
     style={styles.card}
     onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: fetchLibrary })}
     onLongPress={() =>
-      navigation.navigate("EditBook", { book: item, dbId: item.db_id, onGoBack: fetchLibrary })
+      navigation.navigate("EditBook", { book: item, dbId: item.db_id, ubId: item.id, onGoBack: fetchLibrary })
     }
     delayLongPress={400}
   >

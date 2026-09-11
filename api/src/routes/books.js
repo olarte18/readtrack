@@ -158,6 +158,7 @@ const EDITABLE_FIELDS = {
   author: { type: "string", max: 300 },
   cover: { type: "string", max: 1000 },
   pages: { type: "integer", min: 1 },
+  chapters: { type: "integer", min: 1 },
   year: { type: "integer", min: 1, max: 2100 },
   isbn: { type: "string", max: 50 },
   description: { type: "string", max: 5000 },
