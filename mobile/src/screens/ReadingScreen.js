@@ -195,7 +195,24 @@ export default function ReadingScreen({ navigation }) {
             );
           }}
           ListEmptyComponent={
-            <Text style={styles.empty}>No tienes libros en curso{"\n"}Agrega uno desde tu biblioteca</Text>
+            <View style={styles.emptyWrap}>
+              <Ionicons name="book-outline" size={34} color={colors.textDim} />
+              <Text style={styles.empty}>No tienes libros en curso</Text>
+              <TouchableOpacity
+                style={styles.emptyBtnPrimary}
+                onPress={() => navigation.navigate("Search")}
+              >
+                <Ionicons name="search" size={18} color={colors.onAccent} />
+                <Text style={styles.emptyBtnPrimaryText}>Buscar un libro</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.emptyBtnSecondary}
+                onPress={() => navigation.navigate("Main", { screen: "Home" })}
+              >
+                <Ionicons name="library-outline" size={18} color={colors.accent} />
+                <Text style={styles.emptyBtnSecondaryText}>Agregar desde tu biblioteca</Text>
+              </TouchableOpacity>
+            </View>
           }
           onRefresh={fetchReading}
           refreshing={loading}
@@ -275,7 +292,33 @@ const createStyles = (colors) =>
       gap: 4,
     },
     continueBtnLabel: { color: colors.onAccent, fontSize: 12, fontWeight: "bold" },
-    empty: { color: colors.textDim, textAlign: "center", marginTop: 60, fontSize: 16, lineHeight: 26 },
+    emptyWrap: { alignItems: "center", paddingHorizontal: 24, paddingTop: 40 },
+    empty: { color: colors.textDim, fontSize: 16, lineHeight: 26, marginTop: 12, marginBottom: 24, textAlign: "center" },
+    emptyBtnPrimary: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: colors.accent,
+      borderRadius: 12,
+      paddingVertical: 13,
+      alignSelf: "stretch",
+    },
+    emptyBtnPrimaryText: { color: colors.onAccent, fontWeight: "bold", fontSize: 14 },
+    emptyBtnSecondary: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderRadius: 12,
+      paddingVertical: 13,
+      alignSelf: "stretch",
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    emptyBtnSecondaryText: { color: colors.accent, fontWeight: "bold", fontSize: 14 },
     goalCard: {
       backgroundColor: colors.surface,
       borderRadius: 16,

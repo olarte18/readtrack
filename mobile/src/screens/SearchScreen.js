@@ -41,7 +41,16 @@ const handleScan = async (isbn) => {
 };
   return (
     <View style={styles.container}>
-      <Text style={styles.title}>Buscar libros</Text>
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backBtn}
+          onPress={() => navigation.goBack()}
+          hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+        >
+          <Ionicons name="chevron-back" size={28} color={colors.accent} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Buscar libros</Text>
+      </View>
       <View style={styles.searchRow}>
         <TextInput
           style={styles.input}
@@ -94,8 +103,10 @@ const handleScan = async (isbn) => {
 
 const createStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background, paddingTop: 50 },
-  title: { fontSize: 24, fontWeight: "bold", color: colors.text, paddingHorizontal: 20, marginBottom: 16 },
+  container: { flex: 1, backgroundColor: colors.background },
+  header: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: 16, paddingTop: 50, marginBottom: 16 },
+  backBtn: { padding: 4 },
+  title: { fontSize: 24, fontWeight: "bold", color: colors.text, flex: 1 },
   searchRow: { flexDirection: "row", paddingHorizontal: 16, marginBottom: 12, gap: 8, alignItems: "center" },
   input: { flex: 1, backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
   scanBtn: { backgroundColor: colors.surface, borderRadius: 10, padding: 10 },
