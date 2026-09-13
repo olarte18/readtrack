@@ -8,6 +8,7 @@ const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
 const { getGoalCompletion } = require("../utils/goalProgress");
+const { SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
 router.use(globalUserLimiter);
@@ -34,15 +35,15 @@ router.post("/", async (req, res) => {
     `SELECT COUNT(*)::int AS n
      FROM reading_sessions
      WHERE user_id = $1 AND id <> $2
-       AND TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD')
-         = TO_CHAR(NOW() AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD')`,
+       AND ${SQL.toChar()}
+         = TO_CHAR(${SQL.nowInApp()}, 'YYYY-MM-DD')`,
     [req.userId, rows[0].id]
   );
 
   let streak = null;
   if (prior[0].n === 0) {
     const { rows: dates } = await pool.query(
-      `SELECT DISTINCT TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date
+      `SELECT DISTINCT ${SQL.toChar()} AS date
        FROM reading_sessions WHERE user_id = $1`,
       [req.userId]
     );
@@ -103,7 +104,7 @@ router.patch("/:id", async (req, res) => {
              finished_at = CASE WHEN ub.reading_mode = 'percentage' AND $1 >= 100
                                  OR ub.reading_mode = 'chapter' AND b.chapters IS NOT NULL AND $1 >= b.chapters
                                  OR ub.reading_mode = 'page' AND b.pages IS NOT NULL AND $1 >= b.pages
-                              THEN (NOW() AT TIME ZONE 'America/Bogota')::date ELSE ub.finished_at END
+                              THEN (${SQL.nowInApp()})::date ELSE ub.finished_at END
          FROM books b
          WHERE ub.id = $2 AND ub.user_id = $3 AND b.id = ub.book_id`,
         [data.page, rows[0].user_book_id, req.userId]
@@ -122,13 +123,13 @@ router.get("/:user_book_id", async (req, res) => {
       return res.status(400).json({ error: "Fecha inválida" });
     }
     dateFilter =
-      "AND TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') = $3";
+      `AND ${SQL.toChar("rs.created_at")} = $3`;
     params.push(req.query.date);
   }
   const { rows } = await pool.query(
     `SELECT rs.id, rs.page, rs.start_page, rs.pages_read, rs.duration_seconds,
-            TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date_bogota,
-            TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'HH24:MI') AS time_bogota
+            ${SQL.toChar("rs.created_at")} AS date_bogota,
+            ${SQL.toChar("rs.created_at", "HH24:MI")} AS time_bogota
      FROM reading_sessions rs
      WHERE rs.user_book_id = $1 AND rs.user_id = $2 ${dateFilter}
      ORDER BY rs.created_at ASC`,

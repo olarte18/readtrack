@@ -7,8 +7,7 @@ const { validate } = require("../utils/validators");
 const httpError = require("../utils/httpError");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
-
-const BOGOTA_TZ = "America/Bogota";
+const { SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
 router.use(globalUserLimiter);
@@ -20,7 +19,7 @@ router.get("/streak", async (req, res) => {
   if (cached) return res.json(cached);
 
   const { rows } = await pool.query(
-    `SELECT DISTINCT TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date
+    `SELECT DISTINCT ${SQL.toChar()} AS date
      FROM reading_sessions WHERE user_id = $1`,
     [req.userId]
   );
@@ -32,8 +31,8 @@ router.get("/streak", async (req, res) => {
     `SELECT COUNT(*)::int AS n
      FROM reading_sessions
      WHERE user_id = $1
-       AND created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
-         >= date_trunc('day', NOW() AT TIME ZONE 'America/Bogota')`,
+       AND ${SQL.utcToApp()}
+         >= date_trunc('day', ${SQL.nowInApp()})`,
     [req.userId]
   );
   const hasSessionToday = todaySessions[0].n > 0;
@@ -163,9 +162,9 @@ router.get("/activity", async (req, res) => {
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
-  const dayExpr = `TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '${BOGOTA_TZ}', 'YYYY-MM-DD')`;
-  const subExpr = `TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '${BOGOTA_TZ}', 'MM')`;
-  const ddExpr = `TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '${BOGOTA_TZ}', 'DD')`;
+  const dayExpr = `${SQL.toChar("rs.created_at")}`;
+  const subExpr = `${SQL.toChar("rs.created_at", "MM")}`;
+  const ddExpr = `${SQL.toChar("rs.created_at", "DD")}`;
   const AGG = `COALESCE(SUM(rs.duration_seconds), 0)::float / 60 AS minutes,
               COALESCE(SUM(rs.pages_read), 0)::int AS pages,
               COUNT(*)::int AS sessions,
@@ -188,7 +187,7 @@ router.get("/activity", async (req, res) => {
     sql = `SELECT ${groupExpr} AS bucket, ${AGG}
            FROM reading_sessions rs
            WHERE rs.user_id = $1
-             AND EXTRACT(YEAR FROM rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '${BOGOTA_TZ}') = $2
+             AND EXTRACT(YEAR FROM ${SQL.utcToApp("rs.created_at")}) = $2
            GROUP BY 1`;
     params = [req.userId, data.year];
     const labels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
@@ -222,7 +221,7 @@ router.get("/activity", async (req, res) => {
     sql = `SELECT ${groupExpr} AS bucket, ${AGG}
            FROM reading_sessions rs
            WHERE rs.user_id = $1
-             AND TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE '${BOGOTA_TZ}', 'YYYY-MM') = $2
+             AND ${SQL.toChar("rs.created_at", "YYYY-MM")} = $2
            GROUP BY 1`;
     params = [req.userId, start];
     const n = new Date(data.year, data.month, 0).getDate();

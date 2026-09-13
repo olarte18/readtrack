@@ -5,9 +5,7 @@ const authMiddleware = require("../middleware/auth");
 const { globalUserLimiter } = require("../middleware/rateLimit");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
-
-const BOGOTA_TZ = "America/Bogota";
-const bogotaYear = () => Number(new Intl.DateTimeFormat("en-CA", { timeZone: BOGOTA_TZ, year: "numeric" }).format(new Date()));
+const { appYear, SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
 router.use(globalUserLimiter);
@@ -26,7 +24,7 @@ router.get("/:year/:month", async (req, res) => {
   if (cached) return res.json(cached);
 
   const { rows } = await pool.query(
-    `SELECT TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date,
+    `SELECT ${SQL.toChar("rs.created_at")} AS date,
             rs.user_book_id,
             SUM(rs.duration_seconds) / 60 AS minutes,
             SUM(rs.pages_read) AS pages,
@@ -35,14 +33,14 @@ router.get("/:year/:month", async (req, res) => {
      JOIN user_books ub ON ub.id = rs.user_book_id
      JOIN books b ON b.id = ub.book_id
      WHERE rs.user_id = $1
-       AND TO_CHAR(rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM') = $2
+       AND TO_CHAR(${SQL.utcToApp("rs.created_at")}, 'YYYY-MM') = $2
      GROUP BY 1, rs.user_book_id, b.title, b.author, b.cover
      ORDER BY date DESC`,
     [req.userId, start]
   );
 
   const { rows: sessionDates } = await pool.query(
-    `SELECT DISTINCT TO_CHAR(created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS date
+    `SELECT DISTINCT ${SQL.toChar()} AS date
      FROM reading_sessions
      WHERE user_id = $1`,
     [req.userId]
@@ -50,7 +48,7 @@ router.get("/:year/:month", async (req, res) => {
 
   const { rows: dailyGoalRows } = await pool.query(
     "SELECT value FROM reading_goals WHERE user_id = $1 AND year = $2 AND type = 'daily'",
-    [req.userId, bogotaYear()]
+    [req.userId, appYear()]
   );
 
   const dayMap = new Map();

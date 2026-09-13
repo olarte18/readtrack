@@ -2,6 +2,7 @@ const AdmZip = require("adm-zip");
 const initSqlJs = require("sql.js");
 const path = require("path");
 const httpError = require("./httpError");
+const { appDay } = require("./dates");
 
 // Lee un archivo .bookmory (zip con bases Sembast) y devuelve los stores
 // normalizados: books, notes, tags, streakCaches, goals, yearlyGoals, collections.
@@ -12,16 +13,8 @@ const httpError = require("./httpError");
 // El SQLite es el completo (incluye streak_caches), así que se usa ese como
 // fuente principal y el plano solo como respaldo si faltara.
 
-const APP_TZ = "America/Bogota";
-const dayFmt = new Intl.DateTimeFormat("en-CA", {
-  timeZone: APP_TZ,
-  year: "numeric",
-  month: "2-digit",
-  day: "2-digit",
-});
-
 // Fecha YYYY-MM-DD en hora Colombia para un epoch en milisegundos.
-const bogotaDay = (ms) => dayFmt.format(new Date(ms));
+const bogotaDay = (ms) => appDay(new Date(ms));
 
 function parseFlatSembast(text) {
   const stores = {};

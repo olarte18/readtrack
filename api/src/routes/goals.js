@@ -6,18 +6,17 @@ const { globalUserLimiter } = require("../middleware/rateLimit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
+const { APP_TZ, appYear, SQL } = require("../utils/dates");
 
 const TYPES = ["annual", "monthly", "weekly", "daily"];
 const METRICS = ["books", "minutes", "hours"];
-const BOGOTA_TZ = "America/Bogota";
-const bogotaYear = () => Number(new Intl.DateTimeFormat("en-CA", { timeZone: BOGOTA_TZ, year: "numeric" }).format(new Date()));
 
 router.use(authMiddleware);
 router.use(globalUserLimiter);
 
 // GET /goals — obtener todas las metas del año actual
 router.get("/", async (req, res) => {
-  const year = bogotaYear();
+  const year = appYear();
   const cacheKey = `goals:${req.userId}:${year}`;
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
@@ -33,15 +32,15 @@ router.get("/", async (req, res) => {
      WHERE user_id = $1 AND status = 'completed'
        AND finished_at >= date_trunc('year', NOW() AT TIME ZONE $2)::date
        AND finished_at < (date_trunc('year', NOW() AT TIME ZONE $2) + INTERVAL '1 year')::date`,
-    [req.userId, BOGOTA_TZ]
+    [req.userId, APP_TZ]
   );
 
   const { rows: weeklyProgress } = await pool.query(
     `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
      FROM reading_sessions
      WHERE user_id = $1
-     AND created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
-       >= date_trunc('week', NOW() AT TIME ZONE 'America/Bogota')`,
+     AND ${SQL.utcToApp()}
+       >= date_trunc('week', ${SQL.nowInApp()})`,
     [req.userId]
   );
 
@@ -49,8 +48,8 @@ router.get("/", async (req, res) => {
     `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
      FROM reading_sessions
      WHERE user_id = $1
-     AND created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
-       >= date_trunc('day', NOW() AT TIME ZONE 'America/Bogota')`,
+     AND ${SQL.utcToApp()}
+       >= date_trunc('day', ${SQL.nowInApp()})`,
     [req.userId]
   );
 
@@ -60,15 +59,15 @@ router.get("/", async (req, res) => {
      WHERE user_id = $1 AND status = 'completed'
        AND finished_at >= date_trunc('month', NOW() AT TIME ZONE $2)::date
        AND finished_at < (date_trunc('month', NOW() AT TIME ZONE $2) + INTERVAL '1 month')::date`,
-    [req.userId, BOGOTA_TZ]
+    [req.userId, APP_TZ]
   );
 
   const { rows: monthlyMinutesProgress } = await pool.query(
     `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
      FROM reading_sessions
      WHERE user_id = $1
-     AND created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
-       >= date_trunc('month', NOW() AT TIME ZONE 'America/Bogota')`,
+     AND ${SQL.utcToApp()}
+       >= date_trunc('month', ${SQL.nowInApp()})`,
     [req.userId]
   );
 
@@ -134,17 +133,17 @@ router.get("/detail", async (req, res) => {
     startExpr = `date_trunc('year', '${data.year}-01-01 00:00:00'::timestamp)`;
     intervalUnit = "year";
     label = String(data.year);
-    endCond = `\n         AND rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota' < (${startExpr} + INTERVAL '1 year')`;
+    endCond = `\n         AND ${SQL.utcToApp("rs.created_at")} < (${startExpr} + INTERVAL '1 year')`;
   } else if (data.type === "annual") {
-    startExpr = "date_trunc('year', NOW() AT TIME ZONE 'America/Bogota')";
+    startExpr = `date_trunc('year', ${SQL.nowInApp()})`;
     intervalUnit = "year";
     label = "este año";
   } else if (data.type === "monthly") {
-    startExpr = "date_trunc('month', NOW() AT TIME ZONE 'America/Bogota')";
+    startExpr = `date_trunc('month', ${SQL.nowInApp()})`;
     intervalUnit = "month";
     label = "este mes";
   } else {
-    startExpr = "date_trunc('week', NOW() AT TIME ZONE 'America/Bogota')";
+    startExpr = `date_trunc('week', ${SQL.nowInApp()})`;
     intervalUnit = "week";
     label = "esta semana";
   }
@@ -176,7 +175,7 @@ router.get("/detail", async (req, res) => {
        JOIN user_books ub ON ub.id = rs.user_book_id
        JOIN books b ON b.id = ub.book_id
        WHERE rs.user_id = $1
-         AND rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota' >= ${startExpr}${endCond}
+         AND ${SQL.utcToApp("rs.created_at")} >= ${startExpr}${endCond}
        GROUP BY ub.id, b.id
        ORDER BY minutes DESC`,
       [req.userId]
@@ -207,7 +206,7 @@ router.post("/", async (req, res) => {
     metric: { required: true, type: "string", enum: METRICS },
     value: { required: true, type: "integer", min: 1 },
   });
-  const year = bogotaYear();
+  const year = appYear();
 
   const { rows } = await pool.query(
     `INSERT INTO reading_goals (user_id, type, metric, value, year)

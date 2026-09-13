@@ -1,14 +1,12 @@
 const pool = require("../db/connection");
-
-const BOGOTA_TZ = "America/Bogota";
-const bogotaYear = () => Number(new Intl.DateTimeFormat("en-CA", { timeZone: BOGOTA_TZ, year: "numeric" }).format(new Date()));
+const { APP_TZ, appYear, SQL } = require("./dates");
 
 // Devuelve solo las metas que se superaron JUSTO con la sesión que se acaba de
 // guardar: compara el progreso actual contra el progreso anterior (sin esta
 // sesión ni el libro terminado en este guardado).
 async function getGoalCompletion(userId, opts = {}) {
   const { excludeSeconds = 0, bookCompleted = false } = opts;
-  const year = bogotaYear();
+  const year = appYear();
   const { rows: goals } = await pool.query(
     "SELECT type, metric, value FROM reading_goals WHERE user_id = $1 AND year = $2",
     [userId, year]
@@ -76,7 +74,7 @@ async function computeProgress(userId) {
        ) AS monthly_books
      FROM user_books
      WHERE user_id = $1 AND status = 'completed'`,
-    [userId, BOGOTA_TZ]
+    [userId, APP_TZ]
   );
   result.annual = parseInt(books[0].annual);
   result.monthly_books = parseInt(books[0].monthly_books);
@@ -84,16 +82,16 @@ async function computeProgress(userId) {
   const { rows: seconds } = await pool.query(
     `SELECT
        COALESCE(SUM(duration_seconds) FILTER (
-         WHERE created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
-           >= date_trunc('day', NOW() AT TIME ZONE 'America/Bogota')
+         WHERE ${SQL.utcToApp()}
+           >= date_trunc('day', ${SQL.nowInApp()})
        ), 0) AS daily_seconds,
        COALESCE(SUM(duration_seconds) FILTER (
-         WHERE created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
-           >= date_trunc('week', NOW() AT TIME ZONE 'America/Bogota')
+         WHERE ${SQL.utcToApp()}
+           >= date_trunc('week', ${SQL.nowInApp()})
        ), 0) AS weekly_seconds,
        COALESCE(SUM(duration_seconds) FILTER (
-         WHERE created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota'
-           >= date_trunc('month', NOW() AT TIME ZONE 'America/Bogota')
+         WHERE ${SQL.utcToApp()}
+           >= date_trunc('month', ${SQL.nowInApp()})
        ), 0) AS monthly_seconds
      FROM reading_sessions
      WHERE user_id = $1`,
