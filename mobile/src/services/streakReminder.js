@@ -4,7 +4,7 @@ import { Platform } from "react-native";
 import { getStreak } from "./api";
 
 const CHANNEL_ID = "racha";
-const REMINDER_MS = 24 * 60 * 60 * 1000;
+const LOOKAHEAD_DAYS = 7;
 const DEFAULT_HOUR = 20;
 
 const configKey = (userId) => `streak_reminder:${userId}`;
@@ -13,7 +13,7 @@ const promptKey = (userId) => `streak_prompt_seen:${userId}`;
 // Escape hatch de desarrollo para previsualizar el modal aunque ya se haya visto.
 const DEV_FORCE = process.env.EXPO_PUBLIC_DEV_STREAKPROMPT === "1";
 
-export const DEFAULT_CONFIG = Object.freeze({ enabled: false, hour: DEFAULT_HOUR, minute: 0, scheduledFor: null, notifId: null });
+export const DEFAULT_CONFIG = Object.freeze({ enabled: false, hour: DEFAULT_HOUR, minute: 0, notifIds: [] });
 
 export async function shouldShowStreakPrompt(userId) {
   try {
@@ -73,11 +73,18 @@ function streakBody(streak) {
   return "¡Da el primer paso! 15 minutos hoy arrancan tu racha.";
 }
 
-function nextTarget(now, hour, minute) {
-  const t = new Date(now);
-  t.setHours(hour, minute, 0, 0);
-  if (t.getTime() <= now.getTime()) t.setTime(t.getTime() + REMINDER_MS);
-  return t;
+/**
+ * Ventana de ocurrencias a programar: desde hoy (o mañana si skipToday) hasta
+ * LOOKAHEAD_DAYS días a la hora configurada, filtrando las ya pasadas.
+ */
+function targetSlots(now, hour, minute, { skipToday = false } = {}) {
+  const slots = [];
+  const startOffset = skipToday ? 1 : 0;
+  for (let i = startOffset; i < LOOKAHEAD_DAYS + startOffset; i++) {
+    const t = new Date(now.getFullYear(), now.getMonth(), now.getDate() + i, hour, minute, 0, 0);
+    if (t.getTime() > now.getTime()) slots.push(t);
+  }
+  return slots;
 }
 
 async function scheduleOneShot(target, streak) {
@@ -103,9 +110,10 @@ async function cancelPending(id) {
 }
 
 /**
- * Agenda el recordatorio del día si el usuario NO tiene sesión hoy y la hora
- * aún no ha pasado; si ya leyó hoy (hasSessionToday), cancela lo pendiente.
- * Idempotente: no re-agenda si el objetivo ya está programado.
+ * Mantiene una ventana móvil de recordatorios (hoy + LOOKAHEAD_DAYS) a la hora
+ * configurada, para que el recordatorio del día exista aunque no se abra la
+ * app ese día. Excluye la ocurrencia de hoy si ya hay sesión (hasSessionToday).
+ * Idempotente: solo agenda los faltantes y cancela los vencidos o sobrantes.
  */
 export async function reconcileStreakReminder(userId, { hasSessionToday, streak } = {}) {
   const cfg = await getStreakReminderConfig(userId);
@@ -113,29 +121,48 @@ export async function reconcileStreakReminder(userId, { hasSessionToday, streak 
 
   await ensureChannel();
 
-  if (hasSessionToday) {
-    if (cfg.notifId != null) {
-      await cancelPending(cfg.notifId);
-      await saveConfig(userId, { ...cfg, scheduledFor: null, notifId: null });
-    }
-    return cfg;
-  }
-
   const now = new Date();
-  const target = nextTarget(now, cfg.hour, cfg.minute);
-  const key = target.toISOString();
+  const targets = targetSlots(now, cfg.hour, cfg.minute, { skipToday: !!hasSessionToday });
+  const wanted = new Map(targets.map((t) => [t.getTime(), t]));
 
-  if (cfg.scheduledFor === key && cfg.notifId != null) return cfg;
-
-  await cancelPending(cfg.notifId);
-  try {
-    const id = await scheduleOneShot(target, streak);
-    const next = { ...cfg, scheduledFor: key, notifId: id };
-    await saveConfig(userId, next);
-    return next;
-  } catch {
-    return cfg;
+  let changed = false;
+  if (cfg.notifId != null) {
+    await cancelPending(cfg.notifId);
+    delete cfg.notifId;
+    delete cfg.scheduledFor;
+    changed = true;
   }
+
+  const stored = Array.isArray(cfg.notifIds) ? cfg.notifIds : [];
+  const nextIds = [];
+
+  for (const entry of stored) {
+    const kept = entry && wanted.has(entry.date);
+    if (kept) {
+      nextIds.push({ date: entry.date, id: entry.id });
+      wanted.delete(entry.date);
+    } else {
+      changed = true;
+      await cancelPending(entry && entry.id);
+    }
+  }
+
+  for (const [date, slot] of wanted) {
+    const id = await scheduleOneShot(slot, streak);
+    if (id != null) {
+      nextIds.push({ date, id });
+      changed = true;
+    }
+  }
+
+  const same =
+    nextIds.length === stored.length &&
+    nextIds.every((e, i) => e.date === stored[i].date && e.id === stored[i].id);
+
+  if (changed || !same) {
+    await saveConfig(userId, { ...cfg, notifIds: nextIds });
+  }
+  return { ...cfg, notifIds: nextIds };
 }
 
 export async function enableStreakReminder(userId, { hour, minute }) {
@@ -154,7 +181,9 @@ export async function enableStreakReminder(userId, { hour, minute }) {
 
 export async function disableStreakReminder(userId) {
   const cfg = await getStreakReminderConfig(userId);
-  await cancelPending(cfg.notifId);
+  const ids = Array.isArray(cfg.notifIds) ? cfg.notifIds : [];
+  for (const entry of ids) await cancelPending(entry && entry.id);
+  if (cfg.notifId != null) await cancelPending(cfg.notifId);
   const next = { ...DEFAULT_CONFIG };
   await saveConfig(userId, next);
   return next;
