@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
+const { globalUserLimiter } = require("../middleware/rateLimit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
@@ -12,6 +13,7 @@ const BOGOTA_TZ = "America/Bogota";
 const bogotaYear = () => Number(new Intl.DateTimeFormat("en-CA", { timeZone: BOGOTA_TZ, year: "numeric" }).format(new Date()));
 
 router.use(authMiddleware);
+router.use(globalUserLimiter);
 
 // GET /goals — obtener todas las metas del año actual
 router.get("/", async (req, res) => {

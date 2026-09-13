@@ -18,3 +18,8 @@ mobile/.env
 
 # Respaldos locales de prueba (datos personales)
 pruebadb/
+
+# Herramientas locales / archivos descargados
+.agents/
+skills-lock.json
+*.deb

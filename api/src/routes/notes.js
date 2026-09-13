@@ -2,10 +2,12 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
+const { globalUserLimiter } = require("../middleware/rateLimit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 
 router.use(authMiddleware);
+router.use(globalUserLimiter);
 
 // GET /notes — todas las notas del usuario con los datos de su libro
 router.get("/", async (req, res) => {

@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
+const { globalUserLimiter } = require("../middleware/rateLimit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
@@ -9,6 +10,7 @@ const cache = require("../utils/cache");
 const STATUSES = ["pending", "reading", "paused", "completed", "wishlist", "abandoned"];
 
 router.use(authMiddleware);
+router.use(globalUserLimiter);
 
 function invalidateUserData(userId) {
   cache.delPrefix(`user-books:${userId}`);

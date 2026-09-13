@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
+const { globalUserLimiter } = require("../middleware/rateLimit");
 const { validate } = require("../utils/validators");
 const httpError = require("../utils/httpError");
 const cache = require("../utils/cache");
@@ -10,6 +11,7 @@ const { computeStreaks } = require("../utils/streaks");
 const BOGOTA_TZ = "America/Bogota";
 
 router.use(authMiddleware);
+router.use(globalUserLimiter);
 
 // GET /stats/streak — racha actual y récord, sin cargar el calendario completo
 router.get("/streak", async (req, res) => {

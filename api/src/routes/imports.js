@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
+const { importLimiter } = require("../middleware/rateLimit");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
 const { buildImport } = require("../utils/csvImport");
@@ -9,6 +10,7 @@ const { parseBookmory } = require("../utils/bookmory");
 const { buildPlan, normPair, pgTs } = require("../utils/bookmoryImport");
 
 router.use(authMiddleware);
+router.use(importLimiter);
 
 function invalidateUserData(userId) {
   for (const prefix of ["user-books", "stats", "goals", "calendar"]) {

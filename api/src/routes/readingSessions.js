@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db/connection");
 const authMiddleware = require("../middleware/auth");
+const { globalUserLimiter } = require("../middleware/rateLimit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
@@ -9,6 +10,7 @@ const { computeStreaks } = require("../utils/streaks");
 const { getGoalCompletion } = require("../utils/goalProgress");
 
 router.use(authMiddleware);
+router.use(globalUserLimiter);
 
 router.post("/", async (req, res) => {
   const data = validate(req.body, {

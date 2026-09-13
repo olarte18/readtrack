@@ -12,6 +12,7 @@ const goalsRouter = require("./routes/goals");
 const calendarRouter = require("./routes/calendar");
 const importsRouter = require("./routes/imports");
 const errorHandler = require("./middleware/errorHandler");
+const { booksLimiter } = require("./middleware/rateLimit");
 
 if (!process.env.JWT_SECRET) {
   console.error("Falta JWT_SECRET en el entorno");
@@ -28,6 +29,7 @@ app.use(cors({
 app.use(express.json({ limit: "15mb" }));
 app.use("/stats", statsRouter);
 app.use("/auth", authRouter);
+app.use("/books", booksLimiter);
 app.use("/books", booksRouter);
 app.use("/user-books", userBooksRouter);
 app.use("/notes", notesRouter);

@@ -203,7 +203,7 @@ router.patch("/:id", authMiddleware, async (req, res) => {
 
 // PATCH /books/:google_id/pages — acepta google_id o el id numérico de BD
 // (los libros manuales no tienen google_id).
-router.patch("/:google_id/pages", async (req, res) => {
+router.patch("/:google_id/pages", authMiddleware, async (req, res) => {
   const data = validate(req.body, { pages: { required: true, type: "integer", min: 1 } });
 
   const param = req.params.google_id;
