@@ -1,8 +1,13 @@
 // Caché en memoria simple con TTL. Una sola instancia de API => Map es suficiente.
-// En NODE_ENV=test queda desactivada para no interferir con los tests.
+// Por defecto queda desactivada en NODE_ENV=test para no interferir con los tests;
+// setEnabled() permite activarla en un test concreto.
 const store = new Map();
 
-const enabled = process.env.NODE_ENV !== "test";
+let enabled = process.env.NODE_ENV !== "test";
+
+function setEnabled(value) {
+  enabled = Boolean(value);
+}
 
 function evictExpired() {
   const now = Date.now();
@@ -35,4 +40,4 @@ function delPrefix(prefix) {
   }
 }
 
-module.exports = { set, get, delPrefix };
+module.exports = { set, get, delPrefix, setEnabled };
