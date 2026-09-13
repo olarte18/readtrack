@@ -100,6 +100,17 @@ CREATE TABLE IF NOT EXISTS notes (
   created_at TIMESTAMP DEFAULT NOW()
 );
 
+-- DB2: FK de notas a user_books con CASCADE (borrar una copia de la biblioteca
+-- elimina sus notas). La columna se agrega nullable para permitir el backfill.
+ALTER TABLE notes ADD COLUMN IF NOT EXISTS user_book_id INTEGER REFERENCES user_books(id) ON DELETE CASCADE;
+-- Backfill: ata cada nota a la copia (user_book) más reciente de su (user, book).
+UPDATE notes n
+SET user_book_id = ub.id
+FROM (SELECT DISTINCT ON (user_id, book_id) id, user_id, book_id
+      FROM user_books ORDER BY user_id, book_id, id DESC) ub
+WHERE ub.user_id = n.user_id AND ub.book_id = n.book_id AND n.user_book_id IS NULL;
+CREATE INDEX IF NOT EXISTS notes_user_book_idx ON notes (user_book_id);
+
 CREATE TABLE IF NOT EXISTS reading_sessions (
   id               SERIAL PRIMARY KEY,
   user_book_id     INTEGER NOT NULL REFERENCES user_books(id) ON DELETE CASCADE,

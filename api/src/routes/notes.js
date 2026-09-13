@@ -40,9 +40,15 @@ router.post("/", async (req, res) => {
     page: { type: "integer", min: 1 },
   });
 
+  // Ata la nota a la copia de biblioteca (user_book) más reciente del libro.
+  const ub = await pool.query(
+    "SELECT id FROM user_books WHERE user_id = $1 AND book_id = $2 ORDER BY id DESC LIMIT 1",
+    [req.userId, data.book_id]
+  );
+
   const { rows } = await pool.query(
-    "INSERT INTO notes (book_id, user_id, content, page) VALUES ($1, $2, $3, $4) RETURNING *",
-    [data.book_id, req.userId, data.content, data.page]
+    "INSERT INTO notes (book_id, user_id, user_book_id, content, page) VALUES ($1, $2, $3, $4, $5) RETURNING *",
+    [data.book_id, req.userId, ub.rows[0] ? ub.rows[0].id : null, data.content, data.page]
   );
   res.status(201).json(rows[0]);
 });

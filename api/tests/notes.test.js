@@ -22,6 +22,16 @@ describe("POST /notes", () => {
     expect(res.body.content).toBe("Idea brillante");
   });
 
+  test("ata la nota a la copia de biblioteca (user_book_id)", async () => {
+    const { token, book } = await setup();
+    const res = await request(app)
+      .post("/notes")
+      .set(authHeader(token))
+      .send({ book_id: book.book_id ?? book.id, content: "nota con copia" });
+    expect(res.status).toBe(201);
+    expect(res.body.user_book_id).toBe(book.id);
+  });
+
   test("rechaza nota sin contenido", async () => {
     const { token, book } = await setup();
     const res = await request(app)
@@ -63,5 +73,22 @@ describe("DELETE /notes/:id", () => {
       .send({ book_id: book.book_id ?? book.id, content: "nota a borrar" });
     const res = await request(app).delete(`/notes/${note.body.id}`).set(authHeader(token));
     expect(res.status).toBe(200);
+  });
+});
+
+describe("FK notes → user_books", () => {
+  test("borrar el libro de la biblioteca cascadea sus notas", async () => {
+    const { token, book } = await setup();
+    await request(app)
+      .post("/notes")
+      .set(authHeader(token))
+      .send({ book_id: book.book_id ?? book.id, content: "nota que debe morir" });
+
+    const del = await request(app).delete(`/user-books/${book.id}`).set(authHeader(token));
+    expect(del.status).toBe(200);
+
+    const list = await request(app).get(`/notes/${book.book_id ?? book.id}`).set(authHeader(token));
+    expect(list.status).toBe(200);
+    expect(list.body).toHaveLength(0);
   });
 });
