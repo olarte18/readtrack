@@ -162,7 +162,15 @@ export const updateBookFicha = async (id, data) =>
     body: JSON.stringify(data),
   });
 
-export const getStats = async () => request("/stats");
+export const getStats = async (year) => request(year ? `/stats?year=${year}` : "/stats");
+
+export const getStatsActivity = async ({ view, year, month, date }) => {
+  const params = [`view=${view}`];
+  if (year) params.push(`year=${year}`);
+  if (month) params.push(`month=${month}`);
+  if (date) params.push(`date=${date}`);
+  return request(`/stats/activity?${params.join("&")}`);
+};
 
 export const getStreak = async () => request("/stats/streak");
 
@@ -200,8 +208,8 @@ export const getGoals = async () => request("/goals");
 
 export const getGoalsStatus = async () => request("/goals/status");
 
-export const getGoalDetail = async (type, metric) =>
-  request(`/goals/detail?type=${encodeURIComponent(type)}&metric=${encodeURIComponent(metric)}`);
+export const getGoalDetail = async (type, metric, year) =>
+  request(`/goals/detail?type=${encodeURIComponent(type)}&metric=${encodeURIComponent(metric)}${year ? `&year=${year}` : ""}`);
 
 export const getCalendar = async (year, month) =>
   request(`/calendar/${year}/${month}`);

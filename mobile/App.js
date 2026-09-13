@@ -64,6 +64,7 @@ function HomeTabs() {
           let iconName;
           if (route.name === "Reading") iconName = focused ? "book" : "book-outline";
           else if (route.name === "Home") iconName = focused ? "library" : "library-outline";
+          else if (route.name === "Stats") iconName = focused ? "stats-chart" : "stats-chart-outline";
           else if (route.name === "Calendar") iconName = focused ? "calendar" : "calendar-outline";
           else if (route.name === "Profile") iconName = focused ? "person" : "person-outline";
           return <Ionicons name={iconName} size={size} color={color} />;
@@ -71,6 +72,7 @@ function HomeTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: "Biblioteca" }} />
+      <Tab.Screen name="Stats" component={StatsScreen} options={{ tabBarLabel: "Estadísticas" }} />
       <Tab.Screen name="Reading" component={ReadingScreen} options={{ tabBarLabel: "Leyendo" }} />
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: "Calendario" }} />
       <Tab.Screen name="Profile" component={ProfileScreen} options={{ tabBarLabel: "Perfil" }} />
@@ -95,7 +97,6 @@ function AppStack() {
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="ManualAdd" component={ManualAddBookScreen} />
       <Stack.Screen name="EditBook" component={EditBookScreen} />
-      <Stack.Screen name="Stats" component={StatsScreen} />
       <Stack.Screen name="ReadingMode" component={ReadingModeScreen} />
       <Stack.Screen name="ActiveSession" component={ActiveSessionScreen} />
       <Stack.Screen name="SessionSummary" component={SessionSummaryScreen} />

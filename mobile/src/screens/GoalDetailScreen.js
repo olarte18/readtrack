@@ -31,7 +31,7 @@ function formatDate(str) {
 export default function GoalDetailScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const { type, metric } = route.params;
+  const { type = "annual", metric = "books", year } = route.params ?? {};
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
@@ -40,7 +40,7 @@ export default function GoalDetailScreen({ route, navigation }) {
     setLoading(true);
     setError(false);
     try {
-      const res = await getGoalDetail(type, metric);
+      const res = await getGoalDetail(type, metric, year);
       setData(res);
     } catch (e) {
       console.error(e);
@@ -48,11 +48,14 @@ export default function GoalDetailScreen({ route, navigation }) {
     } finally {
       setLoading(false);
     }
-  }, [type, metric]);
+  }, [type, metric, year]);
 
   useEffect(() => { fetchDetail(); }, [fetchDetail]);
 
-  const title = TITLES[`${type}:${metric}`] ?? "Detalle de la meta";
+  const title =
+    type === "annual" && year
+      ? `Libros completados en ${year}`
+      : (TITLES[`${type}:${metric}`] ?? "Detalle de la meta");
 
   if (loading) {
     return (

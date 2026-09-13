@@ -29,6 +29,18 @@ async function addSession(token, userBookId, durationSeconds, pagesRead = 1, cre
   return res.body;
 }
 
+async function addSessionLastYear(token, userBookId, durationSeconds, pagesRead = 1) {
+  const res = await request(app)
+    .post("/reading-sessions")
+    .set(authHeader(token))
+    .send({ user_book_id: userBookId, page: 10, duration_seconds: durationSeconds, pages_read: pagesRead });
+  await pool.query(
+    `UPDATE reading_sessions SET created_at = NOW() AT TIME ZONE 'America/Bogota' - INTERVAL '1 year' WHERE id = $1`,
+    [res.body.id]
+  );
+  return res.body;
+}
+
 describe("GET /goals/detail", () => {
   test("rechaza tipo o métrica inválidos", async () => {
     const { token } = await registerUser();
@@ -38,6 +50,61 @@ describe("GET /goals/detail", () => {
     expect(res2.status).toBe(400);
     const res3 = await request(app).get("/goals/detail").set(authHeader(token)).query({ type: "monthly" });
     expect(res3.status).toBe(400);
+  });
+
+  test("rechaza año inválido", async () => {
+    const { token } = await registerUser();
+    const res1 = await request(app).get("/goals/detail").set(authHeader(token)).query({ type: "annual", metric: "books", year: "abc" });
+    expect(res1.status).toBe(400);
+    const res2 = await request(app).get("/goals/detail").set(authHeader(token)).query({ type: "annual", metric: "books", year: "1800" });
+    expect(res2.status).toBe(400);
+  });
+
+  test("annual books con year filtra al año pedido", async () => {
+    const { token } = await registerUser();
+    const last = await addBook(token, { title: "Año pasado" });
+    const current = await addBook(token, { title: "Este año" });
+    const { rows: lastYear } = await pool.query(
+      `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Bogota')::date - INTERVAL '1 year', 'YYYY-MM-DD') AS d`
+    );
+    const { rows: nowDate } = await pool.query(
+      `SELECT TO_CHAR(NOW() AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS d`
+    );
+    await completeBook(token, last.id, lastYear[0].d);
+    await completeBook(token, current.id, nowDate[0].d);
+
+    const res = await request(app)
+      .get("/goals/detail")
+      .set(authHeader(token))
+      .query({ type: "annual", metric: "books", year: lastYear[0].d.slice(0, 4) });
+    expect(res.status).toBe(200);
+    expect(res.body.period).toBe(lastYear[0].d.slice(0, 4));
+    expect(res.body.progress).toBe(1);
+    expect(res.body.books).toHaveLength(1);
+    expect(res.body.books[0].title).toBe("Año pasado");
+  });
+
+  test("annual hours con year solo suma las horas de ese año", async () => {
+    const { token } = await registerUser();
+    const last = await addBook(token, { title: "Año pasado" });
+    const current = await addBook(token, { title: "Este año" });
+    await addSessionLastYear(token, last.id, 7200, 20);
+    await addSession(token, current.id, 3600, 10);
+
+    const { rows: lastYear } = await pool.query(
+      `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Bogota')::date - INTERVAL '1 year', 'YYYY') AS y`
+    );
+
+    const res = await request(app)
+      .get("/goals/detail")
+      .set(authHeader(token))
+      .query({ type: "annual", metric: "hours", year: lastYear[0].y });
+    expect(res.status).toBe(200);
+    expect(res.body.period).toBe(lastYear[0].y);
+    expect(res.body.books).toHaveLength(1);
+    expect(res.body.books[0].title).toBe("Año pasado");
+    expect(res.body.books[0].minutes).toBe(120);
+    expect(res.body.progress).toBe(120);
   });
 
   test("monthly books devuelve solo libros completados este mes", async () => {

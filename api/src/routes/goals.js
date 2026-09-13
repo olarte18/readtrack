@@ -117,16 +117,23 @@ router.get("/detail", async (req, res) => {
   const data = validate(req.query, {
     type: { required: true, type: "string", enum: ["annual", "monthly", "weekly"] },
     metric: { required: true, type: "string", enum: ["books", "hours"] },
+    year: { type: "integer", min: 1970, max: 2100 },
   });
 
-  const cacheKey = `goals:${req.userId}:detail:${data.type}:${data.metric}`;
+  const cacheKey = `goals:${req.userId}:detail:${data.type}:${data.metric}:${data.year ?? ""}`;
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
   let startExpr;
   let intervalUnit;
   let label;
-  if (data.type === "annual") {
+  let endCond = "";
+  if (data.type === "annual" && data.year !== undefined) {
+    startExpr = `date_trunc('year', '${data.year}-01-01 00:00:00'::timestamp)`;
+    intervalUnit = "year";
+    label = String(data.year);
+    endCond = `\n         AND rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota' < (${startExpr} + INTERVAL '1 year')`;
+  } else if (data.type === "annual") {
     startExpr = "date_trunc('year', NOW() AT TIME ZONE 'America/Bogota')";
     intervalUnit = "year";
     label = "este año";
@@ -167,7 +174,7 @@ router.get("/detail", async (req, res) => {
        JOIN user_books ub ON ub.id = rs.user_book_id
        JOIN books b ON b.id = ub.book_id
        WHERE rs.user_id = $1
-         AND rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota' >= ${startExpr}
+         AND rs.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'America/Bogota' >= ${startExpr}${endCond}
        GROUP BY ub.id, b.id
        ORDER BY minutes DESC`,
       [req.userId]
