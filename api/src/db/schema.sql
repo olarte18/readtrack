@@ -142,11 +142,14 @@ CREATE TABLE IF NOT EXISTS verification_codes (
   type       VARCHAR(20),
   expires_at TIMESTAMP NOT NULL,
   used       BOOLEAN DEFAULT FALSE,
+  attempts   INTEGER DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW(),
   CONSTRAINT verification_codes_type_check CHECK (type IN ('verification', 'password_reset'))
 );
 -- Los códigos de recuperación se guardan hasheados; bases creadas antes se amplían a propósito
 ALTER TABLE verification_codes ALTER COLUMN code TYPE VARCHAR(255);
+-- Límite de intentos por código (anti fuerza bruta): bases creadas antes lo adoptan
+ALTER TABLE verification_codes ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0;
 
 -- Refresh tokens de sesión (rotación + revocación de JWT)
 CREATE TABLE IF NOT EXISTS refresh_tokens (

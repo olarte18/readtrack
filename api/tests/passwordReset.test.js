@@ -84,7 +84,7 @@ describe("POST /auth/verify-reset-code", () => {
     expect(res.body).toEqual({ ok: true });
   });
 
-  test("rechaza un código incorrecto sin consumirlo", async () => {
+  test("rechaza un código incorrecto sin consumirlo pero cuenta el intento", async () => {
     await makeUserWithResetCode();
     const wrong = sent[0].code === "123456" ? "654321" : "123456";
     const res = await request(app).post("/auth/verify-reset-code").send({
@@ -92,8 +92,45 @@ describe("POST /auth/verify-reset-code", () => {
       code: wrong,
     });
     expect(res.status).toBe(400);
-    const { rows } = await pool.query("SELECT used FROM verification_codes");
+    const { rows } = await pool.query("SELECT used, attempts FROM verification_codes");
     expect(rows[0].used).toBe(false);
+    expect(rows[0].attempts).toBe(1);
+  });
+
+  test("permite acertar tras menos de 5 fallos previos", async () => {
+    const { code } = await makeUserWithResetCode();
+    for (let i = 0; i < 2; i++) {
+      const wrong = code === "123456" ? "654321" : "123456";
+      const res = await request(app).post("/auth/verify-reset-code").send({
+        email: "juan@example.com",
+        code: wrong,
+      });
+      expect(res.status).toBe(400);
+    }
+    const res = await request(app).post("/auth/verify-reset-code").send({
+      email: "juan@example.com",
+      code,
+    });
+    expect(res.status).toBe(200);
+  });
+
+  test("bloquea el código tras 5 intentos fallidos aunque se conozca el código", async () => {
+    const { code } = await makeUserWithResetCode();
+    for (let i = 0; i < 5; i++) {
+      const wrong = code === "123456" ? "654321" : "123456";
+      const res = await request(app).post("/auth/verify-reset-code").send({
+        email: "juan@example.com",
+        code: wrong,
+      });
+      expect(res.status).toBe(400);
+    }
+    const res = await request(app).post("/auth/verify-reset-code").send({
+      email: "juan@example.com",
+      code,
+    });
+    expect(res.status).toBe(400);
+    const { rows } = await pool.query("SELECT attempts FROM verification_codes");
+    expect(rows[0].attempts).toBe(5);
   });
 
   test("rechaza un código expirado", async () => {
@@ -188,6 +225,27 @@ describe("POST /auth/reset-password", () => {
       password: "password123",
     });
     expect(login.status).toBe(200);
+  });
+
+  test("reset-password también cuenta fallos y bloquea el código tras 5", async () => {
+    const { code } = await makeUserWithResetCode();
+    for (let i = 0; i < 5; i++) {
+      const wrong = code === "654321" ? "123456" : "654321";
+      const res = await request(app).post("/auth/reset-password").send({
+        email: "juan@example.com",
+        code: wrong,
+        newPassword: "nueva123",
+      });
+      expect(res.status).toBe(400);
+    }
+    const res = await request(app).post("/auth/reset-password").send({
+      email: "juan@example.com",
+      code,
+      newPassword: "nueva123",
+    });
+    expect(res.status).toBe(400);
+    const { rows } = await pool.query("SELECT attempts FROM verification_codes");
+    expect(rows[0].attempts).toBe(5);
   });
 
   test("rechaza una contraseña nueva corta", async () => {

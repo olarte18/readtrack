@@ -10,6 +10,7 @@ const { validate } = require("../utils/validators");
 const { sendPasswordResetCode } = require("../utils/email");
 
 const RESET_CODE_TTL_MINUTES = 15;
+const MAX_CODE_ATTEMPTS = 5;
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const ACCESS_TTL = process.env.JWT_ACCESS_EXPIRES || "2h";
@@ -24,6 +25,30 @@ const authLimiter =
     : rateLimit({
         windowMs: 15 * 60 * 1000,
         max: 5,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Demasiados intentos, intenta más tarde" },
+      });
+
+// Anti spam de correos: pedir un código de recuperación (1 por flujo + reenvío)
+const forgotLimiter =
+  process.env.NODE_ENV === "test"
+    ? bypassInTest
+    : rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 3,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Demasiados intentos, intenta más tarde" },
+      });
+
+// Anti fuerza bruta: validar/usar un código (verify + reset comparten el bucket)
+const verifyResetLimiter =
+  process.env.NODE_ENV === "test"
+    ? bypassInTest
+    : rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 10,
         standardHeaders: true,
         legacyHeaders: false,
         message: { error: "Demasiados intentos, intenta más tarde" },
@@ -96,9 +121,10 @@ async function createResetCode(userId) {
 async function findActiveResetCode(userId) {
   const { rows } = await pool.query(
     `SELECT id, code, user_id FROM verification_codes
-     WHERE user_id = $1 AND type = 'password_reset' AND used = false AND expires_at > NOW()
+     WHERE user_id = $1 AND type = 'password_reset' AND used = false
+       AND expires_at > NOW() AND attempts < $2
      ORDER BY id DESC LIMIT 1`,
-    [userId]
+    [userId, MAX_CODE_ATTEMPTS]
   );
   return rows[0] || null;
 }
@@ -106,12 +132,18 @@ async function findActiveResetCode(userId) {
 // Devuelve la fila del código si el código es válido para ese email, si no null.
 // Siempre ejecuta un bcrypt.compare (contra un hash dummy si no hay usuario/código)
 // para no filtrar la existencia del email por el tiempo de respuesta.
+// Un intento fallido consume un intento del código (columna `attempts`): tras
+// MAX_CODE_ATTEMPTS el código queda bloqueado aunque la IP cambie.
 async function checkResetCode(email, code) {
   const { rows } = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
   const user = rows[0];
   const active = user ? await findActiveResetCode(user.id) : null;
   const valid = await bcrypt.compare(code, active ? active.code : DUMMY_CODE_HASH);
-  return valid ? active : null;
+  if (valid) return active;
+  if (active) {
+    await pool.query("UPDATE verification_codes SET attempts = attempts + 1 WHERE id = $1", [active.id]);
+  }
+  return null;
 }
 
 const resetCodeSchema = {
@@ -183,7 +215,7 @@ router.post("/logout", async (req, res) => {
 
 // POST /auth/forgot-password — genera un código de 6 dígitos y lo envía por email.
 // Responde lo mismo exista o no el email (no enumera usuarios).
-router.post("/forgot-password", authLimiter, async (req, res) => {
+router.post("/forgot-password", forgotLimiter, async (req, res) => {
   const { email } = validate(req.body, { email: { required: true, type: "email" } });
   const normalized = email.toLowerCase();
 
@@ -199,7 +231,7 @@ router.post("/forgot-password", authLimiter, async (req, res) => {
 });
 
 // POST /auth/verify-reset-code — valida el código sin consumirlo
-router.post("/verify-reset-code", authLimiter, async (req, res) => {
+router.post("/verify-reset-code", verifyResetLimiter, async (req, res) => {
   const data = validate(req.body, resetCodeSchema);
   if (!/^\d{6}$/.test(data.code)) throw httpError(400, "Código inválido o expirado");
   const row = await checkResetCode(data.email.toLowerCase(), data.code);
@@ -209,7 +241,7 @@ router.post("/verify-reset-code", authLimiter, async (req, res) => {
 
 // POST /auth/reset-password — cambia la contraseña, consume el código y revoca
 // todas las sesiones del usuario (invalida los refresh tokens existentes).
-router.post("/reset-password", authLimiter, async (req, res) => {
+router.post("/reset-password", verifyResetLimiter, async (req, res) => {
   const data = validate(req.body, {
     ...resetCodeSchema,
     newPassword: { required: true, type: "string", min: 6, max: 100 },

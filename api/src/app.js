@@ -21,6 +21,10 @@ if (!process.env.JWT_SECRET) {
 
 const app = express();
 
+// Render corre detrás de un proxy: sin esto `req.ip` es la IP del proxy para
+// todos y express-rate-limit cuenta a toda la app como un solo usuario.
+app.set("trust proxy", 1);
+
 app.use(helmet());
 app.use(cors({
   origin: process.env.ALLOWED_ORIGINS?.split(',').map(s => s.trim()) || false,
