@@ -14,6 +14,7 @@ import EditBookScreen from "./src/screens/EditBookScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
+import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import { Ionicons } from "@expo/vector-icons";
 import StatsScreen from "./src/screens/StatsScreen";
 import ReadingScreen from "./src/screens/ReadingScreen";
@@ -85,6 +86,7 @@ function AuthStack() {
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Login" component={LoginScreen} />
       <Stack.Screen name="Register" component={RegisterScreen} />
+      <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
     </Stack.Navigator>
   );
 }

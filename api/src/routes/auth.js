@@ -7,6 +7,9 @@ const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
+const { sendPasswordResetCode } = require("../utils/email");
+
+const RESET_CODE_TTL_MINUTES = 15;
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const ACCESS_TTL = process.env.JWT_ACCESS_EXPIRES || "2h";
@@ -67,6 +70,55 @@ async function findValidRefreshToken(rawToken) {
   return rows[0];
 }
 
+// Hash dummy para que las comparaciones de código tarden lo mismo exista o no el email
+const DUMMY_CODE_HASH = bcrypt.hashSync("000000", 10);
+
+function generateResetCode() {
+  return crypto.randomInt(0, 1000000).toString().padStart(6, "0");
+}
+
+async function createResetCode(userId) {
+  const code = generateResetCode();
+  const hashed = await bcrypt.hash(code, 10);
+  // Un solo código activo por usuario: invalida los anteriores sin usar
+  await pool.query(
+    "UPDATE verification_codes SET used = true WHERE user_id = $1 AND type = 'password_reset' AND used = false",
+    [userId]
+  );
+  await pool.query(
+    `INSERT INTO verification_codes (user_id, code, type, expires_at)
+     VALUES ($1, $2, 'password_reset', $3)`,
+    [userId, hashed, new Date(Date.now() + RESET_CODE_TTL_MINUTES * 60 * 1000)]
+  );
+  return code;
+}
+
+async function findActiveResetCode(userId) {
+  const { rows } = await pool.query(
+    `SELECT id, code, user_id FROM verification_codes
+     WHERE user_id = $1 AND type = 'password_reset' AND used = false AND expires_at > NOW()
+     ORDER BY id DESC LIMIT 1`,
+    [userId]
+  );
+  return rows[0] || null;
+}
+
+// Devuelve la fila del código si el código es válido para ese email, si no null.
+// Siempre ejecuta un bcrypt.compare (contra un hash dummy si no hay usuario/código)
+// para no filtrar la existencia del email por el tiempo de respuesta.
+async function checkResetCode(email, code) {
+  const { rows } = await pool.query("SELECT id FROM users WHERE email = $1", [email]);
+  const user = rows[0];
+  const active = user ? await findActiveResetCode(user.id) : null;
+  const valid = await bcrypt.compare(code, active ? active.code : DUMMY_CODE_HASH);
+  return valid ? active : null;
+}
+
+const resetCodeSchema = {
+  email: { required: true, type: "email" },
+  code: { required: true, type: "string", min: 6, max: 6 },
+};
+
 // POST /auth/register
 router.post("/register", authLimiter, async (req, res) => {
   const data = validate(req.body, {
@@ -126,6 +178,59 @@ router.post("/logout", async (req, res) => {
     const row = await findValidRefreshToken(refreshToken);
     if (row) await revokeRefreshToken(row.id);
   }
+  res.json({ ok: true });
+});
+
+// POST /auth/forgot-password — genera un código de 6 dígitos y lo envía por email.
+// Responde lo mismo exista o no el email (no enumera usuarios).
+router.post("/forgot-password", authLimiter, async (req, res) => {
+  const { email } = validate(req.body, { email: { required: true, type: "email" } });
+  const normalized = email.toLowerCase();
+
+  const { rows } = await pool.query("SELECT id FROM users WHERE email = $1", [normalized]);
+  if (rows.length > 0) {
+    const code = await createResetCode(rows[0].id);
+    await sendPasswordResetCode(normalized, code);
+  } else {
+    await bcrypt.hash("000000", 10); // mismo costo aproximado que el caso real
+  }
+
+  res.json({ ok: true });
+});
+
+// POST /auth/verify-reset-code — valida el código sin consumirlo
+router.post("/verify-reset-code", authLimiter, async (req, res) => {
+  const data = validate(req.body, resetCodeSchema);
+  if (!/^\d{6}$/.test(data.code)) throw httpError(400, "Código inválido o expirado");
+  const row = await checkResetCode(data.email.toLowerCase(), data.code);
+  if (!row) throw httpError(400, "Código inválido o expirado");
+  res.json({ ok: true });
+});
+
+// POST /auth/reset-password — cambia la contraseña, consume el código y revoca
+// todas las sesiones del usuario (invalida los refresh tokens existentes).
+router.post("/reset-password", authLimiter, async (req, res) => {
+  const data = validate(req.body, {
+    ...resetCodeSchema,
+    newPassword: { required: true, type: "string", min: 6, max: 100 },
+  });
+  if (!/^\d{6}$/.test(data.code)) throw httpError(400, "Código inválido o expirado");
+
+  const row = await checkResetCode(data.email.toLowerCase(), data.code);
+  if (!row) throw httpError(400, "Código inválido o expirado");
+
+  const hashed = await bcrypt.hash(data.newPassword, 10);
+  await pool.query("UPDATE users SET password = $1 WHERE id = $2", [hashed, row.user_id]);
+  await pool.query("UPDATE verification_codes SET used = true WHERE id = $1", [row.id]);
+  await pool.query(
+    "UPDATE verification_codes SET used = true WHERE user_id = $1 AND type = 'password_reset' AND used = false",
+    [row.user_id]
+  );
+  await pool.query(
+    "UPDATE refresh_tokens SET revoked_at = NOW() WHERE user_id = $1 AND revoked_at IS NULL",
+    [row.user_id]
+  );
+
   res.json({ ok: true });
 });
 

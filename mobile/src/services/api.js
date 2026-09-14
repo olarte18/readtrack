@@ -243,3 +243,21 @@ export const importBookmory = async (fileBase64) =>
     method: "POST",
     body: JSON.stringify({ file_base64: fileBase64 }),
   });
+
+export const requestPasswordReset = async (email) =>
+  request("/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
+export const verifyResetCode = async (email, code) =>
+  request("/auth/verify-reset-code", {
+    method: "POST",
+    body: JSON.stringify({ email, code }),
+  });
+
+export const resetPassword = async (email, code, newPassword) =>
+  request("/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ email, code, newPassword }),
+  });
