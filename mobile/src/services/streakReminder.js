@@ -10,6 +10,9 @@ const DEFAULT_HOUR = 20;
 const configKey = (userId) => `streak_reminder:${userId}`;
 const promptKey = (userId) => `streak_prompt_seen:${userId}`;
 
+const logError = (context, error) =>
+  console.warn(`[recordatorio racha] ${context}:`, error);
+
 // Escape hatch de desarrollo para previsualizar el modal aunque ya se haya visto.
 const DEV_FORCE = process.env.EXPO_PUBLIC_DEV_STREAKPROMPT === "1";
 
@@ -27,7 +30,9 @@ export async function shouldShowStreakPrompt(userId) {
 export async function markStreakPromptSeen(userId) {
   try {
     await AsyncStorage.setItem(promptKey(userId), "1");
-  } catch {}
+  } catch (e) {
+    logError("marcar prompt de racha visto", e);
+  }
 }
 
 export async function getStreakReminderConfig(userId) {
@@ -63,7 +68,9 @@ async function ensureChannel() {
         vibrationPattern: [0, 150, 150],
       });
     }
-  } catch {}
+  } catch (e) {
+    logError("crear canal de recordatorios", e);
+  }
 }
 
 function streakBody(streak) {
@@ -106,7 +113,9 @@ async function cancelPending(id) {
   if (id == null) return;
   try {
     await Notifications.cancelScheduledNotificationAsync(id);
-  } catch {}
+  } catch (e) {
+    logError("cancelar notificación programada", e);
+  }
 }
 
 /**
@@ -175,7 +184,9 @@ export async function enableStreakReminder(userId, { hour, minute }) {
     const s = await getStreak();
     hasSessionToday = !!s.hasSessionToday;
     streak = s.current ?? 0;
-  } catch {}
+  } catch (e) {
+    logError("consultar racha al habilitar", e);
+  }
   return reconcileStreakReminder(userId, { hasSessionToday, streak });
 }
 

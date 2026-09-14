@@ -11,13 +11,18 @@ const NATIVE_AVAILABLE = Platform.OS === "android" && !!AlarmNative;
 
 let appInForeground = true;
 
+const logError = (context, error) =>
+  console.warn(`[notificaciones] ${context}:`, error);
+
 try {
   if (Platform.OS !== "web") {
     AppState.addEventListener("change", (next) => {
       appInForeground = next === "active";
     });
   }
-} catch {}
+} catch (e) {
+  logError("listener de AppState", e);
+}
 
 export function configureNotifications() {
   try {
@@ -32,7 +37,9 @@ export function configureNotifications() {
         };
       },
     });
-  } catch {}
+  } catch (e) {
+    logError("configurar handler de notificaciones", e);
+  }
 }
 
 export async function ensureChannel() {
@@ -55,7 +62,9 @@ export async function ensureChannel() {
         },
       });
     }
-  } catch {}
+  } catch (e) {
+    logError("crear canal de alarmas", e);
+  }
 }
 
 export async function requestAlarmPermission() {
@@ -75,10 +84,14 @@ export function openAlarmSettings() {
       Linking.sendIntent("android.settings.NOTIFICATION_POLICY_ACCESS_SETTINGS");
       return;
     }
-  } catch {}
+  } catch (e) {
+    logError("abrir ajustes de política de notificaciones", e);
+  }
   try {
     if (Platform.OS === "android") Linking.openSettings();
-  } catch {}
+  } catch (e) {
+    logError("abrir ajustes del sistema", e);
+  }
 }
 
 export function openFullScreenIntentSettings() {
@@ -87,10 +100,14 @@ export function openFullScreenIntentSettings() {
       Linking.sendIntent("android.settings.MANAGE_APP_USE_FULL_SCREEN_INTENT");
       return;
     }
-  } catch {}
+  } catch (e) {
+    logError("abrir ajustes de pantalla completa", e);
+  }
   try {
     if (Platform.OS === "android") Linking.openSettings();
-  } catch {}
+  } catch (e) {
+    logError("abrir ajustes del sistema", e);
+  }
 }
 
 export async function shouldShowAlarmHint() {
@@ -104,7 +121,9 @@ export async function shouldShowAlarmHint() {
 export async function markAlarmHintSeen() {
   try {
     await AsyncStorage.setItem(HINT_SEEN_KEY, "1");
-  } catch {}
+  } catch (e) {
+    logError("marcar hint de alarma visto", e);
+  }
 }
 
 export async function scheduleAlarm(msFromNow, { title, body } = {}) {
@@ -138,14 +157,18 @@ export async function cancelAlarm(id) {
   if (AlarmNative) {
     try {
       AlarmNative.cancel();
-    } catch {}
+    } catch (e) {
+      logError("cancelar alarma nativa", e);
+    }
     return;
   }
   try {
     if (id !== null && id !== undefined) {
       await Notifications.cancelScheduledNotificationAsync(id);
     }
-  } catch {}
+  } catch (e) {
+    logError("cancelar notificación de alarma", e);
+  }
 }
 
 /**
@@ -184,7 +207,9 @@ export async function cancelAlarmSession(id) {
   if (NATIVE_AVAILABLE) {
     try {
       AlarmNative.stopAlarmSession();
-    } catch {}
+    } catch (e) {
+      logError("detener sesión de alarma", e);
+    }
     return;
   }
   await cancelAlarm(id);
@@ -194,7 +219,9 @@ export async function setAlarmSessionPaused(paused) {
   if (!NATIVE_AVAILABLE) return;
   try {
     AlarmNative.setSessionPaused(!!paused);
-  } catch {}
+  } catch (e) {
+    logError("pausar sesión de alarma", e);
+  }
 }
 
 export async function getAlarmSessionState() {
