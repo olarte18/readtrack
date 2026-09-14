@@ -13,6 +13,7 @@ const calendarRouter = require("./routes/calendar");
 const importsRouter = require("./routes/imports");
 const errorHandler = require("./middleware/errorHandler");
 const { booksLimiter } = require("./middleware/rateLimit");
+const pool = require("./db/connection");
 
 if (!process.env.JWT_SECRET) {
   console.error("Falta JWT_SECRET en el entorno");
@@ -41,7 +42,15 @@ app.use("/reading-sessions", readingSessionsRouter);
 app.use("/goals", goalsRouter);
 app.use("/calendar", calendarRouter);
 app.use("/import", importsRouter);
-app.get("/health", (req, res) => res.json({ status: "ok" }));
+app.get("/health", async (req, res) => {
+  try {
+    await pool.query("SELECT 1");
+    res.json({ status: "ok" });
+  } catch (err) {
+    console.error("Health: no se pudo verificar la BD", err.message);
+    res.status(503).json({ status: "error" });
+  }
+});
 
 app.use(errorHandler);
 

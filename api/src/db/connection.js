@@ -9,6 +9,9 @@ const pool = new Pool({
   port: process.env.DB_PORT,
   database: process.env.DB_NAME,
   ssl: dbSsl(),
+  // Si la BD no responde, no dejar el request (o el /health) colgados hasta el
+  // timeout del SO: fallar en 5s tampoco es aceptable para un health check.
+  connectionTimeoutMillis: 5000,
 });
 
 module.exports = pool;
