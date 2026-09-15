@@ -48,6 +48,8 @@ const formatHoursNum = (minutes) => {
 
 const formatHours = (minutes) => `${formatHoursNum(minutes)} h`;
 
+const formatMinutes = (minutes) => String(Math.round(Number(minutes) || 0));
+
 export default function StatsScreen({ navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -244,7 +246,11 @@ export default function StatsScreen({ navigation }) {
       <View style={styles.card}>
         <View style={styles.cardHeader}>
           <Text style={styles.cardTitle}>
-            {view === "year" && yearMetric === "books" ? "Libros leídos" : "Horas leídas"}
+            {view === "year" && yearMetric === "books"
+              ? "Libros leídos"
+              : view === "week"
+                ? "Minutos leídos"
+                : "Horas leídas"}
           </Text>
           {view === "year" && (
             <View style={styles.unitSeg}>
@@ -263,7 +269,15 @@ export default function StatsScreen({ navigation }) {
         <ActivityChart
           data={chartData}
           colors={colors}
-          formatValue={view === "year" ? (yearMetric === "books" ? undefined : formatHoursNum) : formatHours}
+          formatValue={
+            view === "year"
+              ? yearMetric === "books"
+                ? undefined
+                : formatHoursNum
+              : view === "week"
+                ? formatMinutes
+                : formatHours
+          }
         />
       </View>
 
