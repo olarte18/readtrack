@@ -10,6 +10,7 @@ if (!process.env.TEST_DATABASE_URL) {
 }
 
 const pool = new Pool({ connectionString: process.env.TEST_DATABASE_URL });
+const { sent } = require("../src/utils/email");
 
 const schema = fs.readFileSync(path.join(__dirname, "..", "src", "db", "schema.sql"), "utf8");
 const app = require("../src/app");
@@ -36,12 +37,20 @@ async function registerUser(overrides = {}) {
     password: "password123",
     ...overrides,
   };
-  const res = await request(app).post("/auth/register").send(payload);
+  const code = await requestRegistrationCode(payload.email);
+  const res = await request(app).post("/auth/register").send({ ...payload, code });
   return res.body;
+}
+
+// Pide un código de registro por email y devuelve el último código enviado.
+async function requestRegistrationCode(email) {
+  const res = await request(app).post("/auth/request-register-code").send({ email });
+  if (res.status !== 200) throw new Error(`request-register-code falló (${res.status}): ${JSON.stringify(res.body)}`);
+  return sent[sent.length - 1].code;
 }
 
 function authHeader(token) {
   return { Authorization: `Bearer ${token}` };
 }
 
-module.exports = { app, request, pool, initDb, resetDb, closeDb, registerUser, authHeader };
+module.exports = { app, request, pool, initDb, resetDb, closeDb, registerUser, requestRegistrationCode, authHeader };

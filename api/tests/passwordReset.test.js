@@ -1,4 +1,4 @@
-const { app, request, pool, resetDb, closeDb } = require("./helpers");
+const { app, request, pool, resetDb, closeDb, requestRegistrationCode } = require("./helpers");
 const { sent, clearSent } = require("../src/utils/email");
 
 beforeEach(async () => {
@@ -8,12 +8,14 @@ beforeEach(async () => {
 afterAll(closeDb);
 
 async function makeUserWithResetCode(overrides = {}) {
-  const res = await request(app).post("/auth/register").send({
+  const payload = {
     username: "juan",
     email: "juan@example.com",
     password: "password123",
     ...overrides,
-  });
+  };
+  const code = await requestRegistrationCode(payload.email);
+  const res = await request(app).post("/auth/register").send({ ...payload, code });
   expect(res.status).toBe(201);
   await request(app).post("/auth/forgot-password").send({ email: res.body.user.email });
   return { user: res.body.user, code: sent[sent.length - 1].code };
@@ -30,11 +32,14 @@ describe("POST /auth/forgot-password", () => {
   });
 
   test("crea un código de 6 dígitos hasheado y lo envía al email", async () => {
+    const regCode = await requestRegistrationCode("juan@example.com");
     expect((await request(app).post("/auth/register").send({
       username: "juan",
       email: "juan@example.com",
       password: "password123",
+      code: regCode,
     })).status).toBe(201);
+    clearSent();
     const res = await request(app).post("/auth/forgot-password").send({ email: "juan@example.com" });
     expect(res.status).toBe(200);
     expect(sent).toHaveLength(1);
@@ -42,7 +47,7 @@ describe("POST /auth/forgot-password", () => {
     expect(sent[0].code).toMatch(/^\d{6}$/);
 
     const { rows } = await pool.query(
-      "SELECT code, type, used, expires_at > NOW() AS vigente FROM verification_codes"
+      "SELECT code, type, used, expires_at > NOW() AS vigente FROM verification_codes WHERE type = 'password_reset'"
     );
     expect(rows).toHaveLength(1);
     expect(rows[0].type).toBe("password_reset");
@@ -52,14 +57,18 @@ describe("POST /auth/forgot-password", () => {
   });
 
   test("invalida códigos previos sin usar del mismo usuario", async () => {
+    const regCode = await requestRegistrationCode("juan@example.com");
     await request(app).post("/auth/register").send({
       username: "juan",
       email: "juan@example.com",
       password: "password123",
+      code: regCode,
     });
     await request(app).post("/auth/forgot-password").send({ email: "juan@example.com" });
     await request(app).post("/auth/forgot-password").send({ email: "juan@example.com" });
-    const { rows } = await pool.query("SELECT id, used FROM verification_codes ORDER BY id");
+    const { rows } = await pool.query(
+      "SELECT id, used FROM verification_codes WHERE type = 'password_reset' ORDER BY id"
+    );
     expect(rows).toHaveLength(2);
     expect(rows[0].used).toBe(true);
     expect(rows[1].used).toBe(false);
@@ -85,14 +94,16 @@ describe("POST /auth/verify-reset-code", () => {
   });
 
   test("rechaza un código incorrecto sin consumirlo pero cuenta el intento", async () => {
-    await makeUserWithResetCode();
-    const wrong = sent[0].code === "123456" ? "654321" : "123456";
+    const { code } = await makeUserWithResetCode();
+    const wrong = code === "123456" ? "654321" : "123456";
     const res = await request(app).post("/auth/verify-reset-code").send({
       email: "juan@example.com",
       code: wrong,
     });
     expect(res.status).toBe(400);
-    const { rows } = await pool.query("SELECT used, attempts FROM verification_codes");
+    const { rows } = await pool.query(
+      "SELECT used, attempts FROM verification_codes WHERE type = 'password_reset'"
+    );
     expect(rows[0].used).toBe(false);
     expect(rows[0].attempts).toBe(1);
   });
@@ -129,7 +140,9 @@ describe("POST /auth/verify-reset-code", () => {
       code,
     });
     expect(res.status).toBe(400);
-    const { rows } = await pool.query("SELECT attempts FROM verification_codes");
+    const { rows } = await pool.query(
+      "SELECT attempts FROM verification_codes WHERE type = 'password_reset'"
+    );
     expect(rows[0].attempts).toBe(5);
   });
 
@@ -193,7 +206,7 @@ describe("POST /auth/reset-password", () => {
     const oldRefresh = await request(app).post("/auth/refresh").send({ refreshToken });
     expect(oldRefresh.status).toBe(401);
 
-    const { rows } = await pool.query("SELECT used FROM verification_codes");
+    const { rows } = await pool.query("SELECT used FROM verification_codes WHERE type = 'password_reset'");
     expect(rows[0].used).toBe(true);
   });
 
@@ -244,7 +257,9 @@ describe("POST /auth/reset-password", () => {
       newPassword: "nueva123",
     });
     expect(res.status).toBe(400);
-    const { rows } = await pool.query("SELECT attempts FROM verification_codes");
+    const { rows } = await pool.query(
+      "SELECT attempts FROM verification_codes WHERE type = 'password_reset'"
+    );
     expect(rows[0].attempts).toBe(5);
   });
 

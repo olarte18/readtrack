@@ -138,18 +138,33 @@ CREATE TABLE IF NOT EXISTS reading_goals (
 CREATE TABLE IF NOT EXISTS verification_codes (
   id         SERIAL PRIMARY KEY,
   user_id    INTEGER REFERENCES users(id) ON DELETE CASCADE,
+  email      VARCHAR(100),
   code       VARCHAR(255) NOT NULL,
   type       VARCHAR(20),
   expires_at TIMESTAMP NOT NULL,
   used       BOOLEAN DEFAULT FALSE,
   attempts   INTEGER DEFAULT 0,
   created_at TIMESTAMP DEFAULT NOW(),
-  CONSTRAINT verification_codes_type_check CHECK (type IN ('verification', 'password_reset'))
+  CONSTRAINT verification_codes_type_check CHECK (type IN ('verification', 'password_reset', 'registration'))
 );
 -- Los códigos de recuperación se guardan hasheados; bases creadas antes se amplían a propósito
 ALTER TABLE verification_codes ALTER COLUMN code TYPE VARCHAR(255);
 -- Límite de intentos por código (anti fuerza bruta): bases creadas antes lo adoptan
 ALTER TABLE verification_codes ADD COLUMN IF NOT EXISTS attempts INTEGER DEFAULT 0;
+-- Registro requiere verificar un código por email (el code viaja sin user_id): bases
+-- creadas antes ganan la columna email y amplían el check a type 'registration'
+ALTER TABLE verification_codes ADD COLUMN IF NOT EXISTS email VARCHAR(100);
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'verification_codes_type_check'
+      AND pg_get_constraintdef(oid) NOT LIKE '%registration%'
+  ) THEN
+    ALTER TABLE verification_codes DROP CONSTRAINT verification_codes_type_check;
+    ALTER TABLE verification_codes ADD CONSTRAINT verification_codes_type_check
+      CHECK (type IN ('verification', 'password_reset', 'registration'));
+  END IF;
+END $$;
 
 -- Refresh tokens de sesión (rotación + revocación de JWT)
 CREATE TABLE IF NOT EXISTS refresh_tokens (

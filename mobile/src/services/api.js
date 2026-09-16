@@ -244,6 +244,12 @@ export const importBookmory = async (fileBase64) =>
     body: JSON.stringify({ file_base64: fileBase64 }),
   });
 
+export const requestRegistrationCode = async (email) =>
+  request("/auth/request-register-code", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+
 export const requestPasswordReset = async (email) =>
   request("/auth/forgot-password", {
     method: "POST",

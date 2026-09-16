@@ -1,32 +1,65 @@
-const { app, request, resetDb, closeDb } = require("./helpers");
+const { app, request, pool, resetDb, closeDb, requestRegistrationCode } = require("./helpers");
+const bcrypt = require("bcryptjs");
+
+const registerPayload = (overrides = {}) => ({
+  username: "juan",
+  email: "juan@example.com",
+  password: "password123",
+  ...overrides,
+});
+
+async function registerWithCode(overrides = {}) {
+  const payload = registerPayload(overrides);
+  const code = await requestRegistrationCode(payload.email);
+  return request(app).post("/auth/register").send({ ...payload, code });
+}
+
+// Siembre un código de registro válido para un email (útil cuando el email ya tiene
+// cuenta: la vía normal por diseño no emite más códigos para emails existentes).
+async function seedRegistrationCode(email) {
+  const code = "123456";
+  const hashed = await bcrypt.hash(code, 10);
+  await pool.query(
+    "INSERT INTO verification_codes (email, code, type, expires_at) VALUES ($1, $2, 'registration', NOW() + INTERVAL '15 minutes')",
+    [email, hashed]
+  );
+  return code;
+}
 
 beforeEach(resetDb);
 afterAll(closeDb);
 
 describe("POST /auth/register", () => {
   test("registra un usuario y devuelve token", async () => {
-    const res = await request(app).post("/auth/register").send({
-      username: "juan",
-      email: "juan@example.com",
-      password: "password123",
-    });
+    const res = await registerWithCode();
     expect(res.status).toBe(201);
     expect(res.body.user.username).toBe("juan");
     expect(res.body.user.email).toBe("juan@example.com");
     expect(res.body.token).toBeDefined();
     expect(res.body.user.password).toBeUndefined();
+    expect(res.body.user.verified).toBe(true);
   });
 
   test("rechaza email duplicado", async () => {
-    const payload = { username: "juan", email: "dup@example.com", password: "password123" };
-    await request(app).post("/auth/register").send(payload);
+    await registerWithCode({ email: "dup@example.com" });
+    const code = await seedRegistrationCode("dup@example.com");
     const res = await request(app).post("/auth/register").send({
-      username: "juan2",
-      email: "dup@example.com",
-      password: "password123",
+      ...registerPayload({ email: "dup@example.com", username: "juan2" }),
+      code,
     });
     expect(res.status).toBe(400);
-    expect(res.body.error).toBeDefined();
+    expect(res.body.error).toBe("El email ya está registrado");
+  });
+
+  test("rechaza usuario duplicado", async () => {
+    await registerWithCode();
+    const code = await seedRegistrationCode("otro@example.com");
+    const res = await request(app).post("/auth/register").send({
+      ...registerPayload({ email: "otro@example.com" }),
+      code,
+    });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("El usuario ya existe");
   });
 
   test("rechaza campos faltantes", async () => {
@@ -35,31 +68,35 @@ describe("POST /auth/register", () => {
   });
 
   test("rechaza email inválido", async () => {
-    const res = await request(app).post("/auth/register").send({
-      username: "juan",
-      email: "no-es-email",
-      password: "password123",
-    });
+    const res = await request(app).post("/auth/register").send(registerPayload({ email: "no-es-email" }));
     expect(res.status).toBe(400);
   });
 
   test("rechaza contraseña corta", async () => {
+    const res = await request(app).post("/auth/register").send(registerPayload({ password: "123" }));
+    expect(res.status).toBe(400);
+  });
+
+  test("rechaza registro sin código", async () => {
+    const res = await request(app).post("/auth/register").send(registerPayload());
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("code es requerido");
+  });
+
+  test("rechaza un código incorrecto", async () => {
+    await requestRegistrationCode("juan@example.com");
     const res = await request(app).post("/auth/register").send({
-      username: "juan",
-      email: "juan@example.com",
-      password: "123",
+      ...registerPayload(),
+      code: "000000",
     });
     expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Código inválido o expirado");
   });
 });
 
 describe("POST /auth/login", () => {
   beforeEach(async () => {
-    await request(app).post("/auth/register").send({
-      username: "juan",
-      email: "juan@example.com",
-      password: "password123",
-    });
+    await registerWithCode();
   });
 
   test("loguea con credenciales válidas", async () => {
@@ -90,11 +127,7 @@ describe("POST /auth/login", () => {
 
 describe("POST /auth/refresh", () => {
   beforeEach(async () => {
-    await request(app).post("/auth/register").send({
-      username: "juan",
-      email: "juan@example.com",
-      password: "password123",
-    });
+    await registerWithCode();
   });
 
   test("rota el refresh token y devuelve un access token nuevo", async () => {

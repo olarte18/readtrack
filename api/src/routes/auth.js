@@ -7,9 +7,10 @@ const jwt = require("jsonwebtoken");
 const rateLimit = require("express-rate-limit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
-const { sendPasswordResetCode } = require("../utils/email");
+const { sendPasswordResetCode, sendRegistrationCode } = require("../utils/email");
 
 const RESET_CODE_TTL_MINUTES = 15;
+const REGISTER_CODE_TTL_MINUTES = 15;
 const MAX_CODE_ATTEMPTS = 5;
 
 const JWT_SECRET = process.env.JWT_SECRET;
@@ -32,6 +33,18 @@ const authLimiter =
 
 // Anti spam de correos: pedir un código de recuperación (1 por flujo + reenvío)
 const forgotLimiter =
+  process.env.NODE_ENV === "test"
+    ? bypassInTest
+    : rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 3,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { error: "Demasiados intentos, intenta más tarde" },
+      });
+
+// Anti spam de correos de registro (1 por flujo + reenvío)
+const registerCodeLimiter =
   process.env.NODE_ENV === "test"
     ? bypassInTest
     : rateLimit({
@@ -69,10 +82,10 @@ const signAccessToken = (id) => jwt.sign({ id }, JWT_SECRET, { expiresIn: ACCESS
 
 const hashRefresh = (token) => crypto.createHash("sha256").update(token).digest("hex");
 
-async function issueRefreshToken(userId) {
+async function issueRefreshToken(userId, conn = pool) {
   const token = crypto.randomBytes(48).toString("base64url");
   const expiresAt = new Date(Date.now() + REFRESH_TTL_SECONDS * 1000);
-  const { rows } = await pool.query(
+  const { rows } = await conn.query(
     "INSERT INTO refresh_tokens (user_id, token_hash, expires_at) VALUES ($1, $2, $3) RETURNING id",
     [userId, hashRefresh(token), expiresAt]
   );
@@ -129,6 +142,48 @@ async function findActiveResetCode(userId) {
   return rows[0] || null;
 }
 
+// ---- Registro: código de verificación por email (la cuenta no existe aún) ----
+
+// Un solo código de registro activo por email: invalida los anteriores sin usar.
+// El código queda hasheado y ligado al email (user_id NULL hasta crear la cuenta).
+async function createRegistrationCode(email) {
+  const code = generateResetCode();
+  const hashed = await bcrypt.hash(code, 10);
+  await pool.query(
+    "UPDATE verification_codes SET used = true WHERE email = $1 AND type = 'registration' AND used = false",
+    [email]
+  );
+  await pool.query(
+    `INSERT INTO verification_codes (email, code, type, expires_at)
+     VALUES ($1, $2, 'registration', $3)`,
+    [email, hashed, new Date(Date.now() + REGISTER_CODE_TTL_MINUTES * 60 * 1000)]
+  );
+  return code;
+}
+
+// Valida un código de registro (por email, aún sin cuenta). Siempre ejecuta un
+// bcrypt.compare (contra un hash dummy si no hay código) para no filtrar la
+// existencia del email por el tiempo de respuesta. Un fallo cuenta un intento.
+// Corre fuera de la transacción del register a propósito: si un intento fallido
+// se revirtiera con el ROLLBACK, los intentos nunca se acumularían y el código
+// no se podría bloquear por fuerza bruta.
+async function checkRegistrationCode(conn, email, code) {
+  const { rows } = await conn.query(
+    `SELECT id, code FROM verification_codes
+     WHERE email = $1 AND type = 'registration' AND used = false
+       AND expires_at > NOW() AND attempts < $2
+     ORDER BY id DESC LIMIT 1`,
+    [email, MAX_CODE_ATTEMPTS]
+  );
+  const active = rows[0] || null;
+  const valid = await bcrypt.compare(code, active ? active.code : DUMMY_CODE_HASH);
+  if (valid) return active;
+  if (active) {
+    await conn.query("UPDATE verification_codes SET attempts = attempts + 1 WHERE id = $1", [active.id]);
+  }
+  return null;
+}
+
 // Devuelve la fila del código si el código es válido para ese email, si no null.
 // Siempre ejecuta un bcrypt.compare (contra un hash dummy si no hay usuario/código)
 // para no filtrar la existencia del email por el tiempo de respuesta.
@@ -151,25 +206,80 @@ const resetCodeSchema = {
   code: { required: true, type: "string", min: 6, max: 6 },
 };
 
-// POST /auth/register
+// POST /auth/request-register-code — genera un código de 6 dígitos para verificar el
+// email al registrarse y lo envía por email. Sin código no se crea la cuenta.
+// Responde lo mismo exista o no el email (no enumera usuarios).
+router.post("/request-register-code", registerCodeLimiter, async (req, res) => {
+  const { email } = validate(req.body, { email: { required: true, type: "email" } });
+  const normalized = email.toLowerCase();
+
+  const { rows } = await pool.query("SELECT id FROM users WHERE email = $1", [normalized]);
+  if (rows.length === 0) {
+    const code = await createRegistrationCode(normalized);
+    await sendRegistrationCode(normalized, code);
+  } else {
+    await bcrypt.hash("000000", 10); // mismo costo aproximado que el caso real
+  }
+
+  res.json({ ok: true });
+});
+
+// POST /auth/register — crea la cuenta solo si el email fue verificado con un código
+// de registro válido. La cuenta nace verified = true. El código se valida ANTES de
+// abrir la transacción (un intento fallido persiste y no se revierte con el
+// ROLLBACK), y el consumo ocurre dentro con un UPDATE guardado por `used = false`:
+// si dos requests usan el mismo código en paralelo, solo uno gana.
 router.post("/register", authLimiter, async (req, res) => {
   const data = validate(req.body, {
     username: { required: true, type: "string", max: 50 },
     email: { required: true, type: "email" },
     password: { required: true, type: "string", min: 6, max: 100 },
+    code: { required: true, type: "string", min: 6, max: 6 },
   });
+  const normalized = data.email.toLowerCase();
 
-  const hashed = await bcrypt.hash(data.password, 10);
-  const { rows } = await pool.query(
-    "INSERT INTO users (username, email, password) VALUES ($1, $2, $3) RETURNING id, username, email",
-    [data.username.trim(), data.email.toLowerCase(), hashed]
-  );
-  const refresh = await issueRefreshToken(rows[0].id);
-  res.status(201).json({
-    user: rows[0],
-    token: signAccessToken(rows[0].id),
-    refreshToken: refresh.token,
-  });
+  const codeRow = await checkRegistrationCode(pool, normalized, data.code);
+  if (!codeRow) throw httpError(400, "Código inválido o expirado");
+
+  const client = await pool.connect();
+  try {
+    await client.query("BEGIN");
+    const consumed = await client.query(
+      "UPDATE verification_codes SET used = true WHERE id = $1 AND used = false",
+      [codeRow.id]
+    );
+    if (consumed.rowCount === 0) throw httpError(400, "Código inválido o expirado");
+
+    const hashed = await bcrypt.hash(data.password, 10);
+    let userId;
+    try {
+      const { rows } = await client.query(
+        "INSERT INTO users (username, email, password, verified) VALUES ($1, $2, $3, true) RETURNING id",
+        [data.username.trim(), normalized, hashed]
+      );
+      userId = rows[0].id;
+    } catch (err) {
+      if (err.code === "23505") {
+        const isEmail = err.constraint === "users_email_key";
+        throw httpError(400, isEmail ? "El email ya está registrado" : "El usuario ya existe");
+      }
+      throw err;
+    }
+
+    const user = { id: userId, username: data.username.trim(), email: normalized, verified: true };
+    const refresh = await issueRefreshToken(userId, client);
+    await client.query("COMMIT");
+    res.status(201).json({
+      user,
+      token: signAccessToken(userId),
+      refreshToken: refresh.token,
+    });
+  } catch (err) {
+    await client.query("ROLLBACK").catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 });
 
 // POST /auth/login
