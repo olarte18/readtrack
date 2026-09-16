@@ -182,7 +182,7 @@ export default function CalendarScreen() {
             <View style={styles.grid}>
               {cells.map((day, i) =>
                 day === null ? (
-                  <View key={`blank-${i}`} style={styles.dayCell} />
+                  <View key={`blank-${i}`} style={styles.blankCell} />
                 ) : (
                   <TouchableOpacity key={day} style={styles.dayCellWrapper} accessibilityLabel={`Día ${day}`} onPress={() => setSelectedDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}>
                     <View
@@ -378,6 +378,7 @@ const createStyles = (colors) =>
   weekRow: { flexDirection: "row", marginBottom: 6 },
   weekDayLabel: { width: "14.2857%", textAlign: "center", fontSize: 12, fontWeight: "bold", color: colors.textMuted },
   grid: { flexDirection: "row", flexWrap: "wrap" },
+  blankCell: { width: "14.2857%" },
   dayCellWrapper: { width: "14.2857%", aspectRatio: 1, padding: 2 },
   dayCell: {
     flex: 1,
