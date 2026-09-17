@@ -84,5 +84,5 @@ export async function flushQueue(submitFn) {
   }
 
   const remaining = (await getPending()).length;
-  return { synced, remaining, failed, networkError };
+  return { synced, remaining, failed };
 }

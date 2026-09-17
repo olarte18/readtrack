@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../utils/config";
-import { markOnline, markOffline } from "./connectivity";
+import { markOnline, markOffline, getConnectivity } from "./connectivity";
 
 const getHeaders = async () => {
   const token = await AsyncStorage.getItem("token");
@@ -10,8 +10,14 @@ const getHeaders = async () => {
   };
 };
 
-const DEFAULT_TIMEOUT = 30000;
+const DEFAULT_TIMEOUT = 10000;
 const RETRY_DELAYS = [1500, 3000];
+
+// Tras una caída de red marcamos offline; durante esta ventana las lecturas con
+// caché se sirven al instante sin tocar la red (nada de gris). Pasada la ventana
+// se vuelve a probar la red (pull-to-refresh, re-foco): si ya hay señal se vuelve
+// a network-first, si sigue caída se re-marca offline.
+const OFFLINE_RECHECK_MS = 8000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -44,20 +50,48 @@ const writeCached = async (path, data) => {
   }
 };
 
-// GET con soporte offline: ante éxito guarda la última respuesta; ante fallo
-// de red sirve la caché con fromCache:true (si la hay) para que las pantallas
-// sigan funcionando sin señal.
+// GET con soporte offline: cuando hay señal se pide fresco (network-first con
+// timeout corto y reintentos acotados) y la caché es el respaldo si la red cae
+// a mitad de camino. Cuando sabemos que no hay señal (y no ha pasado mucho) se
+// sirve la caché al instante sin tocar la red: nada de gris.
+const isOfflineLocked = () => {
+  const { online, lastFailure } = getConnectivity();
+  return !online && lastFailure != null && Date.now() - lastFailure < OFFLINE_RECHECK_MS;
+};
+
+// Devuelve el dato cacheado (puede ser objeto o array) marcado como servido de
+// caché SIN cambiar su tipo: esparcir un array lo degrada a objeto con claves
+// numéricas y rompe .length/.filter en las pantallas.
+const withFromCache = (data) => {
+  if (Array.isArray(data)) {
+    data.fromCache = true;
+    return data;
+  }
+  return { ...data, fromCache: true };
+};
+
 const getWithCache = async (path, options = {}) => {
+  const cached = await readCached(path);
+  if (cached != null && isOfflineLocked()) {
+    return withFromCache(cached);
+  }
+  // Revisión periódica de señal: si tenemos caché y sabemos que la red estaba
+  // caída (ventana pasada), se prueba con un timeout corto y un solo intento
+  // para no congelar la pantalla mientras se confirma si ya hay internet.
+  // Lo mismo vale para el caso normal: una lectura cacheable no reintenta
+  // (un fallo → caché al instante); los reintentos quedan para GETs sin caché.
+  const probing = cached != null && !getConnectivity().online;
+  const probeOptions = probing ? { timeout: 4000, retry: false } : { retry: false };
   try {
-    const data = await request(path, options);
+    const data = await request(path, { ...probeOptions, ...options });
     writeCached(path, data);
     return data;
   } catch (err) {
     if (isNetworkError(err)) {
-      const cached = await readCached(path);
-      if (cached != null) {
+      const fresh = cached ?? (await readCached(path));
+      if (fresh != null) {
         markOffline();
-        return { ...cached, fromCache: true };
+        return withFromCache(fresh);
       }
     }
     throw err;
@@ -74,11 +108,19 @@ const refreshAccessToken = async () => {
     refreshingPromise = (async () => {
       const refreshToken = await AsyncStorage.getItem("refreshToken");
       if (!refreshToken) throw new Error("Sin refresh token");
-      const res = await fetch(`${API_URL}/auth/refresh`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ refreshToken }),
-      });
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
+      let res;
+      try {
+        res = await fetch(`${API_URL}/auth/refresh`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ refreshToken }),
+          signal: controller.signal,
+        });
+      } finally {
+        clearTimeout(timer);
+      }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Sesión expirada");
       await AsyncStorage.multiSet([
@@ -107,6 +149,12 @@ const request = async (path, options = {}) => {
   let refreshTried = false;
 
   while (true) {
+    // Sabemos que no hay señal recientemente: fallar al instante en lugar de
+    // esperar el timeout. getWithCache sirve la caché; las escrituras caen al
+    // catch del caller (p. ej. encolar la sesión) sin bloquear la pantalla.
+    if (isOfflineLocked()) {
+      throw new Error("Network request failed");
+    }
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), timeout);
     try {
@@ -136,21 +184,37 @@ const request = async (path, options = {}) => {
     } catch (err) {
       clearTimeout(timer);
       const retryable = isNetworkError(err);
-      if (retryable && attempt < maxRetries) {
+      // Solo se reintenta si creíamos estar online (blip transitorio). Si ya
+      // sabíamos que la red estaba caída, marcar offline y salir ya.
+      if (retryable && !isOfflineLocked() && attempt < maxRetries) {
         attempt += 1;
         await sleep(RETRY_DELAYS[attempt - 1] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1]);
         continue;
       }
-      if (retryable) markOffline();
+      if (retryable) markOffline(); // el indicador se prende ante el primer fallo
       throw err;
     }
   }
 };
 
 export const getLibrary = async () => {
-  const data = await getWithCache("/user-books");
+  let data;
+  try {
+    data = await getWithCache("/user-books");
+  } catch (err) {
+    // Sin caché nueva (primera ejecución offline tras la actualización): usar la
+    // clave legacy que ya poblaba la app anterior, así Leyendo no queda vacío.
+    if (isNetworkError(err)) {
+      const legacy = await getLibraryCached();
+      if (legacy != null) return legacy;
+    }
+    throw err;
+  }
   const token = await AsyncStorage.getItem("token");
-  if (token) await AsyncStorage.setItem(`library:${token}`, JSON.stringify(data));
+  if (token) {
+    // JSON.stringify de un array ignora la propiedad fromCache → caché legacy limpia.
+    await AsyncStorage.setItem(`library:${token}`, JSON.stringify(data));
+  }
   return data;
 };
 
@@ -169,7 +233,14 @@ export const warmup = () => {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 8000);
   fetch(`${API_URL}/health`, { signal: controller.signal })
-    .catch(() => {})
+    .then((res) => {
+      if (res.ok) markOnline();
+    })
+    .catch((err) => {
+      // El arranque sin señal se conoce desde el primer frame: los reads de la
+      // primera pantalla sirven la caché sin esperar el timeout.
+      if (isNetworkError(err)) markOffline();
+    })
     .finally(() => clearTimeout(timer));
 };
 

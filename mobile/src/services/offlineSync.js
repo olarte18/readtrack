@@ -1,6 +1,7 @@
 import { AppState } from "react-native";
 import { updateBook, addReadingSession } from "./api";
 import { getPending, flushQueue } from "./offline";
+import { getConnectivity, subscribe } from "./connectivity";
 
 let flushing = false;
 
@@ -32,10 +33,20 @@ export const syncQueue = async () => {
 
 // Flush al arrancar y cada vez que la app vuelve a primer plano (cuando hay
 // red se propagan en el request; aquí cubrimos la vuelta de avión/sin señal).
+// Además se intenta de inmediato cuando la conectividad pasa de offline a
+// online, sin esperar a que la app vuelva a primer plano.
 export const initOfflineSync = () => {
   syncQueue();
   const sub = AppState.addEventListener("change", (next) => {
     if (next === "active") syncQueue();
   });
-  return () => sub.remove();
+  let wasOnline = getConnectivity().online;
+  const unsub = subscribe((state) => {
+    if (state.online && !wasOnline) syncQueue();
+    wasOnline = state.online;
+  });
+  return () => {
+    sub.remove();
+    unsub();
+  };
 };
