@@ -113,6 +113,21 @@ describe("GET /calendar/:year/:month", () => {
     expect(res.body.streak.current).toBeGreaterThanOrEqual(1);
   });
 
+  test("hasSessionToday refleja si hubo sesión hoy, en cualquier mes consultado", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+
+    // Sin sesión hoy
+    const empty = await request(app).get("/calendar/2020/1").set(authHeader(token));
+    expect(empty.body.hasSessionToday).toBe(false);
+
+    // Una sesión "de hoy" (hora Bogotá) debe encender la racha en cualquier mes
+    await insertSession(user.id, book.id, `${await bogotaToday()} 12:00:00`, 600);
+    const res = await request(app).get("/calendar/2020/1").set(authHeader(token));
+    expect(res.body.days).toEqual([]);
+    expect(res.body.hasSessionToday).toBe(true);
+  });
+
   test("aisla los datos entre usuarios", async () => {
     const { token } = await registerUser();
     const other = await registerUser({ username: "otro", email: "otro@example.com" });

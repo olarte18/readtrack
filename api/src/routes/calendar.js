@@ -51,6 +51,18 @@ router.get("/:year/:month", async (req, res) => {
     [req.userId, appYear()]
   );
 
+  // ¿Hubo al menos una sesión hoy (hora Bogotá)? Es global (no depende del mes
+  // visible): así la racha/flame de la app no se apagan al navegar a otro mes.
+  const { rows: todaySessions } = await pool.query(
+    `SELECT COUNT(*)::int AS n
+     FROM reading_sessions
+     WHERE user_id = $1
+       AND ${SQL.utcToApp()}
+         >= date_trunc('day', ${SQL.nowInApp()})`,
+    [req.userId]
+  );
+  const hasSessionToday = todaySessions[0].n > 0;
+
   const dayMap = new Map();
   for (const row of rows) {
     if (!dayMap.has(row.date)) {
@@ -76,6 +88,7 @@ router.get("/:year/:month", async (req, res) => {
     month,
     days: [...dayMap.values()],
     daily_goal_minutes: dailyGoalRows[0]?.value ?? null,
+    hasSessionToday,
     streak: computeStreaks(sessionDates.map((r) => r.date)),
   };
   cache.set(cacheKey, payload, 60000);

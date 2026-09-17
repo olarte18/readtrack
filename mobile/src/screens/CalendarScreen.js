@@ -1,6 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
+import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { getCalendar, getReadingSessions, updateReadingSession } from "../services/api";
@@ -34,17 +35,19 @@ export default function CalendarScreen() {
   const [sessionsLoading, setSessionsLoading] = useState(false);
   const [savingId, setSavingId] = useState(null);
 
-  useEffect(() => {
-    let cancelled = false;
-    setLoading(true);
-    const t = todayString().split("-");
-    setSelectedDate(year === Number(t[0]) && month === Number(t[1]) ? todayString() : null);
-    getCalendar(year, month)
-      .then((res) => { if (!cancelled) setData(res); })
-      .catch((e) => console.error(e))
-      .finally(() => { if (!cancelled) setLoading(false); });
-    return () => { cancelled = true; };
-  }, [year, month]);
+  useFocusEffect(
+    useCallback(() => {
+      let cancelled = false;
+      setLoading(true);
+      const t = todayString().split("-");
+      setSelectedDate(year === Number(t[0]) && month === Number(t[1]) ? todayString() : null);
+      getCalendar(year, month)
+        .then((res) => { if (!cancelled) setData(res); })
+        .catch((e) => console.error(e))
+        .finally(() => { if (!cancelled) setLoading(false); });
+      return () => { cancelled = true; };
+    }, [year, month])
+  );
 
   const refreshMonth = async () => {
     try {
@@ -137,7 +140,7 @@ export default function CalendarScreen() {
   const dayMap = {};
   (data?.days ?? []).forEach((d) => { dayMap[d.date] = d; });
   const selectedDay = selectedDate ? dayMap[selectedDate] : null;
-  const hasSessionToday = !!dayMap[todayStr];
+  const hasSessionToday = data?.hasSessionToday === true;
 
   const dayStyleFor = (day) => {
     const info = dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`];
