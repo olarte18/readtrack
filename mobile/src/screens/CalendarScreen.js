@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
@@ -27,6 +27,7 @@ export default function CalendarScreen() {
   const [month, setMonth] = useState(now.getMonth() + 1);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [selectedDate, setSelectedDate] = useState(todayString);
   const [editBook, setEditBook] = useState(null);
   const [sessions, setSessions] = useState(null);
@@ -51,6 +52,15 @@ export default function CalendarScreen() {
       setData(res);
     } catch (e) {
       console.error(e);
+    }
+  };
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await refreshMonth();
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -172,7 +182,12 @@ export default function CalendarScreen() {
       {loading ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
       ) : (
-        <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        <ScrollView
+          contentContainerStyle={{ paddingBottom: 40 }}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} colors={[colors.accent]} />
+          }
+        >
           <View style={styles.calendarCard}>
             <View style={styles.weekRow}>
               {WEEK_DAYS.map((d, i) => (

@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { useEffect, useMemo, useState, useCallback } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { getStats, getStatsActivity } from "../services/api";
@@ -66,6 +66,25 @@ export default function StatsScreen({ navigation }) {
   const [activity, setActivity] = useState(null);
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const fetchStats = useCallback(async () => {
+    try {
+      const res = await getStats(year);
+      setStats(res);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [year]);
+
+  const fetchActivity = useCallback(async () => {
+    const params = { view };
+    if (view === "year") params.year = year;
+    else if (view === "month") { params.year = year; params.month = month; }
+    else params.date = weekDate;
+    const res = await getStatsActivity(params);
+    setActivity(res);
+  }, [view, year, month, weekDate]);
 
   useEffect(() => {
     let cancelled = false;
@@ -88,6 +107,17 @@ export default function StatsScreen({ navigation }) {
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [view, year, month, weekDate]);
+
+  const refresh = async () => {
+    setRefreshing(true);
+    try {
+      await Promise.all([fetchStats(), fetchActivity()]);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const selectView = (v) => {
     setView(v);
@@ -195,7 +225,12 @@ export default function StatsScreen({ navigation }) {
   }
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
+    <ScrollView
+      contentContainerStyle={styles.container}
+      refreshControl={
+        <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} colors={[colors.accent]} />
+      }
+    >
       <View style={styles.headerRow}>
         <Text style={styles.title}>Estadísticas</Text>
         <View style={styles.yearControl}>
