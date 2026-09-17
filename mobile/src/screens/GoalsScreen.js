@@ -4,6 +4,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { getGoals, saveGoal } from "../services/api";
+import { getPending } from "../services/offline";
+import { goalsWithLocal } from "../utils/offlineCompute";
 
 const GOAL_TYPES = [
   { key: "annual", label: "Anual", description: "Libros al año", metrics: ["books"] },
@@ -27,7 +29,7 @@ export default function GoalsScreen({ navigation }) {
     setLoading(true);
     try {
       const res = await getGoals();
-      setData(res);
+      setData(res?.fromCache ? goalsWithLocal(res, await getPending()) : res);
     } catch (e) {
       console.error(e);
     } finally {

@@ -5,20 +5,15 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { getCalendar, getReadingSessions, updateReadingSession } from "../services/api";
+import { getPending } from "../services/offline";
+import { calendarWithLocal } from "../utils/offlineCompute";
+import { todayString } from "../utils/dates";
 
 const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 const WEEK_DAYS = ["L", "M", "X", "J", "V", "S", "D"];
-
-const todayString = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 
 export default function CalendarScreen() {
   const { colors } = useTheme();
@@ -42,7 +37,7 @@ export default function CalendarScreen() {
       const t = todayString().split("-");
       setSelectedDate(year === Number(t[0]) && month === Number(t[1]) ? todayString() : null);
       getCalendar(year, month)
-        .then((res) => { if (!cancelled) setData(res); })
+        .then(async (res) => { if (!cancelled) setData(res?.fromCache ? calendarWithLocal(res, await getPending()) : res); })
         .catch((e) => console.error(e))
         .finally(() => { if (!cancelled) setLoading(false); });
       return () => { cancelled = true; };
@@ -52,7 +47,7 @@ export default function CalendarScreen() {
   const refreshMonth = async () => {
     try {
       const res = await getCalendar(year, month);
-      setData(res);
+      setData(res?.fromCache ? calendarWithLocal(res, await getPending()) : res);
     } catch (e) {
       console.error(e);
     }

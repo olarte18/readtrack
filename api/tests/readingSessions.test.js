@@ -364,3 +364,85 @@ describe("GET /stats/streak — hasSessionToday", () => {
     expect(res.body.hasSessionToday).toBe(true);
   });
 });
+
+describe("POST /reading-sessions — idempotencia con client_id", () => {
+  const CLIENT_ID = "123e4567-e89b-12d3-a456-426614174000";
+
+  test("rechaza un client_id que no es UUID", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    const res = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, duration_seconds: 600, pages_read: 10, client_id: "no-es-uuid" });
+    expect(res.status).toBe(400);
+  });
+
+  test("reenviar el mismo client_id no duplica la sesión", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    const first = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, start_page: 0, duration_seconds: 600, pages_read: 10, client_id: CLIENT_ID });
+    expect(first.status).toBe(201);
+
+    // Reenvío (reintento de red o sync offline): misma sesión, sin insertar
+    const retry = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, start_page: 0, duration_seconds: 600, pages_read: 10, client_id: CLIENT_ID });
+    expect(retry.status).toBe(200);
+    expect(retry.body.id).toBe(first.body.id);
+
+    const { rows } = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM reading_sessions WHERE user_book_id = $1",
+      [book.id]
+    );
+    expect(rows[0].n).toBe(1);
+  });
+
+  test("el reenvío devuelve racha y metas coherentes", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    await request(app)
+      .post("/goals")
+      .set(authHeader(token))
+      .send({ type: "daily", metric: "minutes", value: 10 });
+
+    const first = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, duration_seconds: 600, pages_read: 10, client_id: CLIENT_ID });
+
+    const retry = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, duration_seconds: 600, pages_read: 10, client_id: CLIENT_ID });
+
+    expect(retry.body.first_today).toBe(first.body.first_today);
+    expect(retry.body.streak).toBe(first.body.streak);
+    expect(retry.body.goalJustCompleted).toEqual(first.body.goalJustCompleted);
+  });
+
+  test("client_ids distintos crean sesiones distintas", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    const a = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 10, duration_seconds: 600, pages_read: 10, client_id: "123e4567-e89b-12d3-a456-426614174001" });
+    const b = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: book.id, page: 20, duration_seconds: 1200, pages_read: 10, client_id: "123e4567-e89b-12d3-a456-426614174002" });
+
+    expect(a.status).toBe(201);
+    expect(b.status).toBe(201);
+    expect(a.body.id).not.toBe(b.body.id);
+  });
+});

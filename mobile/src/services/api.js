@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../utils/config";
+import { markOnline, markOffline } from "./connectivity";
 
 const getHeaders = async () => {
   const token = await AsyncStorage.getItem("token");
@@ -13,6 +14,55 @@ const DEFAULT_TIMEOUT = 30000;
 const RETRY_DELAYS = [1500, 3000];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isNetworkError = (err) =>
+  err && (err.name === "AbortError" || err.message === "Network request failed" || /Network request failed/.test(err.message || ""));
+
+export { isNetworkError };
+
+const cacheKey = (path) =>
+  AsyncStorage.getItem("token").then((token) => (token ? `cache:${token}:${path}` : null));
+
+const readCached = async (path) => {
+  const key = await cacheKey(path);
+  if (!key) return null;
+  try {
+    const raw = await AsyncStorage.getItem(key);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeCached = async (path, data) => {
+  const key = await cacheKey(path);
+  if (!key) return;
+  try {
+    await AsyncStorage.setItem(key, JSON.stringify(data));
+  } catch {
+    // la caché es best-effort: fallar en escribir no debe romper la llamada
+  }
+};
+
+// GET con soporte offline: ante éxito guarda la última respuesta; ante fallo
+// de red sirve la caché con fromCache:true (si la hay) para que las pantallas
+// sigan funcionando sin señal.
+const getWithCache = async (path, options = {}) => {
+  try {
+    const data = await request(path, options);
+    writeCached(path, data);
+    return data;
+  } catch (err) {
+    if (isNetworkError(err)) {
+      const cached = await readCached(path);
+      if (cached != null) {
+        markOffline();
+        return { ...cached, fromCache: true };
+      }
+    }
+    throw err;
+  }
+};
 
 let refreshingPromise = null;
 
@@ -37,7 +87,10 @@ const refreshAccessToken = async () => {
       ]);
       return data.token;
     })().catch(async (err) => {
-      await clearAuth();
+      // Si el refresh falla por red, la sesión sigue en pie para operar offline
+      // (la caché y la cola dependen de tener token). Solo se cierra la sesión
+      // cuando el server rechaza el refresh (token realmente inválido/expirado).
+      if (!isNetworkError(err)) await clearAuth();
       throw err;
     }).finally(() => {
       refreshingPromise = null;
@@ -78,22 +131,24 @@ const request = async (path, options = {}) => {
         throw new Error(data.error || "Tu sesión expiró. Inicia sesión de nuevo.");
       }
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+      markOnline();
       return data;
     } catch (err) {
       clearTimeout(timer);
-      const retryable = err.name === "AbortError" || err.message === "Network request failed";
+      const retryable = isNetworkError(err);
       if (retryable && attempt < maxRetries) {
         attempt += 1;
         await sleep(RETRY_DELAYS[attempt - 1] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1]);
         continue;
       }
+      if (retryable) markOffline();
       throw err;
     }
   }
 };
 
 export const getLibrary = async () => {
-  const data = await request("/user-books");
+  const data = await getWithCache("/user-books");
   const token = await AsyncStorage.getItem("token");
   if (token) await AsyncStorage.setItem(`library:${token}`, JSON.stringify(data));
   return data;
@@ -162,24 +217,24 @@ export const updateBookFicha = async (id, data) =>
     body: JSON.stringify(data),
   });
 
-export const getStats = async (year) => request(year ? `/stats?year=${year}` : "/stats");
+export const getStats = async (year) => getWithCache(year ? `/stats?year=${year}` : "/stats");
 
 export const getStatsActivity = async ({ view, year, month, date }) => {
   const params = [`view=${view}`];
   if (year) params.push(`year=${year}`);
   if (month) params.push(`month=${month}`);
   if (date) params.push(`date=${date}`);
-  return request(`/stats/activity?${params.join("&")}`);
+  return getWithCache(`/stats/activity?${params.join("&")}`);
 };
 
-export const getStreak = async () => request("/stats/streak");
+export const getStreak = async () => getWithCache("/stats/streak");
 
 export const getAllNotes = async () => request("/notes");
 
-export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read, book_completed, start_page) =>
+export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read, book_completed, start_page, clientId) =>
   request("/reading-sessions", {
     method: "POST",
-    body: JSON.stringify({ user_book_id, page, start_page, duration_seconds, pages_read, book_completed }),
+    body: JSON.stringify({ user_book_id, page, start_page, duration_seconds, pages_read, book_completed, ...(clientId ? { client_id: clientId } : {}) }),
   });
 
 export const getReadingSessions = async (user_book_id, date) =>
@@ -194,9 +249,9 @@ export const updateReadingSession = async (id, data) =>
   });
 
 export const getReadingSpeed = async (user_book_id) =>
-  request(`/reading-sessions/${user_book_id}/speed`);
+  getWithCache(`/reading-sessions/${user_book_id}/speed`);
 
-export const getReadingGoal = async () => request("/stats/goal");
+export const getReadingGoal = async () => getWithCache("/stats/goal");
 
 export const updateReadingGoal = async (goal) =>
   request("/stats/goal", {
@@ -204,15 +259,15 @@ export const updateReadingGoal = async (goal) =>
     body: JSON.stringify({ goal }),
   });
 
-export const getGoals = async () => request("/goals");
+export const getGoals = async () => getWithCache("/goals");
 
-export const getGoalsStatus = async () => request("/goals/status");
+export const getGoalsStatus = async () => getWithCache("/goals/status");
 
 export const getGoalDetail = async (type, metric, year) =>
-  request(`/goals/detail?type=${encodeURIComponent(type)}&metric=${encodeURIComponent(metric)}${year ? `&year=${year}` : ""}`);
+  getWithCache(`/goals/detail?type=${encodeURIComponent(type)}&metric=${encodeURIComponent(metric)}${year ? `&year=${year}` : ""}`);
 
 export const getCalendar = async (year, month) =>
-  request(`/calendar/${year}/${month}`);
+  getWithCache(`/calendar/${year}/${month}`);
 
 export const saveGoal = async (type, metric, value) =>
   request("/goals", {

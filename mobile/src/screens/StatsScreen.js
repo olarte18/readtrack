@@ -3,6 +3,9 @@ import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { getStats, getStatsActivity } from "../services/api";
+import { getPending } from "../services/offline";
+import { activityWithLocal } from "../utils/offlineCompute";
+import { todayString } from "../utils/dates";
 import ActivityChart from "../components/ActivityChart";
 import ProgressRing from "../components/ProgressRing";
 
@@ -19,14 +22,6 @@ const MONTH_NAMES = [
   "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
-
-const todayString = () =>
-  new Intl.DateTimeFormat("en-CA", {
-    timeZone: "America/Bogota",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  }).format(new Date());
 
 const isoWeekStart = (iso) => {
   const d = new Date(`${iso}T12:00:00Z`);
@@ -83,7 +78,7 @@ export default function StatsScreen({ navigation }) {
     else if (view === "month") { params.year = year; params.month = month; }
     else params.date = weekDate;
     const res = await getStatsActivity(params);
-    setActivity(res);
+    setActivity(res?.fromCache ? activityWithLocal(res, await getPending()) : res);
   }, [view, year, month, weekDate]);
 
   useEffect(() => {
@@ -102,7 +97,7 @@ export default function StatsScreen({ navigation }) {
     else if (view === "month") { params.year = year; params.month = month; }
     else params.date = weekDate;
     getStatsActivity(params)
-      .then((res) => { if (!cancelled) setActivity(res); })
+      .then(async (res) => { if (!cancelled) setActivity(res?.fromCache ? activityWithLocal(res, await getPending()) : res); })
       .catch((e) => console.error(e))
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };

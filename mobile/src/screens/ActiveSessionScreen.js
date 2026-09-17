@@ -9,7 +9,8 @@ import { BlurView } from "expo-blur";
 import { useTheme } from "../contexts/ThemeContext";
 import { getHiResCover } from "../utils/covers";
 import { AppAlert } from "../components/AppAlert";
-import { updateBook, addReadingSession, getReadingSpeed } from "../services/api";
+import { updateBook, addReadingSession, getReadingSpeed, isNetworkError } from "../services/api";
+import { enqueue } from "../services/offline";
 import { modeLabel, modeUnit, formatPoint, deltaLabel, completionBound, isCompleted, progressFraction, pagesEquivalent, pagesLeftEquivalent } from "../utils/progress";
 import {
   cancelAlarm,
@@ -393,27 +394,57 @@ export default function ActiveSessionScreen({ route, navigation }) {
     try {
       const completed = isCompleted(book, page);
       const updates = { current_page: page };
+      let finishedAt = null;
       if (completed) {
         const n = new Date();
+        finishedAt = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
         updates.status = "completed";
-        updates.finished_at = `${n.getFullYear()}-${String(n.getMonth() + 1).padStart(2, "0")}-${String(n.getDate()).padStart(2, "0")}`;
+        updates.finished_at = finishedAt;
       }
-      await updateBook(book.id, updates);
-      const saved = await addReadingSession(book.id, page, readSeconds, pages, completed, startPage);
+      const navigateSummary = ({ offline = false, saved = null } = {}) => {
+        navigation.replace("SessionSummary", {
+          book,
+          pagesRead: pages,
+          delta: Math.max(0, page - startPage),
+          readSeconds,
+          endPage: page,
+          speed: pagesPerHour,
+          completed,
+          streakInfo: offline ? null : saved?.first_today ? { days: saved.streak ?? 1 } : null,
+          goalJustCompleted: offline ? [] : saved?.goalJustCompleted ?? [],
+          offline,
+        });
+      };
       try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      navigation.replace("SessionSummary", {
-        book,
-        pagesRead: pages,
-        delta: Math.max(0, page - startPage),
-        readSeconds,
-        endPage: page,
-        speed: pagesPerHour,
-        completed,
-        streakInfo: saved?.first_today ? { days: saved.streak ?? 1 } : null,
-        goalJustCompleted: saved?.goalJustCompleted ?? [],
-      });
+        await updateBook(book.id, updates);
+        const saved = await addReadingSession(book.id, page, readSeconds, pages, completed, startPage);
+        try {
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        } catch {}
+        navigateSummary({ saved });
+      } catch (err) {
+        if (isNetworkError(err)) {
+          // Sin red: encolar y no perder la sesión. Se sincroniza al reconectar.
+          await enqueue({
+            type: "save-session",
+            payload: {
+              update: updates,
+              finishedAt,
+              session: {
+                user_book_id: book.id,
+                page,
+                start_page: startPage,
+                duration_seconds: readSeconds,
+                pages_read: pages,
+                book_completed: completed,
+              },
+            },
+          });
+          navigateSummary({ offline: true });
+        } else {
+          throw err;
+        }
+      }
     } catch {
       AppAlert.alert("Error", "No se pudo guardar la sesión");
     } finally {

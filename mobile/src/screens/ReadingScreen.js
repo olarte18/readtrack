@@ -5,6 +5,8 @@ import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
 import { getLibrary, getReadingSpeed, getStreak, getGoals } from "../services/api";
+import { getPending } from "../services/offline";
+import { streakWithLocal, goalsWithLocal } from "../utils/offlineCompute";
 import { reconcileStreakReminder } from "../services/streakReminder";
 import { formatPoint, progressFraction, pagesLeftEquivalent } from "../utils/progress";
 import ProgressRing from "../components/ProgressRing";
@@ -55,14 +57,15 @@ export default function ReadingScreen({ navigation }) {
     useCallback(() => {
       fetchReading();
       getStreak()
-        .then((s) => {
-          setStreak(s);
+        .then(async (s) => {
+          const live = s?.fromCache ? streakWithLocal(s, await getPending()) : s;
+          setStreak(live);
           if (user) {
-            reconcileStreakReminder(user.id, { hasSessionToday: !!s.hasSessionToday, streak: s.current ?? 0 }).catch(() => {});
+            reconcileStreakReminder(user.id, { hasSessionToday: !!live?.hasSessionToday, streak: live?.current ?? 0 }).catch(() => {});
           }
         })
         .catch(console.error);
-      getGoals().then(setGoals).catch(console.error);
+      getGoals().then(async (g) => setGoals(g?.fromCache ? goalsWithLocal(g, await getPending()) : g)).catch(console.error);
     }, [user])
   );
 

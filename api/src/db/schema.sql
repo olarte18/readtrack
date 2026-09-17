@@ -115,12 +115,19 @@ CREATE TABLE IF NOT EXISTS reading_sessions (
   id               SERIAL PRIMARY KEY,
   user_book_id     INTEGER NOT NULL REFERENCES user_books(id) ON DELETE CASCADE,
   user_id          INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  client_id        UUID,
   page             INTEGER NOT NULL,
   start_page       INTEGER,
   duration_seconds INTEGER,
   pages_read       INTEGER,
   created_at       TIMESTAMP DEFAULT NOW()
 );
+-- Idempotencia de sesiones: el móvil genera un client_id por sesión; si se
+-- reintenta (o sincroniza la cola offline), devuelve la sesión existente en
+-- lugar de duplicarla. Bases creadas antes lo adoptan.
+ALTER TABLE reading_sessions ADD COLUMN IF NOT EXISTS client_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS reading_sessions_user_client_uidx
+  ON reading_sessions (user_id, client_id) WHERE client_id IS NOT NULL;
 
 CREATE TABLE IF NOT EXISTS reading_goals (
   id         SERIAL PRIMARY KEY,

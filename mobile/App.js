@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, View, AppState } from "react-native";
+import { ActivityIndicator, View, AppState, Text, Platform } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext";
@@ -35,6 +35,8 @@ import { AppAlertHost } from "./src/components/AppAlert";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
 import { warmup, getStreak } from "./src/services/api";
+import { initOfflineSync } from "./src/services/offlineSync";
+import { getConnectivity, subscribe } from "./src/services/connectivity";
 import { configureNotifications } from "./src/services/notifications";
 import StreakReminderModal from "./src/components/StreakReminderModal";
 import { shouldShowStreakPrompt, reconcileStreakReminder } from "./src/services/streakReminder";
@@ -117,6 +119,15 @@ function AppShell() {
   const { user } = useAuth();
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [showStreakPrompt, setShowStreakPrompt] = useState(false);
+  const [offline, setOffline] = useState(false);
+
+  useEffect(() => {
+    setOffline(!getConnectivity().online);
+    const unsub = subscribe((s) => setOffline(!s.online));
+    // Arranque: si la puesta en marcha queda sin señal, que el indicador refleje
+    // el estado real aunque no haya llegado ninguna respuesta todavía.
+    return unsub;
+  }, []);
 
   useEffect(() => {
     shouldShowWhatsNewPopup().then(setShowWhatsNew);
@@ -139,6 +150,12 @@ function AppShell() {
 
   return (
     <>
+      {offline && (
+        <View style={[offlineBannerStyle, { top: Platform.OS === "android" ? 0 : 47 }]}>
+          <Ionicons name="cloud-offline" size={14} color="#fff" />
+          <Text style={offlineTextStyle}>Sin conexión — se muestran datos guardados</Text>
+        </View>
+      )}
       <AppStack />
       <WhatsNewPopup visible={showWhatsNew} onClose={() => setShowWhatsNew(false)} />
       <StreakReminderModal
@@ -150,6 +167,27 @@ function AppShell() {
     </>
   );
 }
+
+const offlineBannerStyle = {
+  position: "absolute",
+  left: 0,
+  right: 0,
+  backgroundColor: "#e67e22",
+  flexDirection: "row",
+  alignItems: "center",
+  justifyContent: "center",
+  gap: 6,
+  paddingVertical: 6,
+  paddingHorizontal: 12,
+  zIndex: 1000,
+  elevation: 6,
+};
+
+const offlineTextStyle = {
+  color: "#fff",
+  fontSize: 13,
+  fontWeight: "600",
+};
 
 function RootNavigator() {
   const { user, loading, setupDone, setupReady } = useAuth();
@@ -185,7 +223,8 @@ export default function App() {
     const sub = AppState.addEventListener("change", (next) => {
       if (next === "active") warmup();
     });
-    return () => sub.remove();
+    const unsubscribeSync = initOfflineSync();
+    return () => { sub.remove(); unsubscribeSync(); };
   }, []);
 
   return (

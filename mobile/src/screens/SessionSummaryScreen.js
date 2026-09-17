@@ -39,7 +39,7 @@ const goalDescription = (goal) => {
 export default function SessionSummaryScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const { book, readSeconds, endPage, speed, streakInfo, completed, goalJustCompleted = [], delta } = route.params;
+  const { book, readSeconds, endPage, speed, streakInfo, completed, goalJustCompleted = [], delta, offline } = route.params;
   const [rating, setRating] = useState(0);
 
   const handleRate = async (stars) => {
@@ -130,6 +130,15 @@ export default function SessionSummaryScreen({ route, navigation }) {
           </>
         )}
       </View>
+
+      {offline && (
+        <View style={styles.offlineBanner}>
+          <Ionicons name="cloud-offline" size={18} color={colors.star} />
+          <Text style={styles.offlineText}>
+            Sin conexión: la sesión se guardará cuando vuelvas a tener señal.
+          </Text>
+        </View>
+      )}
 
       {completed && (
         <View style={styles.card}>
@@ -284,6 +293,19 @@ const createStyles = (colors) =>
     ratingTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 12 },
     starsRow: { flexDirection: "row", justifyContent: "center", gap: 10 },
     ratingHint: { fontSize: 12, color: colors.textDim, textAlign: "center", marginTop: 10 },
+    offlineBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 8,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.star + "55",
+      borderRadius: 12,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 16,
+    },
+    offlineText: { flex: 1, color: colors.textDim, fontSize: 13, lineHeight: 18 },
     card: { backgroundColor: colors.surface, borderRadius: 14, padding: 16, marginBottom: 16 },
     row: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 6 },
     rowInfo: { flex: 1 },

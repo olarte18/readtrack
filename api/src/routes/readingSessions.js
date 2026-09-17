@@ -13,31 +13,19 @@ const { SQL } = require("../utils/dates");
 router.use(authMiddleware);
 router.use(globalUserLimiter);
 
-router.post("/", async (req, res) => {
-  const data = validate(req.body, {
-    user_book_id: { required: true, type: "integer", min: 1 },
-    page: { required: true, type: "integer", min: 0 },
-    start_page: { type: "integer", min: 0 },
-    duration_seconds: { type: "integer", min: 0 },
-    pages_read: { type: "integer", min: 0 },
-  });
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-  const { rows } = await pool.query(
-    "INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *",
-    [data.user_book_id, req.userId, data.page, data.start_page, data.duration_seconds, data.pages_read]
-  );
-  cache.delPrefix(`goals:${req.userId}`);
-  cache.delPrefix(`calendar:${req.userId}`);
-  cache.delPrefix(`stats:${req.userId}`);
-
-  // ¿Primera sesión del día (hora Colombia)? Con ella se define la racha de hoy.
+// Envuelve una sesión recién creada con los extras que consume la app
+// (primera del día, racha, metas cumplidas) para no duplicar lógica entre
+// el insert normal y el reenvío idempotente.
+async function sessionPayload(req, session, body) {
   const { rows: prior } = await pool.query(
     `SELECT COUNT(*)::int AS n
      FROM reading_sessions
      WHERE user_id = $1 AND id <> $2
        AND ${SQL.toChar()}
          = TO_CHAR(${SQL.nowInApp()}, 'YYYY-MM-DD')`,
-    [req.userId, rows[0].id]
+    [req.userId, session.id]
   );
 
   let streak = null;
@@ -51,11 +39,49 @@ router.post("/", async (req, res) => {
   }
 
   const goalJustCompleted = await getGoalCompletion(req.userId, {
-    excludeSeconds: data.duration_seconds || 0,
-    bookCompleted: !!req.body.book_completed,
+    excludeSeconds: session.duration_seconds || 0,
+    bookCompleted: !!body.book_completed,
   });
 
-  res.status(201).json({ ...rows[0], first_today: prior[0].n === 0, streak, goalJustCompleted });
+  return { ...session, first_today: prior[0].n === 0, streak, goalJustCompleted };
+}
+
+router.post("/", async (req, res) => {
+  const data = validate(req.body, {
+    user_book_id: { required: true, type: "integer", min: 1 },
+    page: { required: true, type: "integer", min: 0 },
+    start_page: { type: "integer", min: 0 },
+    duration_seconds: { type: "integer", min: 0 },
+    pages_read: { type: "integer", min: 0 },
+    client_id: { type: "string", max: 36 },
+  });
+
+  if (data.client_id !== undefined && !UUID_RE.test(data.client_id)) {
+    throw httpError(400, "client_id inválido");
+  }
+
+  // Idempotencia: si este client_id ya se guardó (reintento de red o sync de la
+  // cola offline), devolver la sesión existente sin insertar ni duplicar.
+  if (data.client_id !== undefined) {
+    const { rows: existing } = await pool.query(
+      "SELECT * FROM reading_sessions WHERE user_id = $1 AND client_id = $2",
+      [req.userId, data.client_id]
+    );
+    if (existing.length > 0) {
+      return res.status(200).json(await sessionPayload(req, existing[0], req.body));
+    }
+  }
+
+  const { rows } = await pool.query(
+    "INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read, client_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
+    [data.user_book_id, req.userId, data.page, data.start_page, data.duration_seconds, data.pages_read, data.client_id ?? null]
+  );
+  cache.delPrefix(`goals:${req.userId}`);
+  cache.delPrefix(`calendar:${req.userId}`);
+  cache.delPrefix(`stats:${req.userId}`);
+
+  const session = rows[0];
+  res.status(201).json(await sessionPayload(req, session, req.body));
 });
 
 router.patch("/:id", async (req, res) => {
