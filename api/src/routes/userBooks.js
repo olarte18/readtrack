@@ -26,7 +26,7 @@ router.get("/", async (req, res) => {
 
   const { rows } = await pool.query(`
     SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.review,
-           ub.reading_mode,
+           ub.reading_mode, ub.created_at,
            b.id AS db_id,
            b.title, b.author, b.cover, b.pages, b.chapters, b.year, b.genre, b.google_id, b.publisher, b.book_type,
            (
