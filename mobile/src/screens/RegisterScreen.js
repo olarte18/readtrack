@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView, ScrollView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
@@ -55,7 +55,12 @@ export default function RegisterScreen({ navigation }) {
     : "Ingresa tu email y te enviamos un código de verificación";
 
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <Image source={require("../../assets/images/logo.png")} style={styles.logo} />
       <Text style={styles.title}>ReadTrack</Text>
       <Text style={styles.subtitle}>Crear cuenta</Text>
@@ -140,13 +145,14 @@ export default function RegisterScreen({ navigation }) {
       <TouchableOpacity onPress={() => navigation.navigate("Login")}>
         <Text style={[styles.link, { marginTop: 20 }]}>¿Ya tienes cuenta? Inicia sesión</Text>
       </TouchableOpacity>
-    </View>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
 const createStyles = (colors) =>
   StyleSheet.create({
-    container: { flex: 1, backgroundColor: colors.background, justifyContent: "center", paddingHorizontal: 24 },
+    container: { flexGrow: 1, backgroundColor: colors.background, justifyContent: "center", paddingHorizontal: 24, paddingVertical: 40 },
     logo: { width: 110, height: 110, borderRadius: 25, alignSelf: "center", marginBottom: 16 },
     title: { fontSize: 36, fontWeight: "bold", color: colors.accent, textAlign: "center", marginBottom: 8 },
     subtitle: { fontSize: 18, color: colors.textMuted, textAlign: "center", marginBottom: 4 },
