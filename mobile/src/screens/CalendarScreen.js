@@ -1,5 +1,5 @@
 import { useState, useCallback } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal, RefreshControl, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
@@ -285,14 +285,17 @@ export default function CalendarScreen() {
       )}
 
       <Modal visible={!!editBook} transparent animationType="fade" onRequestClose={() => setEditBook(null)}>
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+        >
           <View style={styles.modalCard}>
             <Text style={styles.modalTitle} numberOfLines={2}>{editBook?.title}</Text>
             <Text style={styles.modalSubtitle}>Sesiones del {selectedDate?.split("-").reverse().join("/")}</Text>
             {sessionsLoading ? (
               <ActivityIndicator color={colors.accent} style={{ marginVertical: 24 }} />
             ) : (
-              <ScrollView style={styles.sessionsList} keyboardShouldPersistTaps="handled">
+              <ScrollView style={styles.sessionsList} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
                 {(sessions ?? []).map((s) => (
                   <View key={s.id} style={styles.sessionCard}>
                     <View style={styles.sessionHeader}>
@@ -354,7 +357,7 @@ export default function CalendarScreen() {
               <Text style={styles.modalCloseBtnText}>Cerrar</Text>
             </TouchableOpacity>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );

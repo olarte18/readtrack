@@ -1,9 +1,10 @@
 import { useState } from "react";
-import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { addBook } from "../services/api";
+import { useKeyboardFormScroll } from "../hooks/useKeyboardFormScroll";
 
 const STATUS_OPTIONS = [
   { key: "reading", label: "Leyendo" },
@@ -36,6 +37,8 @@ export default function ManualAddBookScreen({ navigation }) {
   const [description, setDescription] = useState("");
   const [status, setStatus] = useState("pending");
   const [saving, setSaving] = useState(false);
+
+  const { scrollRef, onSectionLayout, onFieldFocus } = useKeyboardFormScroll();
 
   const handleSave = async () => {
     if (!title.trim()) return AppAlert.alert("Error", "El título es obligatorio");
@@ -70,11 +73,17 @@ export default function ManualAddBookScreen({ navigation }) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 60 }}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      <ScrollView
+        ref={scrollRef}
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 60 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <View style={styles.header}>
         <Text style={styles.title}>Agregar manualmente</Text>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -82,7 +91,7 @@ export default function ManualAddBookScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("title")}>
         <Text style={styles.label}>Título *</Text>
         <TextInput
           style={styles.input}
@@ -90,10 +99,11 @@ export default function ManualAddBookScreen({ navigation }) {
           placeholderTextColor={colors.placeholder}
           value={title}
           onChangeText={setTitle}
+          onFocus={onFieldFocus("title")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("pages")}>
         <Text style={styles.label}>Páginas *</Text>
         <TextInput
           style={styles.input}
@@ -102,10 +112,11 @@ export default function ManualAddBookScreen({ navigation }) {
           keyboardType="numeric"
           value={pages}
           onChangeText={setPages}
+          onFocus={onFieldFocus("pages")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("author")}>
         <Text style={styles.label}>Autor</Text>
         <TextInput
           style={styles.input}
@@ -113,10 +124,11 @@ export default function ManualAddBookScreen({ navigation }) {
           placeholderTextColor={colors.placeholder}
           value={author}
           onChangeText={setAuthor}
+          onFocus={onFieldFocus("author")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("cover")}>
         <Text style={styles.label}>Portada (URL)</Text>
         <TextInput
           style={styles.input}
@@ -124,12 +136,13 @@ export default function ManualAddBookScreen({ navigation }) {
           placeholderTextColor={colors.placeholder}
           value={cover}
           onChangeText={setCover}
+          onFocus={onFieldFocus("cover")}
           autoCapitalize="none"
           keyboardType="url"
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("publisher")}>
         <Text style={styles.label}>Editorial</Text>
         <TextInput
           style={styles.input}
@@ -137,6 +150,7 @@ export default function ManualAddBookScreen({ navigation }) {
           placeholderTextColor={colors.placeholder}
           value={publisher}
           onChangeText={setPublisher}
+          onFocus={onFieldFocus("publisher")}
         />
       </View>
 
@@ -157,7 +171,7 @@ export default function ManualAddBookScreen({ navigation }) {
         </View>
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("year")}>
         <Text style={styles.label}>Año</Text>
         <TextInput
           style={styles.input}
@@ -166,10 +180,11 @@ export default function ManualAddBookScreen({ navigation }) {
           keyboardType="numeric"
           value={year}
           onChangeText={setYear}
+          onFocus={onFieldFocus("year")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("isbn")}>
         <Text style={styles.label}>ISBN</Text>
         <TextInput
           style={styles.input}
@@ -177,11 +192,12 @@ export default function ManualAddBookScreen({ navigation }) {
           placeholderTextColor={colors.placeholder}
           value={isbn}
           onChangeText={setIsbn}
+          onFocus={onFieldFocus("isbn")}
           autoCapitalize="none"
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("genre")}>
         <Text style={styles.label}>Género</Text>
         <TextInput
           style={styles.input}
@@ -189,10 +205,11 @@ export default function ManualAddBookScreen({ navigation }) {
           placeholderTextColor={colors.placeholder}
           value={genre}
           onChangeText={setGenre}
+          onFocus={onFieldFocus("genre")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("description")}>
         <Text style={styles.label}>Descripción</Text>
         <TextInput
           style={[styles.input, styles.descriptionInput]}
@@ -200,6 +217,7 @@ export default function ManualAddBookScreen({ navigation }) {
           placeholderTextColor={colors.placeholder}
           value={description}
           onChangeText={setDescription}
+          onFocus={onFieldFocus("description")}
           multiline
         />
       </View>
@@ -228,7 +246,8 @@ export default function ManualAddBookScreen({ navigation }) {
           <Text style={styles.saveBtnText}>Guardar libro</Text>
         )}
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

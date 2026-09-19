@@ -1,11 +1,12 @@
 import { useState, useEffect } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { getGoals, saveGoal } from "../services/api";
 import { getPending } from "../services/offline";
 import { goalsWithLocal } from "../utils/offlineCompute";
+import { useKeyboardFormScroll } from "../hooks/useKeyboardFormScroll";
 
 const GOAL_TYPES = [
   { key: "annual", label: "Anual", description: "Libros al año", metrics: ["books"] },
@@ -24,6 +25,8 @@ export default function GoalsScreen({ navigation }) {
   const [editing, setEditing] = useState(null);
   const [editMetric, setEditMetric] = useState("books");
   const [editValue, setEditValue] = useState("");
+
+  const { scrollRef, onSectionLayout, onFieldFocus } = useKeyboardFormScroll();
 
   const fetchGoals = async () => {
     setLoading(true);
@@ -79,7 +82,17 @@ if (type === "weekly") return data.progress.weekly;
   );
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 40 }}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        ref={scrollRef}
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 40 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <Text style={styles.title}>Mis metas {data?.year}</Text>
 
       {GOAL_TYPES.map((type) => {
@@ -88,7 +101,7 @@ if (type === "weekly") return data.progress.weekly;
         const isEditing = editing === type.key;
 
         return (
-          <View key={type.key} style={styles.goalCard}>
+          <View key={type.key} style={styles.goalCard} onLayout={onSectionLayout(type.key)}>
             <View style={styles.goalCardHeader}>
               <Text style={styles.goalCardTitle}>{type.label}</Text>
               <TouchableOpacity onPress={() => {
@@ -150,6 +163,7 @@ if (type === "weekly") return data.progress.weekly;
                     keyboardType="numeric"
                     value={editValue}
                     onChangeText={setEditValue}
+                    onFocus={onFieldFocus(type.key)}
                   />
                   <TouchableOpacity style={styles.saveBtn} onPress={() => handleSave(type.key)}>
                     <Text style={styles.saveBtnText}>Guardar</Text>
@@ -163,7 +177,8 @@ if (type === "weekly") return data.progress.weekly;
           </View>
         );
       })}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

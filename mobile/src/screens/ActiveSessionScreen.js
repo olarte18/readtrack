@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform, Image, ImageBackground } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform, Image, ImageBackground, KeyboardAvoidingView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
 import { usePreventRemove } from "@react-navigation/native";
@@ -500,7 +500,10 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   const finishModal = (
     <Modal visible={finishVisible} transparent animationType="fade" onRequestClose={() => setFinishVisible(false)}>
-      <View style={styles.modalOverlay}>
+      <KeyboardAvoidingView
+        style={styles.modalOverlay}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>¿En qué {modeLabel(book)} quedaste?</Text>
           <View style={styles.customInputBox}>
@@ -545,7 +548,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 
@@ -560,7 +563,10 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   if (isTimer && !timerStarted) {
     return (
-      <View style={styles.container}>
+      <KeyboardAvoidingView
+        style={styles.container}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+      >
         <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
         <Text style={styles.subtitle}>Elige cuánto quieres leer</Text>
 
@@ -611,7 +617,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>Volver</Text>
         </TouchableOpacity>
-      </View>
+      </KeyboardAvoidingView>
     );
   }
 

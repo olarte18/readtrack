@@ -1,11 +1,12 @@
 import { useState } from "react";
-import { View, Text, TextInput, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useDebouncedCallback } from "use-debounce";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { updateBookFicha, updateBook, addBook } from "../services/api";
 import { formatDateEs } from "../utils/dates";
+import { useKeyboardFormScroll } from "../hooks/useKeyboardFormScroll";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const BOOK_TYPES = [
@@ -58,6 +59,8 @@ export default function EditBookScreen({ route, navigation }) {
   const [saving, setSaving] = useState(false);
   const [previewCover, setPreviewCover] = useState(book.cover ?? "");
   const [coverError, setCoverError] = useState(false);
+
+  const { scrollRef, onSectionLayout, onFieldFocus } = useKeyboardFormScroll();
 
   const debouncedPreview = useDebouncedCallback((url) => {
     setCoverError(false);
@@ -179,11 +182,17 @@ export default function EditBookScreen({ route, navigation }) {
   };
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 60 }}
-      keyboardShouldPersistTaps="handled"
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
+      <ScrollView
+        ref={scrollRef}
+        style={styles.container}
+        contentContainerStyle={{ paddingBottom: 60 }}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <View style={styles.header}>
         <Text style={styles.title}>{isCreate ? "Agregar libro" : "Editar ficha"}</Text>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
@@ -205,7 +214,7 @@ export default function EditBookScreen({ route, navigation }) {
         )}
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("title")}>
         <Text style={styles.label}>Título *</Text>
         <TextInput
           style={styles.input}
@@ -213,10 +222,11 @@ export default function EditBookScreen({ route, navigation }) {
           placeholderTextColor={colors.placeholder}
           value={title}
           onChangeText={setTitle}
+          onFocus={onFieldFocus("title")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("pages")}>
         <Text style={styles.label}>Páginas</Text>
         <TextInput
           style={styles.input}
@@ -225,11 +235,12 @@ export default function EditBookScreen({ route, navigation }) {
           keyboardType="numeric"
           value={pages}
           onChangeText={setPages}
+          onFocus={onFieldFocus("pages")}
         />
       </View>
 
       {readingMode === "chapter" && (
-        <View style={styles.section}>
+        <View style={styles.section} onLayout={onSectionLayout("chapters")}>
           <Text style={styles.label}>Capítulos</Text>
           <TextInput
             style={styles.input}
@@ -238,11 +249,12 @@ export default function EditBookScreen({ route, navigation }) {
             keyboardType="numeric"
             value={chapters}
             onChangeText={setChapters}
+            onFocus={onFieldFocus("chapters")}
           />
         </View>
       )}
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("author")}>
         <Text style={styles.label}>Autor</Text>
         <TextInput
           style={styles.input}
@@ -250,10 +262,11 @@ export default function EditBookScreen({ route, navigation }) {
           placeholderTextColor={colors.placeholder}
           value={author}
           onChangeText={setAuthor}
+          onFocus={onFieldFocus("author")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("cover")}>
         <Text style={styles.label}>Portada (URL)</Text>
         <TextInput
           style={styles.input}
@@ -261,12 +274,13 @@ export default function EditBookScreen({ route, navigation }) {
           placeholderTextColor={colors.placeholder}
           value={cover}
           onChangeText={handleCoverChange}
+          onFocus={onFieldFocus("cover")}
           autoCapitalize="none"
           keyboardType="url"
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("publisher")}>
         <Text style={styles.label}>Editorial</Text>
         <TextInput
           style={styles.input}
@@ -274,6 +288,7 @@ export default function EditBookScreen({ route, navigation }) {
           placeholderTextColor={colors.placeholder}
           value={publisher}
           onChangeText={setPublisher}
+          onFocus={onFieldFocus("publisher")}
         />
       </View>
 
@@ -294,7 +309,7 @@ export default function EditBookScreen({ route, navigation }) {
         </View>
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("year")}>
         <Text style={styles.label}>Año</Text>
         <TextInput
           style={styles.input}
@@ -303,10 +318,11 @@ export default function EditBookScreen({ route, navigation }) {
           keyboardType="numeric"
           value={year}
           onChangeText={setYear}
+          onFocus={onFieldFocus("year")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("isbn")}>
         <Text style={styles.label}>ISBN</Text>
         <TextInput
           style={styles.input}
@@ -314,11 +330,12 @@ export default function EditBookScreen({ route, navigation }) {
           placeholderTextColor={colors.placeholder}
           value={isbn}
           onChangeText={setIsbn}
+          onFocus={onFieldFocus("isbn")}
           autoCapitalize="none"
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("genre")}>
         <Text style={styles.label}>Género</Text>
         <TextInput
           style={styles.input}
@@ -326,10 +343,11 @@ export default function EditBookScreen({ route, navigation }) {
           placeholderTextColor={colors.placeholder}
           value={genre}
           onChangeText={setGenre}
+          onFocus={onFieldFocus("genre")}
         />
       </View>
 
-      <View style={styles.section}>
+      <View style={styles.section} onLayout={onSectionLayout("description")}>
         <Text style={styles.label}>Descripción</Text>
         <TextInput
           style={[styles.input, styles.descriptionInput]}
@@ -337,6 +355,7 @@ export default function EditBookScreen({ route, navigation }) {
           placeholderTextColor={colors.placeholder}
           value={description}
           onChangeText={setDescription}
+          onFocus={onFieldFocus("description")}
           multiline
         />
       </View>
@@ -377,7 +396,7 @@ export default function EditBookScreen({ route, navigation }) {
 
       {!isCreate && (
         <>
-          <View style={styles.section}>
+          <View style={styles.section} onLayout={onSectionLayout("currentPage")}>
             <Text style={styles.label}>
               {(readingMode === "percentage" ? "Porcentaje actual" : readingMode === "chapter" ? "Capítulo actual" : "Página actual")}
             </Text>
@@ -389,6 +408,7 @@ export default function EditBookScreen({ route, navigation }) {
               maxLength={readingMode === "page" ? undefined : 3}
               value={currentPage}
               onChangeText={setCurrentPage}
+              onFocus={onFieldFocus("currentPage")}
             />
           </View>
 
@@ -458,7 +478,8 @@ export default function EditBookScreen({ route, navigation }) {
           <Text style={styles.saveBtnText}>{isCreate ? "Agregar a mi biblioteca" : "Guardar cambios"}</Text>
         )}
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

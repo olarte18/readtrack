@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
@@ -7,6 +7,7 @@ import { updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, reRea
 import { getBookDescription } from "../services/openLibrary";
 import { formatPoint } from "../utils/progress";
 import { formatDateEs } from "../utils/dates";
+import { useKeyboardFormScroll } from "../hooks/useKeyboardFormScroll";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
 const STATUS_LABELS = {
@@ -48,6 +49,8 @@ export default function BookDetailScreen({ route, navigation }) {
   const [showStartPicker, setShowStartPicker] = useState(false);
   const [showRereadPicker, setShowRereadPicker] = useState(false);
   const [history, setHistory] = useState([]);
+
+  const { scrollRef, onSectionLayout, onFieldFocus } = useKeyboardFormScroll();
 
   const alreadyInLibrary = isInLibrary || !!libraryEntry;
   const entryId = libraryEntry?.id ?? book.id;
@@ -201,7 +204,16 @@ export default function BookDetailScreen({ route, navigation }) {
   const actionIcon = statusIsReading ? "book-outline" : statusIsCompleted ? "refresh-outline" : "play-circle-outline";
 
   return (
-    <ScrollView style={styles.container}>
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        ref={scrollRef}
+        style={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <View style={styles.topBar}>
         {alreadyInLibrary ? (
           <TouchableOpacity style={styles.topBtn} onPress={openEdit} disabled={loading}>
@@ -367,7 +379,7 @@ export default function BookDetailScreen({ route, navigation }) {
       )}
 
       {alreadyInLibrary && (
-        <View style={styles.section}>
+        <View style={styles.section} onLayout={onSectionLayout("notes")}>
           <Text style={styles.sectionTitle}>Notas</Text>
           <View style={styles.noteInputRow}>
             <TextInput
@@ -376,6 +388,7 @@ export default function BookDetailScreen({ route, navigation }) {
               placeholderTextColor={colors.placeholder}
               value={newNote}
               onChangeText={setNewNote}
+              onFocus={onFieldFocus("notes")}
               multiline
             />
           </View>
@@ -387,6 +400,7 @@ export default function BookDetailScreen({ route, navigation }) {
               keyboardType="numeric"
               value={notePage}
               onChangeText={setNotePage}
+              onFocus={onFieldFocus("notes")}
             />
             <TouchableOpacity style={styles.pageBtn} onPress={handleAddNote}>
               <Text style={styles.pageBtnText}>Agregar</Text>
@@ -426,7 +440,8 @@ export default function BookDetailScreen({ route, navigation }) {
           </TouchableOpacity>
         </View>
       )}
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 

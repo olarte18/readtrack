@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { useAuth } from "../contexts/AuthContext";
 import { saveGoal } from "../services/api";
+import { useKeyboardFormScroll } from "../hooks/useKeyboardFormScroll";
 
 const UNITS = { books: "libros", hours: "horas", minutes: "minutos" };
 
@@ -25,6 +26,8 @@ export default function GoalSetupScreen() {
   const [busyType, setBusyType] = useState(null);
   const [metricByType, setMetricByType] = useState({ monthly: "books" });
   const [customs, setCustoms] = useState({});
+
+  const { scrollRef, onSectionLayout, onFieldFocus } = useKeyboardFormScroll();
 
   const selectGoal = async (type, metric, value) => {
     if (!value || value <= 0) return AppAlert.alert("Error", "Ingresa un valor válido");
@@ -50,7 +53,16 @@ export default function GoalSetupScreen() {
   const anySaved = Object.keys(saved).length > 0;
 
   return (
-    <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled">
+    <KeyboardAvoidingView
+      style={{ flex: 1, backgroundColor: colors.background }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.container}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+      >
       <View style={styles.header}>
         <TouchableOpacity style={styles.laterLink} onPress={finishSetup} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={styles.laterLinkText}>Más tarde</Text>
@@ -69,7 +81,7 @@ export default function GoalSetupScreen() {
         const savedData = saved[goal.key] ? values[goal.key] : null;
 
         return (
-          <View key={goal.key} style={styles.goalCard}>
+          <View key={goal.key} style={styles.goalCard} onLayout={onSectionLayout(goal.key)}>
             <View style={styles.goalHeader}>
               <Text style={styles.goalLabel}>{goal.label}</Text>
               {isSaved && (
@@ -140,6 +152,7 @@ export default function GoalSetupScreen() {
                     keyboardType="numeric"
                     value={customs[goal.key] ?? ""}
                     onChangeText={(t) => setCustoms((c) => ({ ...c, [goal.key]: t.replace(/[^0-9]/g, "") }))}
+                    onFocus={onFieldFocus(goal.key)}
                   />
                   <TouchableOpacity
                     style={styles.customSaveBtn}
@@ -166,7 +179,8 @@ export default function GoalSetupScreen() {
       >
         <Text style={styles.continueBtnText}>Continuar</Text>
       </TouchableOpacity>
-    </ScrollView>
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
