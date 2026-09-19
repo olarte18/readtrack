@@ -47,6 +47,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const [timeUp, setTimeUp] = useState(false);
   const [saving, setSaving] = useState(false);
   const [finishVisible, setFinishVisible] = useState(false);
+  const [finishExplicit, setFinishExplicit] = useState(false);
   const [keepAwake, setKeepAwakeState] = useState(false);
   const [simpleMode, setSimpleMode] = useState(false);
   const [now, setNow] = useState(() => new Date());
@@ -362,7 +363,10 @@ export default function ActiveSessionScreen({ route, navigation }) {
     return `${h}:${String(m).padStart(2, "0")}`;
   };
 
-  const modeDelta = Math.max(0, parseInt(endPage || 0) - startPage);
+  const endPageVal = parseInt(endPage || "0", 10);
+  const canAutoComplete = bound != null && endPageVal >= bound;
+  const showFinishBook = book.status !== "completed" && !canAutoComplete && endPageVal >= startPage;
+  const modeDelta = Math.max(0, endPageVal - startPage);
   const equivalentPages = pagesEquivalent(book, endPage, startPage);
   const hoursElapsed = (isTimer ? (duration ?? 0) - seconds : seconds) / 3600;
   const estimatedEqPages = avgSpeed && hoursElapsed > 0 ? Math.round(avgSpeed * hoursElapsed) : null;
@@ -392,7 +396,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     cancelSessionAlarm();
     const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
     try {
-      const completed = isCompleted(book, page);
+      const completed = finishExplicit || isCompleted(book, page);
       const updates = { current_page: page };
       let finishedAt = null;
       if (completed) {
@@ -453,7 +457,10 @@ export default function ActiveSessionScreen({ route, navigation }) {
     }
   };
 
-  const handleFinish = () => setFinishVisible(true);
+  const handleFinish = () => {
+    setFinishExplicit(false);
+    setFinishVisible(true);
+  };
 
   // Cualquier intento de salir de la sesión (botón/gesto atrás en Android e iOS)
   // pide confirmación. No protege la pantalla previa de configurar el
@@ -465,7 +472,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
       "Dejarás tu sesión de lectura y tu avance se perderá si no guardas.",
       [
         { text: "Seguir leyendo", style: "cancel" },
-        { text: "Guardar y salir", onPress: () => setFinishVisible(true) },
+        { text: "Guardar y salir", onPress: handleFinish },
         {
           text: "Salir sin guardar",
           style: "destructive",
@@ -511,6 +518,17 @@ export default function ActiveSessionScreen({ route, navigation }) {
           <Text style={styles.pagesEndHint}>
             Leíste {deltaLabel(book, modeDelta)}
           </Text>
+          {showFinishBook && (
+            <View style={styles.finishBookRow}>
+              <Text style={styles.finishBookLabel}>¿Terminaste el libro?</Text>
+              <Switch
+                value={finishExplicit}
+                onValueChange={setFinishExplicit}
+                trackColor={{ true: colors.accent }}
+                thumbColor={finishExplicit ? colors.onAccent : undefined}
+              />
+            </View>
+          )}
           <View style={styles.modalBtnRow}>
             <TouchableOpacity
               style={[styles.modalBtn, styles.modalBtnCancel]}
@@ -832,6 +850,8 @@ const createStyles = (colors, isDark) =>
     completedTitle: { fontSize: 22, fontWeight: "bold", color: colors.text, marginTop: 12 },
     completedSub: { fontSize: 14, color: colors.textDim, marginTop: 6 },
     pagesEndHint: { fontSize: 12, color: colors.textDim, marginTop: 10 },
+    finishBookRow: { flexDirection: "row", alignItems: "center", gap: 10, marginTop: 16 },
+    finishBookLabel: { flex: 1, color: colors.text, fontSize: 15, fontWeight: "bold" },
     modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 32 },
     modalCard: {
       width: "100%",
