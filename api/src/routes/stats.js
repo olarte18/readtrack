@@ -64,6 +64,7 @@ router.get("/", async (req, res) => {
     FROM user_books ub
     JOIN books b ON ub.book_id = b.id
     WHERE ub.user_id = $1
+      AND ub.is_archived = FALSE
   `, [req.userId]);
 
   const { rows: yearRows } = await pool.query(`
@@ -71,6 +72,7 @@ router.get("/", async (req, res) => {
     FROM user_books
     WHERE user_id = $1
       AND status = 'completed'
+      AND is_archived = FALSE
       AND EXTRACT(YEAR FROM finished_at) = $2
   `, [req.userId, year]);
 
@@ -85,6 +87,7 @@ router.get("/", async (req, res) => {
     JOIN books b ON ub.book_id = b.id
     WHERE ub.user_id = $1
       AND ub.status = 'completed'
+      AND ub.is_archived = FALSE
       AND ub.started_at IS NOT NULL
       AND ub.finished_at IS NOT NULL
       AND ub.finished_at > ub.started_at
@@ -112,6 +115,7 @@ router.get("/goal", async (req, res) => {
     `SELECT COUNT(*) AS completed_this_year
      FROM user_books
      WHERE user_id = $1 AND status = 'completed'
+       AND is_archived = FALSE
      AND EXTRACT(YEAR FROM finished_at) = $2`,
     [req.userId, year]
   );
@@ -209,6 +213,7 @@ router.get("/activity", async (req, res) => {
       `SELECT TO_CHAR(ub.finished_at, 'MM') AS mm, COUNT(*)::int AS books
        FROM user_books ub
        WHERE ub.user_id = $1 AND ub.status = 'completed'
+         AND ub.is_archived = FALSE
          AND ub.finished_at >= TO_DATE($2, 'YYYY')
          AND ub.finished_at < TO_DATE($2, 'YYYY') + INTERVAL '1 year'
        GROUP BY 1`,

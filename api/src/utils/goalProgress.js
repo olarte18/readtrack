@@ -73,7 +73,8 @@ async function computeProgress(userId) {
            AND finished_at < (date_trunc('month', NOW() AT TIME ZONE $2) + INTERVAL '1 month')::date
        ) AS monthly_books
      FROM user_books
-     WHERE user_id = $1 AND status = 'completed'`,
+     WHERE user_id = $1 AND status = 'completed'
+       AND is_archived = FALSE`,
     [userId, APP_TZ]
   );
   result.annual = parseInt(books[0].annual);

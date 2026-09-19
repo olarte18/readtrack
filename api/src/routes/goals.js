@@ -30,6 +30,7 @@ router.get("/", async (req, res) => {
     `SELECT COUNT(*) AS books
      FROM user_books
      WHERE user_id = $1 AND status = 'completed'
+       AND is_archived = FALSE
        AND finished_at >= date_trunc('year', NOW() AT TIME ZONE $2)::date
        AND finished_at < (date_trunc('year', NOW() AT TIME ZONE $2) + INTERVAL '1 year')::date`,
     [req.userId, APP_TZ]
@@ -57,6 +58,7 @@ router.get("/", async (req, res) => {
     `SELECT COUNT(*) AS books
      FROM user_books
      WHERE user_id = $1 AND status = 'completed'
+       AND is_archived = FALSE
        AND finished_at >= date_trunc('month', NOW() AT TIME ZONE $2)::date
        AND finished_at < (date_trunc('month', NOW() AT TIME ZONE $2) + INTERVAL '1 month')::date`,
     [req.userId, APP_TZ]
@@ -158,6 +160,7 @@ router.get("/detail", async (req, res) => {
        FROM user_books ub
        JOIN books b ON b.id = ub.book_id
        WHERE ub.user_id = $1 AND ub.status = 'completed'
+         AND ub.is_archived = FALSE
          AND ub.finished_at >= ${startExpr}::date
          AND ub.finished_at < (${startExpr} + INTERVAL '1 ${intervalUnit}')::date
        ORDER BY ub.finished_at DESC`,

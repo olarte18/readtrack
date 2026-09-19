@@ -36,6 +36,11 @@ ALTER TABLE books ADD COLUMN IF NOT EXISTS chapters    INTEGER;
 ALTER TABLE books ALTER COLUMN isbn TYPE VARCHAR(50);
 ALTER TABLE reading_sessions ADD COLUMN IF NOT EXISTS start_page INTEGER;
 ALTER TABLE user_books ADD COLUMN IF NOT EXISTS reading_mode VARCHAR(20) DEFAULT 'page';
+-- Relecturas: cada lectura es una fila de user_books; las anteriores se archivan
+-- (is_archived) y quedan como historial numerado (read_number) sin salir en la
+-- biblioteca activa. Bases creadas antes lo adoptan.
+ALTER TABLE user_books ADD COLUMN IF NOT EXISTS read_number INTEGER NOT NULL DEFAULT 1;
+ALTER TABLE user_books ADD COLUMN IF NOT EXISTS is_archived BOOLEAN NOT NULL DEFAULT FALSE;
 DO $$
 BEGIN
   IF NOT EXISTS (
@@ -84,6 +89,8 @@ CREATE TABLE IF NOT EXISTS user_books (
   created_at   TIMESTAMP DEFAULT NOW(),
   review       TEXT,
   reading_mode VARCHAR(20) DEFAULT 'page',
+  read_number  INTEGER NOT NULL DEFAULT 1,
+  is_archived  BOOLEAN NOT NULL DEFAULT FALSE,
   CONSTRAINT user_books_reading_mode_check CHECK (reading_mode IN ('page', 'chapter', 'percentage')),
   CONSTRAINT user_books_rating_check CHECK (rating >= 1 AND rating <= 5),
   CONSTRAINT user_books_status_check CHECK (status IN (

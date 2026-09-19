@@ -20,4 +20,13 @@ export const addDays = (iso, diffDays) => {
 export const diffDays = (a, b) =>
   Math.round((Date.parse(`${b}T00:00:00Z`) - Date.parse(`${a}T00:00:00Z`)) / 86400000);
 
+// Formatea un "YYYY-MM-DD" (o fecha ISO) a algo legible, p. ej. "12 sep 2026".
+// Se arma desde la fecha local sin zona: es una fecha pura, no un instante.
+export const formatDateEs = (iso) => {
+  if (!iso) return null;
+  const [y, m, d] = String(iso).slice(0, 10).split("-").map(Number);
+  if (!y || !m || !d) return null;
+  return new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", year: "numeric" }).format(new Date(y, m - 1, d));
+};
+
 export const nowIso = () => new Date().toISOString();

@@ -5,6 +5,8 @@ import { useDebouncedCallback } from "use-debounce";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { updateBookFicha, updateBook, addBook } from "../services/api";
+import { formatDateEs } from "../utils/dates";
+import DateTimePicker from "@react-native-community/datetimepicker";
 
 const BOOK_TYPES = [
   { key: "physical", label: "Físico" },
@@ -43,6 +45,12 @@ export default function EditBookScreen({ route, navigation }) {
   const [bookType, setBookType] = useState(book.book_type ?? null);
   const [readingMode, setReadingMode] = useState(book.reading_mode ?? "page");
   const [status, setStatus] = useState(book.status ?? "pending");
+  const [currentPage, setCurrentPage] = useState(book.current_page ? String(book.current_page) : "");
+  const [rating, setRating] = useState(book.rating ?? 0);
+  const [startedAt, setStartedAt] = useState(book.started_at ? String(book.started_at).slice(0, 10) : "");
+  const [finishedAt, setFinishedAt] = useState(book.finished_at ? String(book.finished_at).slice(0, 10) : "");
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showEndPicker, setShowEndPicker] = useState(false);
   const [year, setYear] = useState(book.year ? String(book.year) : "");
   const [isbn, setIsbn] = useState(book.isbn ?? "");
   const [genre, setGenre] = useState(book.genre ?? "");
@@ -77,6 +85,16 @@ export default function EditBookScreen({ route, navigation }) {
         return AppAlert.alert("Error", "Ingresa un número de capítulos válido");
       }
     }
+    let pageCountVal = null;
+    if (currentPage.trim()) {
+      pageCountVal = parseInt(currentPage, 10);
+      if (isNaN(pageCountVal) || pageCountVal < 0) {
+        return AppAlert.alert("Error", "Ingresa una página actual válida");
+      }
+      if (readingMode === "percentage" && pageCountVal > 100) {
+        return AppAlert.alert("Error", "El porcentaje no puede superar 100");
+      }
+    }
 
     setSaving(true);
     try {
@@ -102,7 +120,12 @@ export default function EditBookScreen({ route, navigation }) {
         );
       } else {
         result = await updateBookFicha(dbId, ficha);
-        if (ubId) await updateBook(ubId, { reading_mode: readingMode });
+        const ubUpdates = { status, reading_mode: readingMode };
+        if (pageCountVal !== null) ubUpdates.current_page = pageCountVal;
+        if (rating > 0) ubUpdates.rating = rating;
+        if (startedAt.trim()) ubUpdates.started_at = startedAt.trim();
+        if (finishedAt.trim()) ubUpdates.finished_at = finishedAt.trim();
+        if (ubId) await updateBook(ubId, ubUpdates);
       }
 
       const updatedBook = {
@@ -117,6 +140,11 @@ export default function EditBookScreen({ route, navigation }) {
         description: description.trim() || null,
         genre: genre.trim() || null,
         reading_mode: readingMode,
+        status,
+        current_page: pageCountVal,
+        rating: rating > 0 ? rating : book.rating ?? null,
+        started_at: startedAt.trim() || null,
+        finished_at: finishedAt.trim() || null,
       };
       if (isCreate) {
         updatedBook.status = status;
@@ -330,23 +358,97 @@ export default function EditBookScreen({ route, navigation }) {
         </View>
       </View>
 
-      {isCreate && (
-        <View style={styles.section}>
-          <Text style={styles.label}>Estado</Text>
-          <View style={styles.statusRow}>
-            {STATUS_OPTIONS.map((opt) => (
-              <TouchableOpacity
-                key={opt.key}
-                style={[styles.statusBtn, status === opt.key && styles.statusBtnActive]}
-                onPress={() => setStatus(opt.key)}
-              >
-                <Text style={[styles.statusBtnText, status === opt.key && styles.statusBtnTextActive]}>
-                  {opt.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </View>
+      <View style={styles.section}>
+        <Text style={styles.label}>Estado</Text>
+        <View style={styles.statusRow}>
+          {STATUS_OPTIONS.map((opt) => (
+            <TouchableOpacity
+              key={opt.key}
+              style={[styles.statusBtn, status === opt.key && styles.statusBtnActive]}
+              onPress={() => setStatus(opt.key)}
+            >
+              <Text style={[styles.statusBtnText, status === opt.key && styles.statusBtnTextActive]}>
+                {opt.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
         </View>
+      </View>
+
+      {!isCreate && (
+        <>
+          <View style={styles.section}>
+            <Text style={styles.label}>
+              {(readingMode === "percentage" ? "Porcentaje actual" : readingMode === "chapter" ? "Capítulo actual" : "Página actual")}
+            </Text>
+            <TextInput
+              style={styles.input}
+              placeholder={readingMode === "percentage" ? "Ej. 40" : readingMode === "chapter" ? "Ej. 12" : "Ej. 132"}
+              placeholderTextColor={colors.placeholder}
+              keyboardType="numeric"
+              maxLength={readingMode === "page" ? undefined : 3}
+              value={currentPage}
+              onChangeText={setCurrentPage}
+            />
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Fechas</Text>
+            <TouchableOpacity style={styles.dateRow} onPress={() => setShowStartPicker(true)}>
+              <Text style={styles.dateLabel}>Inicio</Text>
+              <Text style={styles.dateValue}>
+                {startedAt ? formatDateEs(startedAt) : "Sin registrar"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.dateRow} onPress={() => setShowEndPicker(true)}>
+              <Text style={styles.dateLabel}>Fin</Text>
+              <Text style={styles.dateValue}>
+                {finishedAt ? formatDateEs(finishedAt) : "Sin registrar"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.section}>
+            <Text style={styles.label}>Valoración</Text>
+            <View style={styles.starsRow}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                  <Ionicons
+                    name={star <= rating ? "star" : "star-outline"}
+                    size={32}
+                    color={star <= rating ? colors.star : colors.textDim}
+                  />
+                </TouchableOpacity>
+              ))}
+              {rating > 0 && (
+                <TouchableOpacity style={styles.clearRating} onPress={() => setRating(0)}>
+                  <Text style={styles.clearRatingText}>Quitar</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
+        </>
+      )}
+
+      {showStartPicker && (
+        <DateTimePicker
+          value={startedAt ? new Date(`${startedAt}T12:00:00`) : new Date()}
+          mode="date"
+          onChange={(e, date) => {
+            setShowStartPicker(false);
+            if (date) setStartedAt(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
+          }}
+        />
+      )}
+      {showEndPicker && (
+        <DateTimePicker
+          value={finishedAt ? new Date(`${finishedAt}T12:00:00`) : new Date()}
+          mode="date"
+          onChange={(e, date) => {
+            setShowEndPicker(false);
+            if (date) setFinishedAt(`${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`);
+          }}
+        />
       )}
 
       <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
@@ -411,6 +513,12 @@ const createStyles = (colors) =>
     statusBtnActive: { backgroundColor: colors.accent },
     statusBtnText: { color: colors.accent, fontSize: 13 },
     statusBtnTextActive: { color: colors.onAccent, fontWeight: "bold" },
+    dateRow: { flexDirection: "row", justifyContent: "space-between", backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginBottom: 8 },
+    dateLabel: { color: colors.textMuted, fontSize: 14 },
+    dateValue: { color: colors.accent, fontSize: 14 },
+    starsRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+    clearRating: { marginLeft: 8 },
+    clearRatingText: { color: colors.danger, fontSize: 13 },
     saveBtn: {
       marginTop: 24,
       marginHorizontal: 20,

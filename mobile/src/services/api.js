@@ -264,6 +264,14 @@ export const updateBook = async (id, data) =>
 export const deleteBook = async (id) =>
   request(`/user-books/${id}`, { method: "DELETE" });
 
+export const reReadBook = async (id, startedAt) =>
+  request(`/user-books/${id}/reread`, {
+    method: "POST",
+    body: JSON.stringify({ started_at: startedAt }),
+  });
+
+export const getReadingHistory = async (id) => request(`/user-books/${id}/history`);
+
 export const checkBook = async (google_id) => request(`/user-books/check/${google_id}`);
 
 export const getNotes = async (book_id) => request(`/notes/${book_id}`);

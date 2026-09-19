@@ -3,19 +3,20 @@ import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ActivityIn
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
-import { updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, updateBookPages } from "../services/api";
+import { updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, reReadBook, getReadingHistory } from "../services/api";
 import { getBookDescription } from "../services/openLibrary";
-import { formatPoint, isCompleted } from "../utils/progress";
+import { formatPoint } from "../utils/progress";
+import { formatDateEs } from "../utils/dates";
 import DateTimePicker from "@react-native-community/datetimepicker";
 
-const STATUS_OPTIONS = [
-  { key: "reading", label: "Leyendo" },
-  { key: "paused", label: "Pausado" },
-  { key: "completed", label: "Completado" },
-  { key: "pending", label: "Pendiente" },
-  { key: "wishlist", label: "Deseos" },
-  { key: "abandoned", label: "Abandonado" },
-];
+const STATUS_LABELS = {
+  reading: "Leyendo",
+  paused: "Pausado",
+  completed: "Completado",
+  pending: "Pendiente",
+  wishlist: "Deseos",
+  abandoned: "Abandonado",
+};
 
 function toLocalDateString(date) {
   const y = date.getFullYear();
@@ -24,11 +25,9 @@ function toLocalDateString(date) {
   return `${y}-${m}-${d}`;
 }
 
-function parseLocalDate(str) {
-  if (!str) return null;
-  const [y, m, d] = str.split("-").map(Number);
-  if (!y || !m || !d) return null;
-  return new Date(y, m - 1, d);
+function formatMinutes(seconds) {
+  const minutes = Math.round((seconds ?? 0) / 60);
+  return `${minutes} min`;
 }
 
 export default function BookDetailScreen({ route, navigation }) {
@@ -36,127 +35,123 @@ export default function BookDetailScreen({ route, navigation }) {
   const styles = createStyles(colors);
   const { book, onGoBack } = route.params;
   const isInLibrary = !!book.status;
-  const [selectedStatus, setSelectedStatus] = useState(book.status ?? null);
+
   const [loading, setLoading] = useState(false);
   const [libraryEntry, setLibraryEntry] = useState(
-    isInLibrary ? { id: book.id, status: book.status } : null
+    isInLibrary ? { id: book.id, status: book.status, started_at: book.started_at ?? null, finished_at: book.finished_at ?? null } : null
   );
-  const [currentPage, setCurrentPage] = useState(
-    book.current_page ? String(book.current_page) : ""
-  );
-  const [rating, setRating] = useState(book.rating ?? 0);
- const [totalPages, setTotalPages] = useState(book.pages ? String(book.pages) : "");
   const [notes, setNotes] = useState([]);
-const [newNote, setNewNote] = useState("");
-const [notePage, setNotePage] = useState("");
-const [startedAt, setStartedAt] = useState(book.started_at ? parseLocalDate(book.started_at) : null);
-const [finishedAt, setFinishedAt] = useState(book.finished_at ? parseLocalDate(book.finished_at) : null);
-const [showStartPicker, setShowStartPicker] = useState(false);
-const [showEndPicker, setShowEndPicker] = useState(false);
+  const [newNote, setNewNote] = useState("");
+  const [notePage, setNotePage] = useState("");
   const [description, setDescription] = useState(book.description ?? null);
   const [bookDbId, setBookDbId] = useState(book.db_id ?? null);
+  const [showStartPicker, setShowStartPicker] = useState(false);
+  const [showRereadPicker, setShowRereadPicker] = useState(false);
+  const [history, setHistory] = useState([]);
+
+  const alreadyInLibrary = isInLibrary || !!libraryEntry;
+  const entryId = libraryEntry?.id ?? book.id;
+  const status = libraryEntry?.status ?? book.status;
+  const statusIsReading = status === "reading";
+  const statusIsCompleted = status === "completed";
+  const currentReadNumber = libraryEntry?.read_number ?? book.read_number;
+
   useEffect(() => {
     if (!description && (book.workKey || book.description)) {
       getBookDescription(book.workKey).then(setDescription).catch(console.error);
     }
   }, []);
+
   useEffect(() => {
     if (!isInLibrary && book.id) {
       checkBook(book.id).then((data) => {
         if (data.exists) {
-          console.log("checkBook data:", JSON.stringify(data));
           setLibraryEntry(data);
-          setSelectedStatus(data.status);
           if (data.book_db_id) setBookDbId(data.book_db_id);
         }
       });
     }
   }, []);
-useEffect(() => {
-  if (alreadyInLibrary && bookDbId) {
-    getNotes(bookDbId).then(setNotes).catch(console.error);
-  }
-}, [alreadyInLibrary, bookDbId]);
 
-  const alreadyInLibrary = isInLibrary || !!libraryEntry;
-  const entryId = libraryEntry?.id ?? book.id;
+  useEffect(() => {
+    if (alreadyInLibrary && bookDbId) {
+      getNotes(bookDbId).then(setNotes).catch(console.error);
+      getReadingHistory(entryId).then(setHistory).catch(console.error);
+    }
+  }, [alreadyInLibrary, bookDbId, entryId]);
 
-  const handleUpdate = async (id, status) => {
-    setSelectedStatus(status);
+  const startReading = (entry) => navigation.navigate("ReadingMode", { book: entry });
+
+  const handlePrimaryAction = () => {
+    if (statusIsReading) return startReading(book);
+    if (statusIsCompleted) return setShowRereadPicker(true);
+    // No leído: si no hay fecha de inicio, pedirla antes de marcar como leyendo.
+    if (!libraryEntry?.started_at && !book.started_at) return setShowStartPicker(true);
+    setLoading(true);
+    updateBook(entryId, { status: "reading" })
+      .then(() => {
+        setLibraryEntry((prev) => ({ ...prev, status: "reading" }));
+        startReading({ ...book, status: "reading" });
+      })
+      .catch(() => AppAlert.alert("Error", "No se pudo empezar a leer"))
+      .finally(() => setLoading(false));
+  };
+
+  const handleStartDate = async (date) => {
+    if (!date) return setShowStartPicker(false);
+    const iso = toLocalDateString(date);
+    setShowStartPicker(false);
     setLoading(true);
     try {
-      const updates = { status };
-if (status === "reading" && !libraryEntry?.started_at) {
-  updates.started_at = toLocalDateString(new Date());
-}
-if (status === "completed") {
-  updates.finished_at = toLocalDateString(new Date());
-}
-await updateBook(id, updates);
-      setLibraryEntry((prev) => ({ ...prev, status }));
-      onGoBack?.();
-    } catch (error) {
-      AppAlert.alert("Error", "No se pudo actualizar el estado");
+      await updateBook(entryId, { status: "reading", started_at: iso });
+      setLibraryEntry((prev) => ({ ...prev, status: "reading", started_at: iso }));
+      startReading({ ...book, status: "reading", started_at: iso });
+    } catch {
+      AppAlert.alert("Error", "No se pudo empezar a leer");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleSavePage = async () => {
-    const readingMode = book.reading_mode ?? "page";
-    const unitLabel = readingMode === "percentage" ? "porcentaje" : readingMode === "chapter" ? "capítulo" : "página";
-    const val = parseInt(currentPage);
-    if (isNaN(val) || val < 0) return AppAlert.alert("Error", `Ingresa un ${unitLabel} válido`);
-    if (readingMode === "percentage" && val > 100) return AppAlert.alert("Error", "El porcentaje no puede superar 100");
-    if (readingMode === "chapter" && book.chapters && val > book.chapters)
-      return AppAlert.alert("Error", `El libro tiene ${book.chapters} capítulos`);
-    if (readingMode === "page" && book.pages && val > book.pages)
-      return AppAlert.alert("Error", `El libro tiene ${book.pages} páginas`);
-
+  const handleRereadDate = async (date) => {
+    if (!date) return setShowRereadPicker(false);
+    const iso = toLocalDateString(date);
+    setShowRereadPicker(false);
+    setLoading(true);
     try {
-      const completed = isCompleted(book, val);
-      if (completed) {
-        await updateBook(entryId, { current_page: val, status: "completed" });
-        setSelectedStatus("completed");
-        setLibraryEntry((prev) => ({ ...prev, status: "completed" }));
-        AppAlert.alert("¡Felicidades!", `Terminaste "${book.title}"`);
-      } else {
-        await updateBook(entryId, { current_page: val });
-        AppAlert.alert("Guardado", `${formatPoint(book, val)} guardado`);
-      }
-      onGoBack?.();
+      const res = await reReadBook(entryId, iso);
+      const newRead = {
+        ...book,
+        id: res.id,
+        status: "reading",
+        current_page: 0,
+        started_at: res.started_at,
+        read_number: res.read_number,
+      };
+      startReading(newRead);
     } catch {
-      AppAlert.alert("Error", "No se pudo guardar");
+      AppAlert.alert("Error", "No se pudo iniciar la relectura");
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleRating = async (stars) => {
-    setRating(stars);
-    try {
-      await updateBook(entryId, { rating: stars });
-    } catch {
-      AppAlert.alert("Error", "No se pudo guardar el rating");
-    }
-  };
-const handleDateChange = async (field, date) => {
-  if (!date) return;
-  const iso = toLocalDateString(date);
-  if (field === "started_at") setStartedAt(date);
-  else setFinishedAt(date);
-  try {
-    await updateBook(entryId, { [field]: iso });
-  } catch {
-    AppAlert.alert("Error", "No se pudo guardar la fecha");
-  }
-};
+  const openEdit = () =>
+    navigation.navigate("EditBook", {
+      book,
+      dbId: bookDbId ?? book.db_id,
+      ubId: entryId,
+      onGoBack,
+    });
+
   const handleDelete = () => {
     AppAlert.alert(
-      "Eliminar libro",
+      "Quitar de biblioteca",
       `¿Quitar "${book.title}" de tu biblioteca?`,
       [
         { text: "Cancelar", style: "cancel" },
         {
-          text: "Eliminar",
+          text: "Quitar",
           style: "destructive",
           onPress: async () => {
             try {
@@ -164,40 +159,61 @@ const handleDateChange = async (field, date) => {
               onGoBack?.();
               navigation.goBack();
             } catch {
-              AppAlert.alert("Error", "No se pudo eliminar el libro");
+              AppAlert.alert("Error", "No se pudo quitar el libro");
             }
           }
         }
       ]
     );
   };
-const handleAddNote = async () => {
-  if (!newNote.trim()) return AppAlert.alert("Error", "Escribe algo en la nota");
-  try {
-    const note = await addNote(bookDbId, newNote.trim(), notePage ? parseInt(notePage) : null);
-    setNotes((prev) => [note, ...prev]);
-    setNewNote("");
-    setNotePage("");
-  } catch {
-    AppAlert.alert("Error", "No se pudo guardar la nota");
-  }
-};
 
-const handleDeleteNote = (id) => {
-  AppAlert.alert("Eliminar nota", "¿Eliminar esta nota?", [
-    { text: "Cancelar", style: "cancel" },
-    {
-      text: "Eliminar", style: "destructive",
-      onPress: async () => {
-        await deleteNote(id);
-        setNotes((prev) => prev.filter((n) => n.id !== id));
-      }
+  const handleAddNote = async () => {
+    if (!newNote.trim()) return AppAlert.alert("Error", "Escribe algo en la nota");
+    try {
+      const note = await addNote(bookDbId, newNote.trim(), notePage ? parseInt(notePage) : null);
+      setNotes((prev) => [note, ...prev]);
+      setNewNote("");
+      setNotePage("");
+    } catch {
+      AppAlert.alert("Error", "No se pudo guardar la nota");
     }
-  ]);
-};
+  };
+
+  const handleDeleteNote = (id) => {
+    AppAlert.alert("Eliminar nota", "¿Eliminar esta nota?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Eliminar", style: "destructive",
+        onPress: async () => {
+          await deleteNote(id);
+          setNotes((prev) => prev.filter((n) => n.id !== id));
+        }
+      }
+    ]);
+  };
+
+  const startedAt = libraryEntry?.started_at ?? book.started_at;
+  const finishedAt = libraryEntry?.finished_at ?? book.finished_at;
+  const currentPage = libraryEntry?.current_page ?? book.current_page;
+  const rating = libraryEntry?.rating ?? book.rating;
+
+  const actionLabel = statusIsReading ? "Leer" : statusIsCompleted ? "Leer de nuevo" : "Empezar a leer";
+  const actionIcon = statusIsReading ? "book-outline" : statusIsCompleted ? "refresh-outline" : "play-circle-outline";
+
   return (
     <ScrollView style={styles.container}>
-<View style={styles.hero}>
+      <View style={styles.topBar}>
+        {alreadyInLibrary ? (
+          <TouchableOpacity style={styles.topBtn} onPress={openEdit} disabled={loading}>
+            <Ionicons name="create-outline" size={16} color={colors.accent} />
+            <Text style={styles.topBtnText}>Editar ficha</Text>
+          </TouchableOpacity>
+        ) : (
+          <View />
+        )}
+      </View>
+
+      <View style={styles.hero}>
         {book.cover ? (
           <Image source={{ uri: book.cover }} style={styles.cover} />
         ) : (
@@ -208,8 +224,13 @@ const handleDeleteNote = (id) => {
         <Text style={styles.title}>{String(book.title)}</Text>
         <Text style={styles.author}>{String(book.author)}</Text>
         {!!book.year && <Text style={styles.meta}>{String(book.year)}</Text>}
-        {!!(book.pages || totalPages) && (
-          <Text style={styles.meta}>{book.pages || totalPages} páginas</Text>
+        {(!!book.pages || !!book.chapters) && (
+          <Text style={styles.meta}>
+            {[
+              book.pages ? `${book.pages} páginas` : null,
+              book.chapters ? `${book.chapters} capítulos` : null,
+            ].filter(Boolean).join(" · ")}
+          </Text>
         )}
         {(!!book.publisher || !!book.book_type) && (
           <Text style={styles.meta}>
@@ -239,90 +260,98 @@ const handleDeleteNote = (id) => {
       )}
 
       {alreadyInLibrary && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Total de páginas</Text>
-         <Text style={styles.hint}>
-  {book.pages ? `Registradas: ${book.pages} — puedes corregirlas` : "Este libro no tiene páginas registradas"}
-</Text>
-          <View style={styles.pageRow}>
-            <TextInput
-              style={styles.pageInput}
-              placeholder="Ej. 647"
-              placeholderTextColor={colors.placeholder}
-              keyboardType="numeric"
-              value={totalPages}
-              onChangeText={setTotalPages}
-            />
+        <>
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Resumen</Text>
+            <View style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <Text style={styles.infoLabel}>Estado</Text>
+                <Text style={styles.infoValue}>{STATUS_LABELS[status] ?? "—"}</Text>
+              </View>
+              {!!currentReadNumber && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Lectura</Text>
+                  <Text style={styles.infoValue}>{currentReadNumber}</Text>
+                </View>
+              )}
+              {!!startedAt && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Inicio</Text>
+                  <Text style={styles.infoValue}>{formatDateEs(startedAt)}</Text>
+                </View>
+              )}
+              {statusIsCompleted && !!finishedAt && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Fin</Text>
+                  <Text style={styles.infoValue}>{formatDateEs(finishedAt)}</Text>
+                </View>
+              )}
+              {statusIsReading && !!currentPage && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Página actual</Text>
+                  <Text style={styles.infoValue}>{formatPoint(book, currentPage)}</Text>
+                </View>
+              )}
+              {!!rating && (
+                <View style={styles.infoRow}>
+                  <Text style={styles.infoLabel}>Valoración</Text>
+                  <View style={styles.starsRow}>
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Ionicons key={s} name={s <= rating ? "star" : "star-outline"} size={15} color={s <= rating ? colors.star : colors.textDim} />
+                    ))}
+                  </View>
+                </View>
+              )}
+            </View>
+
             <TouchableOpacity
-              style={styles.pageBtn}
-              onPress={async () => {
-                const p = parseInt(totalPages);
-                if (isNaN(p) || p <= 0) return AppAlert.alert("Error", "Ingresa un número válido");
-                try {
-                  await updateBookPages(book.google_id ?? book.db_id ?? book.id, p);
-                  AppAlert.alert("Guardado", `${p} páginas guardadas`);
-                } catch {
-                  AppAlert.alert("Error", "No se pudo guardar");
-                }
-              }}
+              style={styles.actionBtn}
+              onPress={handlePrimaryAction}
+              disabled={loading}
             >
-              <Text style={styles.pageBtnText}>Guardar</Text>
+              {loading ? (
+                <ActivityIndicator color={colors.onAccent} />
+              ) : (
+                <>
+                  <Ionicons name={actionIcon} size={20} color={colors.onAccent} />
+                  <Text style={styles.actionBtnText}>{actionLabel}</Text>
+                </>
+              )}
             </TouchableOpacity>
           </View>
-        </View>
+
+          {history.length > 0 && (
+            <View style={styles.section}>
+              <Text style={styles.sectionTitle}>Lecturas</Text>
+              {history.map((h) => (
+                <View key={h.user_book_id} style={styles.historyCard}>
+                  <View style={styles.historyHead}>
+                    <Text style={styles.historyTitle}>Lectura {h.read_number}</Text>
+                    {!!h.rating && (
+                      <View style={styles.starsRow}>
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Ionicons key={s} name={s <= h.rating ? "star" : "star-outline"} size={13} color={s <= h.rating ? colors.star : colors.textDim} />
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.historyDates}>
+                    {[formatDateEs(h.started_at), formatDateEs(h.finished_at)].filter(Boolean).join(" — ")}
+                  </Text>
+                  <Text style={styles.historyStats}>
+                    {h.sessions} {h.sessions === 1 ? "sesión" : "sesiones"} · {h.pages_read} páginas · {formatMinutes(h.duration_seconds)}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+        </>
       )}
-{alreadyInLibrary && (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Fechas</Text>
-    <TouchableOpacity style={styles.dateRow} onPress={() => setShowStartPicker(true)}>
-      <Text style={styles.dateLabel}>Inicio</Text>
-      <Text style={styles.dateValue}>
-        {startedAt ? toLocalDateString(startedAt) : "Toca para agregar"}
-      </Text>
-    </TouchableOpacity>
-    {selectedStatus === "completed" && (
-  <TouchableOpacity style={styles.dateRow} onPress={() => setShowEndPicker(true)}>
-    <Text style={styles.dateLabel}>Fin</Text>
-    <Text style={styles.dateValue}>
-      {finishedAt ? toLocalDateString(finishedAt) : "Toca para agregar"}
-    </Text>
-  </TouchableOpacity>
-)}
-{showEndPicker && (
-  <DateTimePicker
-    value={finishedAt ?? new Date()}
-    mode="date"
-    onChange={(e, date) => { setShowEndPicker(false); handleDateChange("finished_at", date); }}
-  />
-)}
-  
-  </View>
-)}
-      <View style={styles.section}>
-        {alreadyInLibrary ? (
-          <>
-            <Text style={styles.sectionTitle}>Cambiar estado</Text>
-            {loading ? (
-              <ActivityIndicator color={colors.accent} />
-            ) : (
-              <View style={styles.statusRow}>
-                {STATUS_OPTIONS.map((opt) => (
-                  <TouchableOpacity
-                    key={opt.key}
-                    style={[styles.statusBtn, selectedStatus === opt.key && styles.statusBtnActive]}
-                    onPress={() => handleUpdate(entryId, opt.key)}
-                  >
-                    <Text style={[styles.statusBtnText, selectedStatus === opt.key && styles.statusBtnTextActive]}>
-                      {opt.label}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
-          </>
-        ) : (
+
+      {!alreadyInLibrary && (
+        <View style={styles.section}>
           <TouchableOpacity
-            style={styles.addBtn}
+            style={styles.actionBtn}
             onPress={() =>
               navigation.navigate("EditBook", {
                 book: { ...book, google_id: book.id },
@@ -332,118 +361,65 @@ const handleDeleteNote = (id) => {
             }
           >
             <Ionicons name="add-circle-outline" size={20} color={colors.onAccent} />
-            <Text style={styles.addBtnText}>Agregar a mi biblioteca</Text>
+            <Text style={styles.actionBtnText}>Agregar a mi biblioteca</Text>
           </TouchableOpacity>
-        )}
-      </View>
-
-      {selectedStatus === "reading" && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>
-            {(book.reading_mode ?? "page") === "percentage"
-              ? "Porcentaje actual"
-              : (book.reading_mode ?? "page") === "chapter"
-                ? "Capítulo actual"
-                : "Página actual"}
-          </Text>
-          <View style={styles.pageRow}>
-            <TextInput
-              style={styles.pageInput}
-              placeholder={
-                (book.reading_mode ?? "page") === "percentage"
-                  ? "¿Qué porcentaje llevas?"
-                  : (book.reading_mode ?? "page") === "chapter"
-                    ? "¿En qué capítulo vas?"
-                    : "¿En qué página vas?"
-              }
-              placeholderTextColor={colors.placeholder}
-              keyboardType="numeric"
-              maxLength={(book.reading_mode ?? "page") === "page" ? undefined : 3}
-              value={currentPage}
-              onChangeText={setCurrentPage}
-            />
-            <TouchableOpacity style={styles.pageBtn} onPress={handleSavePage}>
-              <Text style={styles.pageBtnText}>Guardar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      )}
-    {showStartPicker && (
-      <DateTimePicker
-        value={startedAt ?? new Date()}
-        mode="date"
-        onChange={(e, date) => { setShowStartPicker(false); handleDateChange("started_at", date); }}
-      />
-    )}
-      {selectedStatus === "completed" && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Tu valoración</Text>
-          <View style={styles.starsRow}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => handleRating(star)}>
-                <Ionicons
-                  name={star <= rating ? "star" : "star-outline"}
-                  size={32}
-                  color={star <= rating ? colors.star : colors.textDim}
-                />
-              </TouchableOpacity>
-            ))}
-          </View>
         </View>
       )}
 
-{alreadyInLibrary && (
-  <View style={styles.section}>
-    <Text style={styles.sectionTitle}>Notas</Text>
-    <View style={styles.noteInputRow}>
-      <TextInput
-        style={styles.noteInput}
-        placeholder="Escribe una nota..."
-        placeholderTextColor={colors.placeholder}
-        value={newNote}
-        onChangeText={setNewNote}
-        multiline
-      />
-    </View>
-    <View style={styles.pageRow}>
-      <TextInput
-        style={[styles.pageInput, { flex: 1 }]}
-        placeholder="Página (opcional)"
-        placeholderTextColor={colors.placeholder}
-        keyboardType="numeric"
-        value={notePage}
-        onChangeText={setNotePage}
-      />
-      <TouchableOpacity style={styles.pageBtn} onPress={handleAddNote}>
-        <Text style={styles.pageBtnText}>Agregar</Text>
-      </TouchableOpacity>
-    </View>
-    {notes.map((note) => (
-      <TouchableOpacity key={note.id} style={styles.noteCard} onLongPress={() => handleDeleteNote(note.id)}>
-        {note.page && <Text style={styles.notePage}>{formatPoint(book, note.page)}</Text>}
-        <Text style={styles.noteContent}>{note.content}</Text>
-      </TouchableOpacity>
-    ))}
-  </View>
-)}
       {alreadyInLibrary && (
         <View style={styles.section}>
-          {!!(bookDbId || book.db_id) && (
-            <TouchableOpacity
-              style={styles.editBtn}
-              onPress={() =>
-                navigation.navigate("EditBook", {
-                  book,
-                  dbId: bookDbId ?? book.db_id,
-                  ubId: entryId,
-                  onGoBack,
-                })
-              }
-            >
-              <Ionicons name="create-outline" size={16} color={colors.accent} />
-              <Text style={styles.editBtnText}>Editar ficha</Text>
+          <Text style={styles.sectionTitle}>Notas</Text>
+          <View style={styles.noteInputRow}>
+            <TextInput
+              style={styles.noteInput}
+              placeholder="Escribe una nota..."
+              placeholderTextColor={colors.placeholder}
+              value={newNote}
+              onChangeText={setNewNote}
+              multiline
+            />
+          </View>
+          <View style={styles.pageRow}>
+            <TextInput
+              style={[styles.pageInput, { flex: 1 }]}
+              placeholder="Página (opcional)"
+              placeholderTextColor={colors.placeholder}
+              keyboardType="numeric"
+              value={notePage}
+              onChangeText={setNotePage}
+            />
+            <TouchableOpacity style={styles.pageBtn} onPress={handleAddNote}>
+              <Text style={styles.pageBtnText}>Agregar</Text>
             </TouchableOpacity>
-          )}
+          </View>
+          {notes.map((note) => (
+            <TouchableOpacity key={note.id} style={styles.noteCard} onLongPress={() => handleDeleteNote(note.id)}>
+              {note.page && <Text style={styles.notePage}>{formatPoint(book, note.page)}</Text>}
+              <Text style={styles.noteContent}>{note.content}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      {showStartPicker && (
+        <DateTimePicker
+          value={new Date()}
+          mode="date"
+          maximumDate={new Date()}
+          onChange={(e, date) => handleStartDate(date)}
+        />
+      )}
+      {showRereadPicker && (
+        <DateTimePicker
+          value={new Date()}
+          mode="date"
+          maximumDate={new Date()}
+          onChange={(e, date) => handleRereadDate(date)}
+        />
+      )}
+
+      {alreadyInLibrary && (
+        <View style={styles.section}>
           <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
             <Ionicons name="trash-outline" size={16} color={colors.danger} />
             <Text style={styles.deleteBtnText}>Quitar de biblioteca</Text>
@@ -456,61 +432,82 @@ const handleDeleteNote = (id) => {
 
 const createStyles = (colors) =>
   StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
-  hero: { alignItems: "center", paddingTop: 60, paddingBottom: 30, paddingHorizontal: 20 },
-  cover: { width: 120, height: 180, borderRadius: 10, marginBottom: 16 },
-  noCover: { width: 120, height: 180, borderRadius: 10, backgroundColor: colors.surfaceAlt, justifyContent: "center", alignItems: "center", marginBottom: 16 },
-  title: { fontSize: 20, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 6 },
-  author: { fontSize: 15, color: colors.textMuted, marginBottom: 4 },
-  meta: { fontSize: 13, color: colors.textDim },
-  categoriesRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6, marginTop: 10 },
-  categoryChip: {
-    backgroundColor: colors.surfaceAlt,
-    borderRadius: 20,
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  categoryChipPrimary: { backgroundColor: colors.accent + "22", borderColor: colors.accent },
-  categoryChipText: { fontSize: 11, color: colors.textMuted },
-  categoryChipTextPrimary: { color: colors.accent, fontWeight: "bold" },
-  description: { fontSize: 14, color: colors.text, lineHeight: 21 },
-  section: { paddingHorizontal: 20, marginTop: 20 },
-  sectionTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, marginBottom: 12 },
-  statusRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  statusBtn: { backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 14, paddingVertical: 8 },
-  statusBtnActive: { backgroundColor: colors.accent },
-  statusBtnText: { color: colors.accent, fontSize: 13 },
-  statusBtnTextActive: { color: colors.onAccent, fontWeight: "bold" },
-  pageRow: { flexDirection: "row", gap: 8, alignItems: "center" },
-  pageInput: { flex: 1, backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
-  pageBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  pageBtnText: { color: colors.onAccent, fontWeight: "bold" },
-  starsRow: { flexDirection: "row", gap: 8 },
-  editBtn: {
-    backgroundColor: colors.accent + "22",
-    borderRadius: 10,
-    paddingVertical: 12,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    marginBottom: 10,
-  },
-  editBtnText: { color: colors.accent, fontWeight: "bold", fontSize: 15 },
-  addBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8 },
-  addBtnText: { color: colors.onAccent, fontWeight: "bold", fontSize: 15 },
-  deleteBtn: { backgroundColor: colors.danger + "22", borderRadius: 10, paddingVertical: 12, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, marginBottom: 40 },
-  deleteBtnText: { color: colors.danger, fontWeight: "bold", fontSize: 15 },
-noteInputRow: { marginBottom: 8 },
-noteInput: { backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 80, textAlignVertical: "top" },
-noteCard: { backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginTop: 8 },
-notePage: { fontSize: 11, color: colors.accent, marginBottom: 4 },
-noteContent: { fontSize: 14, color: colors.text },
-hint: { fontSize: 12, color: colors.textDim, marginBottom: 8 },
-dateText: { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
-dateRow: { flexDirection: "row", justifyContent: "space-between", backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginBottom: 8 },
-dateLabel: { color: colors.textMuted, fontSize: 14 },
-dateValue: { color: colors.accent, fontSize: 14 },
-});
+    container: { flex: 1, backgroundColor: colors.background },
+    topBar: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      paddingHorizontal: 20,
+      paddingTop: 50,
+    },
+    topBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+      backgroundColor: colors.accent + "22",
+      borderRadius: 10,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+    },
+    topBtnText: { color: colors.accent, fontWeight: "bold", fontSize: 14 },
+    hero: { alignItems: "center", paddingTop: 12, paddingBottom: 30, paddingHorizontal: 20 },
+    cover: { width: 120, height: 180, borderRadius: 10, marginBottom: 16 },
+    noCover: { width: 120, height: 180, borderRadius: 10, backgroundColor: colors.surfaceAlt, justifyContent: "center", alignItems: "center", marginBottom: 16 },
+    title: { fontSize: 20, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 6 },
+    author: { fontSize: 15, color: colors.textMuted, marginBottom: 4 },
+    meta: { fontSize: 13, color: colors.textDim },
+    categoriesRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 6, marginTop: 10 },
+    categoryChip: {
+      backgroundColor: colors.surfaceAlt,
+      borderRadius: 20,
+      paddingHorizontal: 12,
+      paddingVertical: 5,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    categoryChipPrimary: { backgroundColor: colors.accent + "22", borderColor: colors.accent },
+    categoryChipText: { fontSize: 11, color: colors.textMuted },
+    categoryChipTextPrimary: { color: colors.accent, fontWeight: "bold" },
+    description: { fontSize: 14, color: colors.text, lineHeight: 21 },
+    section: { paddingHorizontal: 20, marginTop: 20 },
+    sectionTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, marginBottom: 12 },
+    infoCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, gap: 10, marginBottom: 16 },
+    infoRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+    infoLabel: { fontSize: 14, color: colors.textMuted },
+    infoValue: { fontSize: 14, color: colors.text, fontWeight: "600" },
+    starsRow: { flexDirection: "row", gap: 2 },
+    actionBtn: {
+      backgroundColor: colors.accent,
+      borderRadius: 12,
+      paddingVertical: 14,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+    },
+    actionBtnText: { color: colors.onAccent, fontWeight: "bold", fontSize: 15 },
+    historyCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 14, marginBottom: 10 },
+    historyHead: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 },
+    historyTitle: { fontSize: 15, fontWeight: "bold", color: colors.text },
+    historyDates: { fontSize: 13, color: colors.textMuted, marginBottom: 4 },
+    historyStats: { fontSize: 13, color: colors.textDim },
+    pageRow: { flexDirection: "row", gap: 8, alignItems: "center" },
+    pageInput: { backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 15 },
+    pageBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
+    pageBtnText: { color: colors.onAccent, fontWeight: "bold" },
+    deleteBtn: {
+      backgroundColor: colors.danger + "22",
+      borderRadius: 10,
+      paddingVertical: 12,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginBottom: 40,
+    },
+    deleteBtnText: { color: colors.danger, fontWeight: "bold", fontSize: 15 },
+    noteInputRow: { marginBottom: 8 },
+    noteInput: { backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 10, fontSize: 14, minHeight: 80, textAlignVertical: "top" },
+    noteCard: { backgroundColor: colors.surface, borderRadius: 10, padding: 12, marginTop: 8 },
+    notePage: { fontSize: 11, color: colors.accent, marginBottom: 4 },
+    noteContent: { fontSize: 14, color: colors.text },
+  });
