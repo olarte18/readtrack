@@ -15,7 +15,7 @@ const { sent } = require("../src/utils/email");
 const schema = fs.readFileSync(path.join(__dirname, "..", "src", "db", "schema.sql"), "utf8");
 const app = require("../src/app");
 
-const TABLES = ["refresh_tokens", "verification_codes", "reading_sessions", "reading_goals", "notes", "user_books", "books", "users"];
+const TABLES = ["refresh_tokens", "verification_codes", "reading_sessions", "reading_goals", "notes", "user_books", "books", "users", "user_achievements"];
 
 async function initDb() {
   await pool.query(schema);

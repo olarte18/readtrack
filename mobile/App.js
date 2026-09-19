@@ -28,10 +28,13 @@ import CalendarScreen from "./src/screens/CalendarScreen";
 import ThemePickerScreen from "./src/screens/ThemePickerScreen";
 import ImportScreen from "./src/screens/ImportScreen";
 import NotesScreen from "./src/screens/NotesScreen";
+import AchievementsScreen from "./src/screens/AchievementsScreen";
 import WhatsNewScreen from "./src/screens/WhatsNewScreen";
 import AlarmDeepLinkScreen from "./src/screens/AlarmDeepLinkScreen";
 import WhatsNewPopup from "./src/components/WhatsNewPopup";
 import { AppAlertHost } from "./src/components/AppAlert";
+import { CelebrationModal } from "./src/components/AchievementCelebration";
+import { onAchievements } from "./src/services/achievementsBus";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
 import { warmup, getStreak } from "./src/services/api";
@@ -109,6 +112,7 @@ function AppStack() {
       <Stack.Screen name="GoalDetail" component={GoalDetailScreen} />
       <Stack.Screen name="BookSessions" component={BookSessionsScreen} />
       <Stack.Screen name="Notes" component={NotesScreen} />
+      <Stack.Screen name="Achievements" component={AchievementsScreen} />
       <Stack.Screen name="WhatsNew" component={WhatsNewScreen} />
       <Stack.Screen name="AlarmLink" component={AlarmDeepLinkScreen} />
     </Stack.Navigator>
@@ -120,6 +124,20 @@ function AppShell() {
   const [showWhatsNew, setShowWhatsNew] = useState(false);
   const [showStreakPrompt, setShowStreakPrompt] = useState(false);
   const [offline, setOffline] = useState(false);
+  const [achievementCelebration, setAchievementCelebration] = useState([]);
+
+  // Logros que el server devuelve como recién desbloqueados tras una acción:
+  // se muestran de inmediato, sin esperar a entrar a la pantalla de Logros.
+  useEffect(
+    () =>
+      onAchievements((items) => {
+        setAchievementCelebration((prev) => {
+          const seen = new Set(prev.map((i) => `${i.code}:${i.tier}`));
+          return [...prev, ...items.filter((i) => !seen.has(`${i.code}:${i.tier}`))];
+        });
+      }),
+    []
+  );
 
   useEffect(() => {
     setOffline(!getConnectivity().online);
@@ -163,6 +181,10 @@ function AppShell() {
         onClose={() => setShowStreakPrompt(false)}
         userId={user?.id}
         mode="invite"
+      />
+      <CelebrationModal
+        items={achievementCelebration}
+        onClose={() => setAchievementCelebration([])}
       />
     </>
   );

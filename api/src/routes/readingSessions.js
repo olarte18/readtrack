@@ -8,6 +8,7 @@ const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
 const { getGoalCompletion } = require("../utils/goalProgress");
+const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
 const { SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
@@ -68,7 +69,9 @@ router.post("/", async (req, res) => {
       [req.userId, data.client_id]
     );
     if (existing.length > 0) {
-      return res.status(200).json(await sessionPayload(req, existing[0], req.body));
+      let ach = null;
+      try { ach = await recheckAchievements(req.userId); } catch {}
+      return res.status(200).json(await withFreshAchievements(await sessionPayload(req, existing[0], req.body), ach));
     }
   }
 
@@ -79,9 +82,11 @@ router.post("/", async (req, res) => {
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
   cache.delPrefix(`stats:${req.userId}`);
+  let ach = null;
+  try { ach = await recheckAchievements(req.userId); } catch {}
 
   const session = rows[0];
-  res.status(201).json(await sessionPayload(req, session, req.body));
+  res.status(201).json(await withFreshAchievements(await sessionPayload(req, session, req.body), ach));
 });
 
 router.patch("/:id", async (req, res) => {
@@ -108,6 +113,8 @@ router.patch("/:id", async (req, res) => {
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
   cache.delPrefix(`stats:${req.userId}`);
+  let ach = null;
+  try { ach = await recheckAchievements(req.userId); } catch {}
 
   // Si la sesión editada es la última del libro, sincronizar current_page
   // (así queda como si la sesión se hubiera guardado bien desde el inicio)
@@ -138,7 +145,7 @@ router.patch("/:id", async (req, res) => {
     }
   }
 
-  res.json(rows[0]);
+  res.json(await withFreshAchievements(rows[0], ach));
 });
 
 router.get("/:user_book_id", async (req, res) => {

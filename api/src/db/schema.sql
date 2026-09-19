@@ -192,3 +192,151 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
 );
 CREATE INDEX IF NOT EXISTS refresh_tokens_user_idx ON refresh_tokens (user_id);
 CREATE UNIQUE INDEX IF NOT EXISTS refresh_tokens_hash_active_idx ON refresh_tokens (token_hash) WHERE revoked_at IS NULL;
+
+-- Logros: el catálogo es idéntico para todos y los desbloqueos quedan por
+-- usuario. Cada fila del catálogo es un (code, tier): el mismo code comparte
+-- icono y descripción y escala su umbral (target) por tier. Los logros
+-- is_secret solo se muestran una vez desbloqueados.
+CREATE TABLE IF NOT EXISTS achievements (
+  code        TEXT NOT NULL,
+  tier        TEXT NOT NULL CHECK (tier IN ('bronze', 'silver', 'gold', 'special')),
+  name        VARCHAR(60) NOT NULL,
+  description VARCHAR(180) NOT NULL,
+  leyenda     VARCHAR(180),
+  icon        VARCHAR(40) NOT NULL,
+  grp         VARCHAR(20) NOT NULL,
+  target      INTEGER NOT NULL,
+  is_secret   BOOLEAN NOT NULL DEFAULT FALSE,
+  sort_order  INTEGER NOT NULL DEFAULT 0,
+  PRIMARY KEY (code, tier)
+);
+ALTER TABLE achievements ADD COLUMN IF NOT EXISTS leyenda VARCHAR(180);
+
+CREATE TABLE IF NOT EXISTS user_achievements (
+  user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code        TEXT NOT NULL,
+  tier        TEXT NOT NULL,
+  unlocked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+  seen_at     TIMESTAMP,
+  PRIMARY KEY (user_id, code, tier),
+  FOREIGN KEY (code, tier) REFERENCES achievements(code, tier)
+);
+CREATE INDEX IF NOT EXISTS user_achievements_user_idx ON user_achievements (user_id);
+
+-- Eventos de logro: contadores que no se pueden derivar del estado actual
+-- (retroalimentación = ediciones, abandono = acción puntual). Los hooks de las
+-- rutas insertan aquí y computeProgress hace COUNT.
+CREATE TABLE IF NOT EXISTS achievement_events (
+  id         BIGSERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code       TEXT NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS achievement_events_user_idx ON achievement_events (user_id, code);
+
+-- El seed usa UPSERT: actualiza umbrales, descripciones, iconos y banderas
+-- (is_secret) de filas ya sembradas sin tocar user_achievements (FK intacta).
+-- Los códigos eliminados del catálogo se purgan antes de sembrar.
+DELETE FROM user_achievements WHERE code IN ('madrugador','tras_medianoche');
+DELETE FROM achievements WHERE code IN ('madrugador','tras_medianoche');
+
+INSERT INTO achievements (code, tier, name, description, leyenda, icon, grp, target, is_secret, sort_order) VALUES
+  ('en_racha','bronze','En racha','Lee 7 días seguidos','El hábito empieza con una semana.','flame','rachas',7,FALSE,1),
+  ('en_racha','silver','En racha','Lee 30 días seguidos','Un mes entero a tu ritmo.','flame','rachas',30,FALSE,2),
+  ('en_racha','gold','En racha','Lee 100 días seguidos','El tiempo ya se acostumbró a leerte.','flame','rachas',100,FALSE,3),
+  ('en_racha','special','En racha','Lee 250 días seguidos','El año no pasa sin tus páginas.','flame','rachas',250,TRUE,4),
+  ('mes_perfecto','special','Mes perfecto','Leíste todos los días de un mes','La constancia tiene su calendario.','calendar','rachas',1,TRUE,5),
+  ('primer_libro','special','Primer libro','Terminaste tu primer libro','Cada historia comienza por la primera.','book','volumen',1,TRUE,1),
+  ('raton_biblioteca','bronze','Ratón de biblioteca','Termina 5 libros distintos','Tu biblioteca empieza a tener dueño.','library','volumen',5,FALSE,2),
+  ('raton_biblioteca','silver','Ratón de biblioteca','Termina 25 libros distintos','Ya nadie puede quitarles tu lugar.','library','volumen',25,FALSE,3),
+  ('raton_biblioteca','gold','Ratón de biblioteca','Termina 50 libros distintos','Los estantes te reconocen.','library','volumen',50,FALSE,4),
+  ('raton_biblioteca','special','Ratón de biblioteca','Termina 100 libros distintos','Eres parte del inventario.','library','volumen',100,TRUE,5),
+  ('maratonista','bronze','Maratonista','Lee 5 000 páginas','Las páginas ya suman kilómetros.','walk','volumen',5000,FALSE,6),
+  ('maratonista','silver','Maratonista','Lee 15 000 páginas','Palabra por palabra, llegaste lejos.','walk','volumen',15000,FALSE,7),
+  ('maratonista','gold','Maratonista','Lee 30 000 páginas','Nadie corre como tú entre páginas.','walk','volumen',30000,FALSE,8),
+  ('maratonista','special','Maratonista','Lee 60 000 páginas','Ya no lees libros, los atraviesas.','walk','volumen',60000,TRUE,9),
+  ('tomo_pesado','bronze','Tomo pesado','Termina 3 libros de más de 500 páginas','Le entraste al ladrillo y no te asustaste.','barbell','volumen',3,FALSE,10),
+  ('tomo_pesado','silver','Tomo pesado','Termina 7 libros de más de 500 páginas','El grosor ya no te intimida.','barbell','volumen',7,FALSE,11),
+  ('tomo_pesado','gold','Tomo pesado','Termina 12 libros de más de 500 páginas','Los tomos gruesos son tu terreno favorito.','barbell','volumen',12,FALSE,12),
+  ('tomo_pesado','special','Tomo pesado','Termina 22 libros de más de 500 páginas','Ya no lees libros pesados, los cargas como si nada.','barbell','volumen',22,TRUE,13),
+  ('lectura_expres','bronze','Lectura exprés','Termina 3 libros de menos de 150 páginas','Corto pero no menos importante.','flash','volumen',3,FALSE,14),
+  ('lectura_expres','silver','Lectura exprés','Termina 10 libros de menos de 150 páginas','Sabes que una gran historia no necesita ser larga.','flash','volumen',10,FALSE,15),
+  ('lectura_expres','gold','Lectura exprés','Termina 25 libros de menos de 150 páginas','El maestro de las lecturas rápidas.','flash','volumen',25,FALSE,16),
+  ('lectura_expres','special','Lectura exprés','Termina 50 libros de menos de 150 páginas','Ni parpadeas y ya terminaste otro.','flash','volumen',50,TRUE,17),
+  ('maraton_fin_de_semana','bronze','Maratón de fin de semana','Lee más de 50 páginas los fines de semana','El fin de semana fue tuyo y de tu libro.','sunny','volumen',50,FALSE,18),
+  ('maraton_fin_de_semana','silver','Maratón de fin de semana','Lee más de 150 páginas los fines de semana','Ni el sofá te movió de esa lectura.','sunny','volumen',150,FALSE,19),
+  ('maraton_fin_de_semana','gold','Maratón de fin de semana','Lee más de 300 páginas los fines de semana','Convertiste dos días en una biblioteca completa.','sunny','volumen',300,FALSE,20),
+  ('maraton_fin_de_semana','special','Maratón de fin de semana','Lee más de 600 páginas los fines de semana','El mundo esperó, tú seguiste leyendo.','sunny','volumen',600,TRUE,21),
+  ('meta_anual','bronze','Meta cumplida','Cumple tu meta anual de lectura','Cumpliste lo que te prometiste.','ribbon','volumen',1,FALSE,22),
+  ('explorador','bronze','Explorador de géneros','Lee en 5 géneros distintos','Un mundo nuevo se abrió contigo.','grid','variedad',5,FALSE,1),
+  ('explorador','silver','Explorador de géneros','Lee en 10 géneros distintos','Tus lecturas hablan varios idiomas.','grid','variedad',10,FALSE,2),
+  ('autor_fiel','bronze','Autor fiel','Lee 3 libros del mismo autor','Encontraste una voz que vuelve.','people','variedad',3,FALSE,3),
+  ('autor_fiel','silver','Autor fiel','Lee 6 libros del mismo autor','El autor ya te espera en cada lanzamiento.','people','variedad',6,FALSE,4),
+  ('autor_fiel','gold','Autor fiel','Lee 9 libros del mismo autor','Su estilo ya se siente como casa.','people','variedad',9,FALSE,5),
+  ('autor_fiel','special','Autor fiel','Lee 15 libros del mismo autor','De tanto leerlo, el autor ya te conoce.','people','variedad',15,TRUE,6),
+  ('critico','bronze','Crítico','Califica 10 libros','Tu opinión empieza a contar.','star','interaccion',10,FALSE,1),
+  ('critico','silver','Crítico','Califica 50 libros','Juzgar con cariño es un oficio.','star','interaccion',50,FALSE,2),
+  ('anotador','bronze','Anotador','Escribe 20 notas','Las ideas que no se van.','document-text','interaccion',20,FALSE,3),
+  ('anotador','silver','Anotador','Escribe 100 notas','Dejaste la huella de tu pensamiento.','document-text','interaccion',100,FALSE,4),
+  ('retroalimentacion','bronze','Retroalimentación','Edita 5 veces una nota o calificación en libros terminados','Vuelves a tus palabras para afinarlas.','pencil','interaccion',5,FALSE,5),
+  ('retroalimentacion','silver','Retroalimentación','Edita 20 veces una nota o calificación en libros terminados','Tus reseñas maduran con el tiempo.','pencil','interaccion',20,FALSE,6),
+  ('retroalimentacion','gold','Retroalimentación','Edita 50 veces una nota o calificación en libros terminados','Revisar es parte de tu forma de leer.','pencil','interaccion',50,FALSE,7),
+  ('retroalimentacion','special','Retroalimentación','Edita 100 veces una nota o calificación en libros terminados','Nunca dejas una opinión a medio pulir.','pencil','interaccion',100,TRUE,8),
+  ('dedicacion','special','Dedicación','Lees 3 horas en un solo día','El tiempo se rindió ante tu lectura.','hourglass','secretos',1,TRUE,1),
+  ('abandono','special','Abandono con estilo','Dejaste un libro cuando tocaba decir adiós','Leer también es dejar ir.','flag-outline','secretos',1,TRUE,2)
+ON CONFLICT (code, tier) DO UPDATE SET
+  name = EXCLUDED.name,
+  description = EXCLUDED.description,
+  leyenda = EXCLUDED.leyenda,
+  icon = EXCLUDED.icon,
+  grp = EXCLUDED.grp,
+  target = EXCLUDED.target,
+  is_secret = EXCLUDED.is_secret,
+  sort_order = EXCLUDED.sort_order;
+
+-- Catálogo de referencia: elimina filas huérfanas (tiers que cambiaron de nombre o códigos
+-- retirados no contemplados arriba), respetando la FK de user_achievements. El motor reinserta
+-- el escalón correcto al recalcular el progreso del usuario.
+DELETE FROM user_achievements ua
+WHERE (ua.code, ua.tier) NOT IN (
+  SELECT code, tier FROM (VALUES
+      ('en_racha','bronze'),('en_racha','silver'),('en_racha','gold'),('en_racha','special'),
+      ('mes_perfecto','special'),
+      ('primer_libro','special'),
+      ('raton_biblioteca','bronze'),('raton_biblioteca','silver'),('raton_biblioteca','gold'),('raton_biblioteca','special'),
+      ('maratonista','bronze'),('maratonista','silver'),('maratonista','gold'),('maratonista','special'),
+      ('tomo_pesado','bronze'),('tomo_pesado','silver'),('tomo_pesado','gold'),('tomo_pesado','special'),
+      ('lectura_expres','bronze'),('lectura_expres','silver'),('lectura_expres','gold'),('lectura_expres','special'),
+      ('maraton_fin_de_semana','bronze'),('maraton_fin_de_semana','silver'),('maraton_fin_de_semana','gold'),('maraton_fin_de_semana','special'),
+      ('meta_anual','bronze'),
+      ('explorador','bronze'),('explorador','silver'),
+      ('autor_fiel','bronze'),('autor_fiel','silver'),('autor_fiel','gold'),('autor_fiel','special'),
+      ('critico','bronze'),('critico','silver'),
+      ('anotador','bronze'),('anotador','silver'),
+      ('retroalimentacion','bronze'),('retroalimentacion','silver'),('retroalimentacion','gold'),('retroalimentacion','special'),
+      ('dedicacion','special'),
+      ('abandono','special')
+    ) AS catalog(code, tier)
+  );
+
+DELETE FROM achievements a
+WHERE (a.code, a.tier) NOT IN (
+  SELECT code, tier FROM (VALUES
+    ('en_racha','bronze'),('en_racha','silver'),('en_racha','gold'),('en_racha','special'),
+    ('mes_perfecto','special'),
+    ('primer_libro','special'),
+    ('raton_biblioteca','bronze'),('raton_biblioteca','silver'),('raton_biblioteca','gold'),('raton_biblioteca','special'),
+    ('maratonista','bronze'),('maratonista','silver'),('maratonista','gold'),('maratonista','special'),
+    ('tomo_pesado','bronze'),('tomo_pesado','silver'),('tomo_pesado','gold'),('tomo_pesado','special'),
+    ('lectura_expres','bronze'),('lectura_expres','silver'),('lectura_expres','gold'),('lectura_expres','special'),
+    ('maraton_fin_de_semana','bronze'),('maraton_fin_de_semana','silver'),('maraton_fin_de_semana','gold'),('maraton_fin_de_semana','special'),
+    ('meta_anual','bronze'),
+    ('explorador','bronze'),('explorador','silver'),
+    ('autor_fiel','bronze'),('autor_fiel','silver'),('autor_fiel','gold'),('autor_fiel','special'),
+    ('critico','bronze'),('critico','silver'),
+    ('anotador','bronze'),('anotador','silver'),
+    ('retroalimentacion','bronze'),('retroalimentacion','silver'),('retroalimentacion','gold'),('retroalimentacion','special'),
+    ('dedicacion','special'),
+    ('abandono','special')
+  ) AS catalog(code, tier)
+);

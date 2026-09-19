@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/auth");
 const { globalUserLimiter } = require("../middleware/rateLimit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
+const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
 
 router.use(authMiddleware);
 router.use(globalUserLimiter);
@@ -50,7 +51,9 @@ router.post("/", async (req, res) => {
     "INSERT INTO notes (book_id, user_id, user_book_id, content, page) VALUES ($1, $2, $3, $4, $5) RETURNING *",
     [data.book_id, req.userId, ub.rows[0] ? ub.rows[0].id : null, data.content, data.page]
   );
-  res.status(201).json(rows[0]);
+  let ach = null;
+  try { ach = await recheckAchievements(req.userId); } catch {}
+  res.status(201).json(await withFreshAchievements(rows[0], ach));
 });
 
 // DELETE /notes/:id

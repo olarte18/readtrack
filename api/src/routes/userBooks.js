@@ -6,6 +6,7 @@ const { globalUserLimiter } = require("../middleware/rateLimit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
+const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
 const { appDay } = require("../utils/dates");
 
 const STATUSES = ["pending", "reading", "paused", "completed", "wishlist", "abandoned"];
@@ -108,6 +109,11 @@ router.patch("/:id", async (req, res) => {
     reading_mode: { type: "string", enum: ["page", "chapter", "percentage"] },
   });
 
+  const { rows: oldRows } = await pool.query(
+    "SELECT status, rating FROM user_books WHERE id = $1 AND user_id = $2",
+    [req.params.id, req.userId]
+  );
+
   const { rows } = await pool.query(`
     UPDATE user_books
     SET status = COALESCE($1, status),
@@ -122,8 +128,21 @@ router.patch("/:id", async (req, res) => {
        data.reading_mode, req.params.id, req.userId]);
 
   if (rows.length === 0) throw httpError(404, "No encontrado");
+
+  // Eventos de logro: abandono (marcar como dejado) y retroalimentación
+  // (editar la calificación de un libro ya terminado).
+  const before = oldRows[0];
+  if (data.status === "abandoned" && before && before.status !== "abandoned") {
+    await pool.query("INSERT INTO achievement_events (user_id, code) VALUES ($1, 'abandono')", [req.userId]);
+  }
+  if (data.rating !== undefined && rows[0].status === "completed" && before && before.rating !== data.rating) {
+    await pool.query("INSERT INTO achievement_events (user_id, code) VALUES ($1, 'retroalimentacion')", [req.userId]);
+  }
+
   invalidateUserData(req.userId);
-  res.json(rows[0]);
+  let ach = null;
+  try { ach = await recheckAchievements(req.userId); } catch {}
+  res.json(await withFreshAchievements(rows[0], ach));
 });
 
 // GET /user-books/check/:google_id

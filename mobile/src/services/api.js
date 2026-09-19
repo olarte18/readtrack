@@ -1,6 +1,8 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../utils/config";
 import { markOnline, markOffline, getConnectivity } from "./connectivity";
+import { emitAchievements } from "./achievementsBus";
+import { recordCelebrated } from "./achievementsSnapshot";
 
 const getHeaders = async () => {
   const token = await AsyncStorage.getItem("token");
@@ -180,6 +182,12 @@ const request = async (path, options = {}) => {
       }
       if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
       markOnline();
+      // Logros recién desbloqueados por esta acción: se celebran al instante y
+      // se registran para que la pantalla de Logros no los repita.
+      if (data && Array.isArray(data.new_achievements) && data.new_achievements.length > 0) {
+        recordCelebrated(data.new_achievements);
+        emitAchievements(data.new_achievements);
+      }
       return data;
     } catch (err) {
       clearTimeout(timer);
@@ -353,6 +361,18 @@ export const saveGoal = async (type, metric, value) =>
     method: "POST",
     body: JSON.stringify({ type, metric, value }),
   });
+
+export const getAchievements = async () => getWithCache("/achievements");
+
+export const markAchievementsSeen = async () => {
+  const res = await request("/achievements/seen", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+  const key = await cacheKey("/achievements");
+  if (key) AsyncStorage.removeItem(key).catch(() => {});
+  return res;
+};
 
 export const previewImport = async (csv) =>
   request("/import/preview", {

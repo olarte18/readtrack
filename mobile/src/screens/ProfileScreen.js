@@ -1,9 +1,10 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
+import { useFocusEffect } from "@react-navigation/native";
 import { AppAlert } from "../components/AppAlert";
-import { getGoals, saveGoal } from "../services/api";
+import { getGoals, getAchievements, saveGoal } from "../services/api";
 import { isWhatsNewVisible } from "../utils/whatsNew";
 import StreakReminderModal from "../components/StreakReminderModal";
 import { Ionicons } from "@expo/vector-icons";
@@ -17,10 +18,19 @@ export default function ProfileScreen({ navigation }) {
   const [goalInput, setGoalInput] = useState("");
   const [whatsNewVisible, setWhatsNewVisible] = useState(false);
   const [streakReminderOpen, setStreakReminderOpen] = useState(false);
+  const [unseenAchievements, setUnseenAchievements] = useState(0);
 
   useEffect(() => {
     isWhatsNewVisible().then(setWhatsNewVisible);
   }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      getAchievements()
+        .then((res) => setUnseenAchievements(res.unseen_count ?? 0))
+        .catch(() => {});
+    }, [])
+  );
 
   useEffect(() => {
     getGoals().then((res) => {
@@ -146,9 +156,14 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.menuLabel}>Importar biblioteca</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Notes")}>
-          <Ionicons name="document-text-outline" size={22} color={colors.accent} />
-          <Text style={styles.menuLabel}>Notas</Text>
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Achievements")}>
+          <Ionicons name="medal-outline" size={22} color={colors.accent} />
+          <Text style={styles.menuLabel}>Logros</Text>
+          {unseenAchievements > 0 && (
+            <View style={styles.newBadge}>
+              <Text style={styles.newBadgeText}>NUEVO</Text>
+            </View>
+          )}
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
         </TouchableOpacity>
         <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Stats")}>
@@ -159,6 +174,11 @@ export default function ProfileScreen({ navigation }) {
         <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Goals")}>
           <Ionicons name="trophy-outline" size={22} color={colors.accent} />
           <Text style={styles.menuLabel}>Metas</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Notes")}>
+          <Ionicons name="document-text-outline" size={22} color={colors.accent} />
+          <Text style={styles.menuLabel}>Notas</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
         </TouchableOpacity>
         <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => setStreakReminderOpen(true)}>

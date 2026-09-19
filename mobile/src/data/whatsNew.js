@@ -3,8 +3,7 @@
 export const RELEASE_NOTES = {
   title: "¡Novedades de ReadTrack!",
   items: [
-    { icon: "create", text: "Agrega libros manualmente cuando no aparecen en la búsqueda: solo necesitas título y páginas" },
-    { icon: "pencil", text: "Edita la ficha de cualquier libro de tu biblioteca: portada con vista previa, autor, editorial y más" },
-    { icon: "moon", text: "Modo simple en tu sesión de lectura: reloj grande, la portada como fondo y la pantalla encendida" },
+    { icon: "medal", text: "Logros: gana insignias por tus rachas, libros terminados, páginas leídas y más" },
+    { icon: "sparkles", text: "Tus logros ahora se celebran al instante, justo cuando los desbloqueas" },
   ],
 };

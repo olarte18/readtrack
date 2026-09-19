@@ -6,6 +6,7 @@ const { globalUserLimiter } = require("../middleware/rateLimit");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
+const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
 const { APP_TZ, appYear, SQL } = require("../utils/dates");
 
 const TYPES = ["annual", "monthly", "weekly", "daily"];
@@ -222,7 +223,9 @@ router.post("/", async (req, res) => {
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`stats:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
-  res.status(201).json(rows[0]);
+  let ach = null;
+  try { ach = await recheckAchievements(req.userId); } catch {}
+  res.status(201).json(await withFreshAchievements(rows[0], ach));
 });
 
 module.exports = router;
