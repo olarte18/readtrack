@@ -23,6 +23,7 @@ const palettes = {
     calendarLow: "#2a2a3e",
     calendarMid: "#6c5ce7",
     calendarComplete: "#7ee787",
+    calendarSecret: "#42A5F5",
   },
   light: {
     background: "#f2f2f7",
@@ -41,6 +42,7 @@ const palettes = {
     calendarLow: "#dcdce4",
     calendarMid: "#6c5ce7",
     calendarComplete: "#7ee787",
+    calendarSecret: "#42A5F5",
   },
 };
 

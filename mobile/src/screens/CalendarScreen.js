@@ -14,6 +14,7 @@ const MONTH_NAMES = [
   "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre",
 ];
 const WEEK_DAYS = ["L", "M", "X", "J", "V", "S", "D"];
+const SECRET_MINUTES = 180;
 
 export default function CalendarScreen() {
   const { colors } = useTheme();
@@ -140,10 +141,13 @@ export default function CalendarScreen() {
   const dayStyleFor = (day) => {
     const info = dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`];
     if (!info) return styles.dayCellIdle;
+    if (info.minutes >= SECRET_MINUTES) return styles.dayCellSecret;
     const dailyGoal = data?.daily_goal_minutes ?? 30;
     if (info.minutes >= dailyGoal) return styles.dayCellComplete;
     return styles.dayCellActive;
   };
+
+  const hasSecret = (data?.days ?? []).some((d) => d.minutes >= SECRET_MINUTES);
 
   return (
     <View style={styles.container}>
@@ -231,6 +235,12 @@ export default function CalendarScreen() {
               <View style={[styles.legendSwatch, { backgroundColor: colors.calendarComplete }]} />
               <Text style={styles.legendText}>Meta cumplida</Text>
             </View>
+            {hasSecret && (
+              <View style={styles.secretLegend}>
+                <View style={[styles.legendSwatch, { backgroundColor: colors.calendarSecret }]} />
+                <Text style={styles.legendText}>Días con 3+ horas</Text>
+              </View>
+            )}
           </View>
 
           {selectedDate && (
@@ -403,14 +413,16 @@ const createStyles = (colors) =>
   dayCellIdle: { backgroundColor: colors.calendarLow },
   dayCellActive: { backgroundColor: colors.calendarMid },
   dayCellComplete: { backgroundColor: colors.calendarComplete },
+  dayCellSecret: { backgroundColor: colors.calendarSecret },
   dayCellToday: { borderWidth: 2, borderColor: colors.star },
   dayCellSelected: { borderWidth: 2, borderColor: colors.text },
   dayText: { fontSize: 13, color: colors.textDim },
   dayTextActive: { color: "#fff", fontWeight: "bold" },
   dayTextComplete: { color: "#fff", fontWeight: "bold" },
-  legendRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 12 },
+  legendRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, rowGap: 6, marginTop: 12 },
   legendSwatch: { width: 10, height: 10, borderRadius: 3 },
   legendText: { fontSize: 11, color: colors.textDim, marginRight: 10 },
+  secretLegend: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 6 },
   detailCard: {
     backgroundColor: colors.surface,
     borderRadius: 12,
