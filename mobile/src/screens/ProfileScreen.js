@@ -8,6 +8,7 @@ import { getGoals, getAchievements, saveGoal } from "../services/api";
 import { isWhatsNewVisible } from "../utils/whatsNew";
 import StreakReminderModal from "../components/StreakReminderModal";
 import { Ionicons } from "@expo/vector-icons";
+import * as Updates from "expo-updates";
 
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
@@ -19,6 +20,19 @@ export default function ProfileScreen({ navigation }) {
   const [whatsNewVisible, setWhatsNewVisible] = useState(false);
   const [streakReminderOpen, setStreakReminderOpen] = useState(false);
   const [unseenAchievements, setUnseenAchievements] = useState(0);
+  const [updateInfo, setUpdateInfo] = useState(null);
+
+  useEffect(() => {
+    try {
+      setUpdateInfo({
+        id: Updates.updateId,
+        createdAt: Updates.createdAt ? new Date(Updates.createdAt) : null,
+        runtimeVersion: Updates.runtimeVersion,
+        channel: Updates.channel,
+        embedded: Updates.isEmbeddedLaunch,
+      });
+    } catch {}
+  }, []);
 
   useEffect(() => {
     isWhatsNewVisible().then(setWhatsNewVisible);
@@ -192,6 +206,32 @@ export default function ProfileScreen({ navigation }) {
         </TouchableOpacity>
       </View>
 
+      {updateInfo && (
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Info de la app</Text>
+          <View style={styles.diagRow}>
+            <Text style={styles.diagLabel}>Update ID</Text>
+            <Text style={styles.diagValue}>{updateInfo.id ?? "ninguno (integrados)"}</Text>
+          </View>
+          <View style={styles.diagRow}>
+            <Text style={styles.diagLabel}>Fecha</Text>
+            <Text style={styles.diagValue}>{updateInfo.createdAt ? updateInfo.createdAt.toLocaleString() : "-"}</Text>
+          </View>
+          <View style={styles.diagRow}>
+            <Text style={styles.diagLabel}>Runtime</Text>
+            <Text style={styles.diagValue}>{updateInfo.runtimeVersion}</Text>
+          </View>
+          <View style={styles.diagRow}>
+            <Text style={styles.diagLabel}>Canal</Text>
+            <Text style={styles.diagValue}>{updateInfo.channel}</Text>
+          </View>
+          <View style={styles.diagRow}>
+            <Text style={styles.diagLabel}>Origen</Text>
+            <Text style={styles.diagValue}>{updateInfo.embedded ? "integrado en el APK" : "desde EAS Update"}</Text>
+          </View>
+        </View>
+      )}
+
       <StreakReminderModal
         visible={streakReminderOpen}
         onClose={() => setStreakReminderOpen(false)}
@@ -247,6 +287,9 @@ const createStyles = (colors) =>
     },
     newBadgeText: { fontSize: 10, fontWeight: "bold", color: colors.star },
   menuLabel: { flex: 1, fontSize: 16, color: colors.text },
+  diagRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, paddingVertical: 4 },
+  diagLabel: { color: colors.textDim, fontSize: 13, width: 90 },
+  diagValue: { flex: 1, color: colors.text, fontSize: 13, textAlign: "right" },
   logoutButton: { backgroundColor: colors.danger, borderRadius: 10, paddingHorizontal: 32, paddingVertical: 12 },
   logoutButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });
