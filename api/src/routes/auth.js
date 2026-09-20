@@ -208,18 +208,17 @@ const resetCodeSchema = {
 
 // POST /auth/request-register-code — genera un código de 6 dígitos para verificar el
 // email al registrarse y lo envía por email. Sin código no se crea la cuenta.
-// Responde lo mismo exista o no el email (no enumera usuarios).
 router.post("/request-register-code", registerCodeLimiter, async (req, res) => {
   const { email } = validate(req.body, { email: { required: true, type: "email" } });
   const normalized = email.toLowerCase();
 
   const { rows } = await pool.query("SELECT id FROM users WHERE email = $1", [normalized]);
-  if (rows.length === 0) {
-    const code = await createRegistrationCode(normalized);
-    await sendRegistrationCode(normalized, code);
-  } else {
-    await bcrypt.hash("000000", 10); // mismo costo aproximado que el caso real
+  if (rows.length > 0) {
+    throw httpError(409, "El email ya está registrado. Inicia sesión");
   }
+
+  const code = await createRegistrationCode(normalized);
+  await sendRegistrationCode(normalized, code);
 
   res.json({ ok: true });
 });

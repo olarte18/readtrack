@@ -27,7 +27,7 @@ describe("POST /auth/request-register-code", () => {
     expect(rows[0].code).not.toBe(sent[0].code); // hasheado, no texto plano
   });
 
-  test("responde ok si el email ya tiene cuenta, sin crear código ni enviar", async () => {
+  test("rechaza con 409 si el email ya tiene cuenta, sin crear código ni enviar", async () => {
     const code = await requestRegistrationCode("existente@example.com");
     await request(app).post("/auth/register").send({
       username: "juan",
@@ -37,7 +37,8 @@ describe("POST /auth/request-register-code", () => {
     });
     clearSent();
     const res = await request(app).post("/auth/request-register-code").send({ email: "existente@example.com" });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(409);
+    expect(res.body.error).toMatch(/ya está registrado/i);
     expect(sent).toHaveLength(0);
     const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM verification_codes");
     expect(rows[0].n).toBe(1); // solo el código consumido del registro anterior
