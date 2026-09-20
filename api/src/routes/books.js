@@ -29,6 +29,93 @@ const normKey = (s) =>
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Mapa para borrar acentos en SQL sin extensión unaccent (translate).
+const ACCENTS_FROM = "áàâäãåéèêëíìîïóòôöõúùûüñç";
+const ACCENTS_TO = "aaaaaaeeeeiiiiooooouuuunc";
+
+// Función de relevancia de un libro del catálogo local contra la query.
+function catalogScore(row, q, np) {
+  const nt = normKey(row.title);
+  const na = normKey(row.author);
+  if (row.isbn && row.isbn === q) return 95;
+  if (row.google_id && row.google_id === q) return 95;
+  if (nt === np) return 100;
+  if (nt.startsWith(np)) return 80;
+  if (nt.includes(np)) return 60;
+  if (na.includes(np)) return 40;
+  return 0;
+}
+
+// Busca en el catálogo local (prioridad #1): coincidencia de frase en título o
+// autor (insensible a acentos y mayúsculas), isbn/google_id exactos. Ordena por
+// relevancia y luego por popularidad = nº de copias en bibliotecas (user_books).
+async function searchCatalog(q) {
+  const np = normKey(q);
+  if (!np) return [];
+  const { rows } = await pool.query(
+    `WITH pop AS (
+       SELECT ub.book_id AS id, COUNT(*) AS copies
+       FROM user_books ub
+       GROUP BY ub.book_id
+     )
+     SELECT b.*, COALESCE(pop.copies, 0) AS popularity
+     FROM books b
+     LEFT JOIN pop ON pop.id = b.id
+     WHERE b.isbn = $1 OR b.google_id = $1
+        OR regexp_replace(translate(lower(b.title), $2, $3), '[^a-z0-9]', '', 'g') LIKE '%' || $4 || '%'
+        OR regexp_replace(translate(lower(b.author), $2, $3), '[^a-z0-9]', '', 'g') LIKE '%' || $4 || '%'
+     LIMIT 150`,
+    [q, ACCENTS_FROM, ACCENTS_TO, np]
+  );
+  return rows
+    .map((row) => ({ row, score: catalogScore(row, q, np) }))
+    .filter((x) => x.score > 0)
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        (b.row.popularity ?? 0) - (a.row.popularity ?? 0) ||
+        (a.row.cover ? 0 : 1) - (b.row.cover ? 0 : 1) ||
+        b.row.id - a.row.id
+    )
+    .slice(0, 10)
+    .map(({ row }) => {
+      const id = row.google_id || `db-${row.id}`;
+      return {
+        id,
+        google_id: row.google_id || id,
+        db_id: row.id,
+        source: "db",
+        title: row.title,
+        author: row.author ?? "Autor desconocido",
+        year: row.year ?? null,
+        pages: row.pages ?? null,
+        chapters: row.chapters ?? null,
+        cover: row.cover ?? null,
+        isbn: row.isbn ?? null,
+        description: row.description ?? null,
+        genre: row.genre ?? null,
+        publisher: row.publisher ?? null,
+        book_type: row.book_type ?? null,
+      };
+    });
+}
+
+// Tokens de búsqueda: palabras de ≥3 letras sin acentos.
+const tokenize = (np) => np.split(/\s+/).filter((t) => t.length >= 3);
+
+// Filtro suave de relevancia: el libro se descarta solo si NINGÚN token de la
+// query aparece en su título o autor. Descartar "Leer o morir" para
+// "ensayo sobre la lucidez" pero conservar "Guía para leer a José Saramago".
+// Una query solo numérica (ISBN) no aplica el filtro.
+function matchesTokens(title, author, isbn, q, np) {
+  const tokens = tokenize(np);
+  if (tokens.length === 0) return true;
+  if (/^\d{9,}$/.test(np)) return true;
+  if (isbn && normKey(isbn) === normKey(q)) return true;
+  const hay = `${normKey(title)} ${normKey(author)}`;
+  return tokens.some((t) => hay.includes(t));
+}
+
 async function fetchGoogleBooks(q) {
   // Google desde IPs de datacenter responde 503 intermitente si no puede
   // ubicar el país; el parámetro country lo resuelve y los reintentos cubren
@@ -77,7 +164,7 @@ async function fetchGoogleBooks(q) {
 
 async function fetchOpenLibraryBooks(q) {
   try {
-    const fields = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,isbn";
+    const fields = "key,title,author_name,first_publish_year,number_of_pages_median,cover_i,isbn,edition_count";
     const response = await fetch(
       `${OPENLIBRARY_API}/search.json?q=${encodeURIComponent(q)}&limit=15&fields=${fields}`
     );
@@ -99,13 +186,16 @@ async function fetchOpenLibraryBooks(q) {
         isbn: d.isbn?.[0] ?? null,
         description: null,
         genre: null,
+        edition_count: d.edition_count ?? null,
       }));
   } catch {
     return [];
   }
 }
 
-// GET /books/search?q=mistborn — busca en Google Books y Open Library, une y deduplica
+// GET /books/search?q=mistborn — búsqueda en tres capas: catálogo local
+// (prioridad #1, ordenado por relevancia y popularidad), Google Books y
+// Open Library como relleno. Orden final: BD > Google > OL.
 router.get("/search", async (req, res) => {
   const q = String(req.query.q ?? "").trim();
   if (!q) throw httpError(400, "Query requerida");
@@ -115,12 +205,15 @@ router.get("/search", async (req, res) => {
   const cachedSearch = cache.get(cacheKey);
   if (cachedSearch) return res.json(cachedSearch);
 
-  let [googleBooks, openLibraryBooks] = await Promise.all([
+  const np = normKey(q);
+
+  let [dbBooks, googleBooks, openLibraryBooks] = await Promise.all([
+    searchCatalog(q),
     fetchGoogleBooks(q),
     fetchOpenLibraryBooks(q),
   ]);
 
-  // Segunda ronda si ambas fuentes vinieron vacías: los fallos de Google
+  // Segunda ronda si las fuentes externas vinieron vacías: los fallos de Google
   // desde datacenter son intermitentes y un reintento tardío suele bastar.
   if (googleBooks.length === 0 && openLibraryBooks.length === 0) {
     await sleep(700);
@@ -130,16 +223,46 @@ router.get("/search", async (req, res) => {
     ]);
   }
 
-  // Prioriza Google (trae descripción y género) y descarta duplicados por título+autor
-  const byKey = new Map();
-  for (const book of [...googleBooks, ...openLibraryBooks]) {
-    const key = `${normKey(book.title)}|${normKey(book.author)}`;
-    if (!byKey.has(key)) byKey.set(key, { ...book, google_id: book.id });
+  // Filtro de relevancia sobre lo externo: solo conserva lo que comparte algún
+  // token con la query (mata el ruido tipo "Leer o morir").
+  const googleFiltered = googleBooks.filter((b) =>
+    matchesTokens(b.title, b.author, b.isbn, q, np)
+  );
+  // Open Library solo como relleno: ordenado por edition_count (popularidad).
+  const openLibraryFiltered = openLibraryBooks
+    .filter((b) => matchesTokens(b.title, b.author, b.isbn, q, np))
+    .sort((a, b) => (b.edition_count ?? 0) - (a.edition_count ?? 0));
+
+  // Merge con dedup: la BD gana siempre (título+autor o google_id).
+  const books = [];
+  const seen = new Map();
+  const addUnique = (book, source) => {
+    const candidate = { ...book, source };
+    const gkey = "g:" + (candidate.google_id || candidate.id);
+    const tkey = "t:" + `${normKey(candidate.title)}|${normKey(candidate.author)}`;
+    if (seen.has(gkey) || seen.has(tkey)) return;
+    seen.set(gkey, true);
+    seen.set(tkey, true);
+    books.push(candidate);
+  };
+  for (const b of dbBooks) addUnique(b, "db");
+
+  for (const b of googleFiltered) {
+    if (books.length >= 12) break;
+    addUnique(b, "google");
   }
-  const books = [...byKey.values()];
+
+  // La OL es la fuente del ruido: se omite cuando ya hay buenas coincidencias
+  // locales (≥3) y solo completa hasta el tope.
+  if (dbBooks.length < 3) {
+    for (const b of openLibraryFiltered) {
+      if (books.length >= 12) break;
+      addUnique(b, "openlibrary");
+    }
+  }
 
   await Promise.all(
-    books.map((book) =>
+    [...googleFiltered, ...openLibraryFiltered].map((book) =>
       pool.query(
         `INSERT INTO books (google_id, title, author, cover, pages, year, isbn, description, genre)
          VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
