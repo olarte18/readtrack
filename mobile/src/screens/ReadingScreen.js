@@ -71,7 +71,7 @@ export default function ReadingScreen({ navigation }) {
 
   const dailyGoal = goals?.goals?.find((g) => g.type === "daily");
   const dailyPct =
-    dailyGoal?.value > 0 ? Math.min(100, Math.round(((goals?.progress?.daily ?? 0) / dailyGoal.value) * 100)) : null;
+    dailyGoal?.value > 0 ? Math.round(((goals?.progress?.daily ?? 0) / dailyGoal.value) * 100) : null;
   const hasSessionToday = streak?.hasSessionToday === true;
 
   return (
@@ -117,6 +117,7 @@ export default function ReadingScreen({ navigation }) {
                     color={colors.accent}
                     trackColor={colors.surfaceAlt}
                     bgColor={colors.surface}
+                    completedColor={colors.calendarComplete}
                   >
                     <Text style={styles.goalPct}>{dailyPct}%</Text>
                   </ProgressRing>

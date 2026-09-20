@@ -209,7 +209,7 @@ export default function StatsScreen({ navigation }) {
 
   const completed = stats?.completed_this_year ?? 0;
   const goal = stats?.goal_this_year;
-  const ringPct = goal > 0 ? Math.min((completed / goal) * 100, 100) : 0;
+  const ringPct = goal > 0 ? Math.round((completed / goal) * 100) : 0;
 
   if (loading && !activity) {
     return (
@@ -334,6 +334,7 @@ export default function StatsScreen({ navigation }) {
             color={colors.accent}
             trackColor={colors.surfaceAlt}
             bgColor={colors.surface}
+            completedColor={colors.calendarComplete}
           >
             <Text style={styles.ringNumber}>{Math.round(ringPct)}%</Text>
           </ProgressRing>

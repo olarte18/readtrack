@@ -16,10 +16,12 @@ export default function ProgressRing({
   color,
   trackColor,
   bgColor,
+  completedColor,
   style,
   children,
 }) {
   const pct = Math.max(Math.min(100, percent), 0);
+  const strokeColor = pct >= 100 && completedColor ? completedColor : color;
   const r = Math.max(radius - borderWidth / 2, 1);
   const circumference = 2 * Math.PI * r;
 
@@ -58,7 +60,7 @@ export default function ProgressRing({
           cx={radius}
           cy={radius}
           r={r}
-          stroke={color}
+          stroke={strokeColor}
           strokeWidth={borderWidth}
           fill="none"
           strokeLinecap="round"
