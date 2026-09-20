@@ -195,6 +195,25 @@ export default function BookDetailScreen({ route, navigation }) {
     ]);
   };
 
+  const handleNoteLongPress = (note) => {
+    AppAlert.alert("Nota", "¿Qué quieres hacer con esta nota?", [
+      { text: "Cancelar", style: "cancel" },
+      {
+        text: "Editar",
+        onPress: () =>
+          navigation.navigate("NoteEditor", {
+            note,
+            onGoBack: (updated) =>
+              setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n))),
+          }),
+      },
+      {
+        text: "Eliminar", style: "destructive",
+        onPress: () => handleDeleteNote(note.id),
+      },
+    ]);
+  };
+
   const startedAt = libraryEntry?.started_at ?? book.started_at;
   const finishedAt = libraryEntry?.finished_at ?? book.finished_at;
   const currentPage = libraryEntry?.current_page ?? book.current_page;
@@ -407,7 +426,7 @@ export default function BookDetailScreen({ route, navigation }) {
             </TouchableOpacity>
           </View>
           {notes.map((note) => (
-            <TouchableOpacity key={note.id} style={styles.noteCard} onLongPress={() => handleDeleteNote(note.id)}>
+            <TouchableOpacity key={note.id} style={styles.noteCard} onLongPress={() => handleNoteLongPress(note)}>
               {note.page && <Text style={styles.notePage}>{formatPoint(book, note.page)}</Text>}
               <Text style={styles.noteContent}>{note.content}</Text>
             </TouchableOpacity>

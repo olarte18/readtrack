@@ -292,6 +292,12 @@ export const addNote = async (book_id, content, page) =>
 
 export const deleteNote = async (id) => request(`/notes/${id}`, { method: "DELETE" });
 
+export const updateNote = async (id, { content, page } = {}) =>
+  request(`/notes/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ content, page }),
+  });
+
 export const updateBookPages = async (google_id, pages) =>
   request(`/books/${google_id}/pages`, {
     method: "PATCH",

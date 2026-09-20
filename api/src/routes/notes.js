@@ -56,6 +56,41 @@ router.post("/", async (req, res) => {
   res.status(201).json(await withFreshAchievements(rows[0], ach));
 });
 
+// PATCH /notes/:id — edita contenido y/o página de una nota propia.
+// page se puede limpiar enviando null.
+router.patch("/:id", async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (!id) throw httpError(400, "Id inválido");
+
+  const data = validate(req.body, {
+    content: { type: "string", min: 1, max: 5000 },
+    page: { type: "integer", min: 1 },
+  });
+  const clearPage = req.body.page === null || req.body.page === "";
+
+  const sets = [];
+  const params = [];
+  if (data.content !== undefined) {
+    params.push(data.content);
+    sets.push(`content = $${params.length}`);
+  }
+  if (data.page !== undefined || clearPage) {
+    params.push(clearPage ? null : data.page);
+    sets.push(`page = $${params.length}`);
+  }
+  if (sets.length === 0) throw httpError(400, "Nada que actualizar");
+
+  params.push(id, req.userId);
+  const { rows } = await pool.query(
+    `UPDATE notes SET ${sets.join(", ")}
+     WHERE id = $${params.length - 1} AND user_id = $${params.length}
+     RETURNING *`,
+    params
+  );
+  if (rows.length === 0) throw httpError(404, "Nota no encontrada");
+  res.json(rows[0]);
+});
+
 // DELETE /notes/:id
 router.delete("/:id", async (req, res) => {
   await pool.query("DELETE FROM notes WHERE id = $1 AND user_id = $2", [req.params.id, req.userId]);

@@ -64,6 +64,69 @@ describe("GET /notes/:book_id", () => {
   });
 });
 
+describe("PATCH /notes/:id", () => {
+  async function createNote(token, book, content = "nota original", page) {
+    const res = await request(app)
+      .post("/notes")
+      .set(authHeader(token))
+      .send({ book_id: book.book_id ?? book.id, content, ...(page ? { page } : {}) });
+    return res.body;
+  }
+
+  test("edita el contenido de una nota propia", async () => {
+    const { token, book } = await setup();
+    const note = await createNote(token, book);
+    const res = await request(app)
+      .patch(`/notes/${note.id}`)
+      .set(authHeader(token))
+      .send({ content: "versión corregida" });
+    expect(res.status).toBe(200);
+    expect(res.body.content).toBe("versión corregida");
+  });
+
+  test("edita y limpia la página de una nota", async () => {
+    const { token, book } = await setup();
+    const note = await createNote(token, book, "con página", 30);
+    await request(app).patch(`/notes/${note.id}`).set(authHeader(token)).send({ page: 55 });
+    const withPage = await request(app).get(`/notes/${book.book_id ?? book.id}`).set(authHeader(token));
+    expect(withPage.body[0].page).toBe(55);
+
+    const cleared = await request(app).patch(`/notes/${note.id}`).set(authHeader(token)).send({ page: null });
+    expect(cleared.status).toBe(200);
+    expect(cleared.body.page).toBeNull();
+  });
+
+  test("rechaza nota vacía al editar", async () => {
+    const { token, book } = await setup();
+    const note = await createNote(token, book);
+    const res = await request(app)
+      .patch(`/notes/${note.id}`)
+      .set(authHeader(token))
+      .send({ content: "" });
+    expect(res.status).toBe(400);
+  });
+
+  test("no permite editar una nota ajena", async () => {
+    const { token, book } = await setup();
+    const note = await createNote(token, book);
+    const other = await registerUser({ email: "otro@example.com", username: "otro_usuario" });
+    const res = await request(app)
+      .patch(`/notes/${note.id}`)
+      .set(authHeader(other.token))
+      .send({ content: "hack" });
+    expect(res.status).toBe(404);
+  });
+
+  test("404 si la nota no existe", async () => {
+    const { token } = await setup();
+    const res = await request(app)
+      .patch("/notes/999999")
+      .set(authHeader(token))
+      .send({ content: "nada" });
+    expect(res.status).toBe(404);
+  });
+});
+
 describe("DELETE /notes/:id", () => {
   test("elimina una nota propia", async () => {
     const { token, book } = await setup();
