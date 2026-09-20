@@ -2,9 +2,11 @@ import { useState } from "react";
 import { View, Text, TextInput, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useDebouncedCallback } from "use-debounce";
+import * as ImagePicker from "expo-image-picker";
+import { manipulateAsync, SaveFormat } from "expo-image-manipulator";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
-import { updateBookFicha, updateBook, addBook } from "../services/api";
+import { updateBookFicha, updateBook, addBook, uploadBookCover } from "../services/api";
 import { formatDateEs } from "../utils/dates";
 import { useKeyboardFormScroll } from "../hooks/useKeyboardFormScroll";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -59,6 +61,10 @@ export default function EditBookScreen({ route, navigation }) {
   const [saving, setSaving] = useState(false);
   const [previewCover, setPreviewCover] = useState(book.cover ?? "");
   const [coverError, setCoverError] = useState(false);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  // Al crear un libro todavía no existe books.id: la imagen se guarda en memoria
+  // y se sube justo después de addBook (sin dejar huérfanos si se sale sin guardar).
+  const [pendingCover, setPendingCover] = useState(null);
 
   const { scrollRef, onSectionLayout, onFieldFocus } = useKeyboardFormScroll();
 
@@ -69,7 +75,69 @@ export default function EditBookScreen({ route, navigation }) {
 
   const handleCoverChange = (text) => {
     setCover(text);
+    setPendingCover(null); // escribir una URL manual descarta la imagen elegida
     debouncedPreview(text);
+  };
+
+  const pickCover = () => {
+    AppAlert.alert("Subir portada", "Elige de dónde quieres la imagen", [
+      { text: "Galería", onPress: () => pickImage("library") },
+      { text: "Cámara", onPress: () => pickImage("camera") },
+      { text: "Cancelar", style: "cancel" },
+    ]);
+  };
+
+  const pickImage = async (source) => {
+    try {
+      if (source === "camera") {
+        const perm = await ImagePicker.requestCameraPermissionsAsync();
+        if (!perm.granted) {
+          return AppAlert.alert("Permiso denegado", "Necesitas permitir la cámara para tomar la portada");
+        }
+      } else {
+        const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (!perm.granted) {
+          return AppAlert.alert("Permiso denegado", "Necesitas permitir la galería para elegir la portada");
+        }
+      }
+
+      const result =
+        source === "camera"
+          ? await ImagePicker.launchCameraAsync({ mediaTypes: ["images"], quality: 1 })
+          : await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 1 });
+      if (result.canceled || !result.assets?.length) return;
+
+      // Reduce a una portada ligera (~600px JPEG) antes de subirla al API.
+      const compressed = await manipulateAsync(
+        result.assets[0].uri,
+        [{ resize: { width: 640 } }],
+        { compress: 0.7, format: SaveFormat.JPEG, base64: true }
+      );
+      if (!compressed.base64) throw new Error("no base64");
+
+      if (isCreate) {
+        // El libro no existe aún: se guarda en memoria y se sube al guardar.
+        setPendingCover({ uri: compressed.uri, base64: compressed.base64 });
+        setCoverError(false);
+        setPreviewCover(compressed.uri);
+        return;
+      }
+
+      setUploadingCover(true);
+      const url = await uploadBookCover(dbId, compressed.base64);
+      setCover(url);
+      setCoverError(false);
+      setPreviewCover(url);
+      AppAlert.alert("Portada actualizada", "La portada se subió con éxito.");
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message && !err.message.startsWith("Network")
+          ? err.message
+          : "No se pudo subir la portada. Revisa tu conexión e inténtalo de nuevo.";
+      AppAlert.alert("Error", message);
+    } finally {
+      setUploadingCover(false);
+    }
   };
 
   const handleSave = async () => {
@@ -116,11 +184,23 @@ export default function EditBookScreen({ route, navigation }) {
       };
 
       let result;
+      let coverUploadFailed = false;
       if (isCreate) {
         result = await addBook(
           { ...ficha, google_id: book.google_id ?? book.id, reading_mode: readingMode },
           status
         );
+        // La portada elegida se sube justo después de crear el libro, cuando
+        // ya existe books.id. Si falla, el libro queda agregado igual.
+        if (pendingCover && result?.book_id) {
+          try {
+            const url = await uploadBookCover(result.book_id, pendingCover.base64);
+            ficha.cover = url;
+          } catch {
+            coverUploadFailed = true;
+          }
+        }
+        setPendingCover(null);
       } else {
         result = await updateBookFicha(dbId, ficha);
         const ubUpdates = { status, reading_mode: readingMode };
@@ -156,7 +236,11 @@ export default function EditBookScreen({ route, navigation }) {
       }
       AppAlert.alert(
         isCreate ? "Agregado" : "Guardado",
-        isCreate ? `"${title.trim()}" está en tu biblioteca` : "Ficha del libro actualizada",
+        isCreate
+          ? coverUploadFailed
+            ? `"${title.trim()}" está en tu biblioteca, pero no se pudo subir la portada. Puedes añadirla desde Editar ficha.`
+            : `"${title.trim()}" está en tu biblioteca`
+          : "Ficha del libro actualizada",
         [
           {
             text: "OK",
@@ -267,10 +351,10 @@ export default function EditBookScreen({ route, navigation }) {
       </View>
 
       <View style={styles.section} onLayout={onSectionLayout("cover")}>
-        <Text style={styles.label}>Portada (URL)</Text>
+        <Text style={styles.label}>Portada</Text>
         <TextInput
           style={styles.input}
-          placeholder="https://..."
+          placeholder="https://... o sube una foto"
           placeholderTextColor={colors.placeholder}
           value={cover}
           onChangeText={handleCoverChange}
@@ -278,6 +362,21 @@ export default function EditBookScreen({ route, navigation }) {
           autoCapitalize="none"
           keyboardType="url"
         />
+        <TouchableOpacity style={styles.coverBtn} onPress={pickCover} disabled={uploadingCover}>
+          {uploadingCover ? (
+            <ActivityIndicator size="small" color={colors.onAccent} />
+          ) : (
+            <>
+              <Ionicons name="image" size={18} color={colors.onAccent} />
+              <Text style={styles.coverBtnText}>
+                {isCreate && pendingCover ? "Cambiar portada" : "Subir portada"}
+              </Text>
+            </>
+          )}
+        </TouchableOpacity>
+        {isCreate && pendingCover && (
+          <Text style={styles.coverHint}>La portada se subirá al guardar el libro.</Text>
+        )}
       </View>
 
       <View style={styles.section} onLayout={onSectionLayout("publisher")}>
@@ -524,6 +623,18 @@ const createStyles = (colors) =>
       fontSize: 15,
     },
     descriptionInput: { minHeight: 90, textAlignVertical: "top" },
+    coverBtn: {
+      marginTop: 10,
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      backgroundColor: colors.accent,
+      borderRadius: 10,
+      paddingVertical: 10,
+    },
+    coverBtnText: { color: colors.onAccent, fontWeight: "bold", fontSize: 14 },
+    coverHint: { marginTop: 8, fontSize: 12, color: colors.textDim, textAlign: "center" },
     segRow: { flexDirection: "row", gap: 8 },
     segBtn: { backgroundColor: colors.surface, borderRadius: 8, paddingHorizontal: 16, paddingVertical: 8 },
     segBtnActive: { backgroundColor: colors.accent },

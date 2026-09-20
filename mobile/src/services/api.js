@@ -304,6 +304,17 @@ export const updateBookFicha = async (id, data) =>
     body: JSON.stringify(data),
   });
 
+// Sube la portada al API (que la guarda en Supabase Storage). El body es
+// base64 de una imagen comprimida; necesita más tiempo que el default.
+export const uploadBookCover = async (bookId, base64) => {
+  const res = await request(`/books/${bookId}/cover`, {
+    method: "POST",
+    timeout: 60000,
+    body: JSON.stringify({ image: base64 }),
+  });
+  return res.cover;
+};
+
 export const getStats = async (year) => getWithCache(year ? `/stats?year=${year}` : "/stats");
 
 export const getStatsActivity = async ({ view, year, month, date }) => {

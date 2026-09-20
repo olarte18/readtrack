@@ -5,6 +5,17 @@ const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
 const authMiddleware = require("../middleware/auth");
+const { makeLimiter } = require("../middleware/rateLimit");
+const { uploadCover, isConfigured } = require("../utils/coverStorage");
+
+// Portadas subidas: payloads de ~7MB base64, raro por usuario. Límite estricto
+// por usuario (no IP) para no dejar subir portadas de cientos de libros a un
+// solo usuario. Debe ir DESPUÉS del authMiddleware.
+const coverUploadLimiter = makeLimiter({
+  max: 30,
+  windowMs: process.env.RATE_LIMIT_WINDOW_MS,
+  keyBy: "userId",
+});
 
 const GOOGLE_API = "https://www.googleapis.com/books/v1";
 const OPENLIBRARY_API = "https://openlibrary.org";
@@ -194,6 +205,36 @@ router.patch("/:id", authMiddleware, async (req, res) => {
   if (rows.length === 0) throw httpError(404, "Libro no encontrado");
 
   // La ficha viaja dentro de las respuestas cacheadas de todos los usuarios
+  cache.delPrefix("user-books:");
+  cache.delPrefix("books:search:");
+  cache.delPrefix("calendar:");
+
+  res.json(rows[0]);
+});
+
+// POST /books/:id/cover — el usuario sube una portada. El API sube la imagen a
+// Supabase Storage (service-role) y guarda la URL pública en books.cover, que
+// es TEXT: no hay cambios de schema ni conflicto con la BD.
+router.post("/:id/cover", authMiddleware, coverUploadLimiter, async (req, res) => {
+  if (!/^\d+$/.test(req.params.id)) throw httpError(404, "Libro no encontrado");
+  if (!isConfigured()) throw httpError(503, "Servicio de portadas no configurado");
+
+  const exists = await pool.query("SELECT 1 FROM books WHERE id = $1", [req.params.id]);
+  if (exists.rows.length === 0) throw httpError(404, "Libro no encontrado");
+
+  const raw = req.body?.image;
+  if (typeof raw !== "string" || !raw.trim()) throw httpError(400, "Imagen es requerida");
+  // Acepta data URL (data:image/jpeg;base64,...) o base64 crudo.
+  const base64 = raw.includes(",") ? raw.slice(raw.indexOf(",") + 1) : raw;
+  if (base64.length > 8 * 1024 * 1024) throw httpError(413, "La imagen supera 5 MB");
+
+  const cover = await uploadCover(Buffer.from(base64, "base64"), req.params.id);
+  if (cover.length > 1000) throw httpError(500, "No se pudo guardar la portada");
+
+  const { rows } = await pool.query(
+    "UPDATE books SET cover = $1 WHERE id = $2 RETURNING id, cover",
+    [cover, req.params.id]
+  );
   cache.delPrefix("user-books:");
   cache.delPrefix("books:search:");
   cache.delPrefix("calendar:");
