@@ -147,6 +147,13 @@ export default function BookDetailScreen({ route, navigation }) {
       onGoBack,
     });
 
+  const handleAddToLibrary = () =>
+    navigation.navigate("EditBook", {
+      book: { ...book, google_id: book.id },
+      mode: "create",
+      onGoBack,
+    });
+
   const handleDelete = () => {
     AppAlert.alert(
       "Quitar de biblioteca",
@@ -240,7 +247,14 @@ export default function BookDetailScreen({ route, navigation }) {
             <Text style={styles.topBtnText}>Editar ficha</Text>
           </TouchableOpacity>
         ) : (
-          <View />
+          <TouchableOpacity
+            style={styles.topBtn}
+            onPress={handleAddToLibrary}
+            accessibilityLabel="Agregar a mi biblioteca"
+          >
+            <Ionicons name="add-circle-outline" size={16} color={colors.accent} />
+            <Text style={styles.topBtnText}>Agregar</Text>
+          </TouchableOpacity>
         )}
       </View>
 
@@ -377,24 +391,6 @@ export default function BookDetailScreen({ route, navigation }) {
             </View>
           )}
         </>
-      )}
-
-      {!alreadyInLibrary && (
-        <View style={styles.section}>
-          <TouchableOpacity
-            style={styles.actionBtn}
-            onPress={() =>
-              navigation.navigate("EditBook", {
-                book: { ...book, google_id: book.id },
-                mode: "create",
-                onGoBack,
-              })
-            }
-          >
-            <Ionicons name="add-circle-outline" size={20} color={colors.onAccent} />
-            <Text style={styles.actionBtnText}>Agregar a mi biblioteca</Text>
-          </TouchableOpacity>
-        </View>
       )}
 
       {alreadyInLibrary && (

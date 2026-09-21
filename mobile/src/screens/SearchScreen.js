@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
+import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { useDebouncedCallback } from "use-debounce";
 import { searchBooks } from "../services/api";
 import { searchByISBN } from "../services/openLibrary";
@@ -40,7 +40,11 @@ const handleScan = async (isbn) => {
   setLoading(false);
 };
   return (
-    <View style={styles.container}>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === "ios" ? "padding" : "height"}
+    >
+      <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
@@ -74,6 +78,7 @@ const handleScan = async (isbn) => {
       <FlatList
         data={results}
         keyExtractor={(item) => item.id}
+        keyboardShouldPersistTaps="handled"
         renderItem={({ item }) => (
           <BookCard
             book={item}
@@ -88,16 +93,21 @@ const handleScan = async (isbn) => {
       <TouchableOpacity
         style={styles.manualBtn}
         onPress={() => navigation.navigate("ManualAdd")}
+        accessibilityLabel="Agregar libro manualmente"
       >
-        <Ionicons name="create-outline" size={18} color={colors.onAccent} />
-        <Text style={styles.manualBtnText}>¿No encuentras tu libro? Créalo manualmente</Text>
+        <Ionicons name="add-circle-outline" size={24} color={colors.accent} />
+        <View style={styles.manualBtnCopy}>
+          <Text style={styles.manualBtnHint}>¿No encuentras tu libro?</Text>
+          <Text style={styles.manualBtnText}>Agregar manualmente</Text>
+        </View>
       </TouchableOpacity>
           <BarcodeScanner
         visible={scannerVisible}
         onScan={handleScan}
         onClose={() => setScannerVisible(false)}
       />
-    </View>
+      </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -115,13 +125,19 @@ const createStyles = (colors) =>
   manualBtn: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    backgroundColor: colors.accent,
+    gap: 12,
+    backgroundColor: colors.accent + "1a",
     borderRadius: 12,
-    paddingVertical: 13,
+    borderWidth: 1.5,
+    borderStyle: "dashed",
+    borderColor: colors.accent,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
     marginHorizontal: 16,
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 24,
   },
-  manualBtnText: { color: colors.onAccent, fontWeight: "bold", fontSize: 14 },
+  manualBtnCopy: { flex: 1 },
+  manualBtnHint: { color: colors.textMuted, fontSize: 12, marginBottom: 2 },
+  manualBtnText: { color: colors.accent, fontWeight: "bold", fontSize: 15 },
 });
