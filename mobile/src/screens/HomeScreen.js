@@ -30,6 +30,15 @@ const STATUSES = [
   { key: "abandoned", label: "Abandonado" },
 ];
 
+const STATUS_LABEL = {
+  reading: "Leyendo",
+  paused: "Pausado",
+  completed: "Leído",
+  pending: "Pendiente",
+  wishlist: "Deseos",
+  abandoned: "Abandonado",
+};
+
 export default function HomeScreen({ navigation, route }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -45,6 +54,8 @@ export default function HomeScreen({ navigation, route }) {
   const [formatFilter, setFormatFilter] = useState(null);
   const [genreFilter, setGenreFilter] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerBook, setPickerBook] = useState(null);
 
   const fetchLibrary = async () => {
     setLoading(true);
@@ -154,6 +165,27 @@ export default function HomeScreen({ navigation, route }) {
     setCategoryFilter(null);
   };
 
+  const pickRandom = (pool, exclude) => {
+    if (!pool.length) return null;
+    if (pool.length === 1) return pool[0];
+    let pick = pool[Math.floor(Math.random() * pool.length)];
+    let guard = 0;
+    while (exclude && pick.id === exclude.id && guard < 20) {
+      pick = pool[Math.floor(Math.random() * pool.length)];
+      guard++;
+    }
+    return pick;
+  };
+
+  const openPicker = () => {
+    setPickerBook(pickRandom(filteredBooks));
+    setPickerOpen(true);
+  };
+
+  const pickAnother = () => {
+    setPickerBook(pickRandom(filteredBooks, pickerBook));
+  };
+
   const renderPills = (options, value, setValue) =>
     options.map((opt) => {
       const active = value === opt.key;
@@ -172,9 +204,20 @@ export default function HomeScreen({ navigation, route }) {
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Mi Biblioteca</Text>
-        <TouchableOpacity onPress={() => navigation.navigate("Search")}>
-          <Text style={styles.addBtn}>+ Agregar</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.randomBtn}
+            onPress={openPicker}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityLabel="Libro al azar de tu biblioteca"
+          >
+            <Ionicons name="shuffle" size={15} color={colors.accent} />
+            <Text style={styles.randomBtnText}>Al azar</Text>
+          </TouchableOpacity>
+          <TouchableOpacity onPress={() => navigation.navigate("Search")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Text style={styles.addBtn}>+ Agregar</Text>
+          </TouchableOpacity>
+        </View>
       </View>
       <View style={styles.statusWrap}>
         <FlatList
@@ -334,6 +377,57 @@ export default function HomeScreen({ navigation, route }) {
           </View>
         </View>
       </Modal>
+    <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
+        <View style={styles.pickerOverlay}>
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPickerOpen(false)} />
+          <View style={styles.pickerCard}>
+            <TouchableOpacity
+              style={styles.pickerClose}
+              onPress={() => setPickerOpen(false)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityLabel="Cerrar"
+            >
+              <Ionicons name="close" size={20} color={colors.textDim} />
+            </TouchableOpacity>
+            <Text style={styles.pickerTitle}>Al azar en tu biblioteca</Text>
+            <Text style={styles.pickerSubtitle}>
+              {filteredBooks.length} {filteredBooks.length === 1 ? "libro" : "libros"} en {STATUSES.find((s) => s.key === filter)?.label ?? "tu biblioteca"}
+            </Text>
+
+            {pickerBook ? (
+              <>
+                {pickerBook.cover ? (
+                  <Image source={{ uri: pickerBook.cover }} style={styles.pickerCover} />
+                ) : (
+                  <View style={[styles.pickerCover, styles.pickerCoverNoImg]}>
+                    <Ionicons name="book" size={48} color={colors.textDim} />
+                  </View>
+                )}
+                <Text style={styles.pickerBookTitle} numberOfLines={2}>{String(pickerBook.title)}</Text>
+                <Text style={styles.pickerAuthor} numberOfLines={1}>{String(pickerBook.author)}</Text>
+                <Text style={styles.pickerStatus}>{STATUS_LABEL[pickerBook.status]}</Text>
+                <View style={styles.pickerActions}>
+                  <TouchableOpacity style={styles.pickerAgainBtn} onPress={pickAnother}>
+                    <Ionicons name="shuffle" size={16} color={colors.accent} />
+                    <Text style={styles.pickerAgainText}>Otro libro</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.pickerDetailBtn}
+                    onPress={() => {
+                      setPickerOpen(false);
+                      navigation.navigate("BookDetail", { book: pickerBook, onGoBack: fetchLibrary });
+                    }}
+                  >
+                    <Text style={styles.pickerDetailText}>Ver detalle</Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : (
+              <Text style={styles.pickerEmpty}>No hay libros en esta sección</Text>
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -343,6 +437,9 @@ const createStyles = (colors) =>
     container: { flex: 1, backgroundColor: colors.background },
     header: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", padding: 20, paddingTop: 50 },
     title: { fontSize: 24, fontWeight: "bold", color: colors.text },
+    headerActions: { flexDirection: "row", alignItems: "center", gap: 14 },
+    randomBtn: { flexDirection: "row", alignItems: "center", gap: 4 },
+    randomBtnText: { color: colors.accent, fontSize: 14, fontWeight: "600" },
     addBtn: { color: colors.accent, fontSize: 16, fontWeight: "600" },
     card: { flexDirection: "row", backgroundColor: colors.surface, borderRadius: 12, marginHorizontal: 16, marginVertical: 6, padding: 12, alignItems: "center" },
     cover: { width: 65, height: 95, borderRadius: 6 },
@@ -391,4 +488,20 @@ const createStyles = (colors) =>
     clearBtnText: { color: colors.textMuted, fontSize: 15, fontWeight: "600" },
     doneBtn: { flex: 1, borderRadius: 10, paddingVertical: 12, alignItems: "center", backgroundColor: colors.accent },
     doneBtnText: { color: colors.onAccent, fontSize: 15, fontWeight: "bold" },
+    pickerOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.6)", justifyContent: "center", alignItems: "center", padding: 32 },
+    pickerCard: { width: "100%", maxWidth: 300, backgroundColor: colors.surface, borderRadius: 20, padding: 24, alignItems: "center" },
+    pickerClose: { position: "absolute", top: 12, right: 14, zIndex: 1 },
+    pickerTitle: { fontSize: 18, fontWeight: "bold", color: colors.text, marginBottom: 4, textAlign: "center" },
+    pickerSubtitle: { fontSize: 13, color: colors.textMuted, marginBottom: 16 },
+    pickerCover: { width: 150, height: 220, borderRadius: 10, marginBottom: 16 },
+    pickerCoverNoImg: { backgroundColor: colors.surfaceAlt, justifyContent: "center", alignItems: "center" },
+    pickerBookTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, textAlign: "center", marginBottom: 4 },
+    pickerAuthor: { fontSize: 14, color: colors.textMuted, marginBottom: 10 },
+    pickerStatus: { fontSize: 12, color: colors.accent, fontWeight: "600", marginBottom: 20 },
+    pickerActions: { flexDirection: "row", gap: 12, width: "100%" },
+    pickerAgainBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, borderRadius: 12, paddingVertical: 12, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surfaceAlt },
+    pickerAgainText: { color: colors.accent, fontSize: 14, fontWeight: "600" },
+    pickerDetailBtn: { flex: 1, borderRadius: 12, paddingVertical: 12, alignItems: "center", backgroundColor: colors.accent },
+    pickerDetailText: { color: colors.onAccent, fontSize: 14, fontWeight: "bold" },
+    pickerEmpty: { color: colors.textDim, fontSize: 15, marginTop: 24, marginBottom: 8 },
   });
