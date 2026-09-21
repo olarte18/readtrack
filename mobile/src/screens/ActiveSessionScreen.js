@@ -9,8 +9,9 @@ import { BlurView } from "expo-blur";
 import { useTheme } from "../contexts/ThemeContext";
 import { getHiResCover } from "../utils/covers";
 import { AppAlert } from "../components/AppAlert";
-import { updateBook, addReadingSession, getReadingSpeed, isNetworkError } from "../services/api";
-import { enqueue } from "../services/offline";
+import { updateBook, addReadingSession, getReadingSpeed, isNetworkError, QUICK_FAIL_MS, OFFLINE_GRACE_MS } from "../services/api";
+import { enqueue, uuidv4 } from "../services/offline";
+import { markOffline } from "../services/connectivity";
 import { modeLabel, modeUnit, formatPoint, deltaLabel, completionBound, isCompleted, progressFraction, pagesEquivalent, pagesLeftEquivalent } from "../utils/progress";
 import {
   cancelAlarm,
@@ -419,34 +420,49 @@ export default function ActiveSessionScreen({ route, navigation }) {
           offline,
         });
       };
-      try {
-        await updateBook(book.id, updates);
-        const saved = await addReadingSession(book.id, page, readSeconds, pages, completed, startPage);
+      // La sesión es idempotente por client_id (el server no la duplica): se
+      // genera un id por operación y se reintenta el guardado con el mismo id.
+      // Así un cuelgue del server (p. ej. cold start de Render) no pierde ni
+      // duplica la sesión mientras esperamos la ventana de gracia.
+      const clientId = uuidv4();
+      const opStart = Date.now();
+      while (true) {
+        const attemptStart = Date.now();
         try {
-          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {}
-        navigateSummary({ saved });
-      } catch (err) {
-        if (isNetworkError(err)) {
-          // Sin red: encolar y no perder la sesión. Se sincroniza al reconectar.
-          await enqueue({
-            type: "save-session",
-            payload: {
-              update: updates,
-              finishedAt,
-              session: {
-                user_book_id: book.id,
-                page,
-                start_page: startPage,
-                duration_seconds: readSeconds,
-                pages_read: pages,
-                book_completed: completed,
+          await updateBook(book.id, updates);
+          const saved = await addReadingSession(book.id, page, readSeconds, pages, completed, startPage, clientId);
+          try {
+            Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          } catch {}
+          navigateSummary({ saved });
+          break;
+        } catch (err) {
+          if (!isNetworkError(err)) throw err;
+          const offlineNow = Date.now() - attemptStart < QUICK_FAIL_MS; // red rota de verdad
+          const deadlineHit = Date.now() - opStart >= OFFLINE_GRACE_MS; // el server no responde a tiempo
+          if (offlineNow || deadlineHit) {
+            if (deadlineHit) markOffline(); // agotamos la espera: indicador sincero
+            // Sin red garantizada: encolar y no perder la sesión. Se sincroniza al reconectar.
+            await enqueue({
+              type: "save-session",
+              payload: {
+                update: updates,
+                finishedAt,
+                session: {
+                  user_book_id: book.id,
+                  page,
+                  start_page: startPage,
+                  duration_seconds: readSeconds,
+                  pages_read: pages,
+                  book_completed: completed,
+                },
               },
-            },
-          });
-          navigateSummary({ offline: true });
-        } else {
-          throw err;
+            });
+            navigateSummary({ offline: true });
+            break;
+          }
+          // Cuelgue: el server puede estar despertando; esperar y reintentar.
+          await new Promise((resolve) => setTimeout(resolve, 4000));
         }
       }
     } catch {

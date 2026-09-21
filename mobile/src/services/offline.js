@@ -7,7 +7,7 @@ const queueKey = () =>
   AsyncStorage.getItem("token").then((token) => (token ? `offline:${token}` : null));
 
 // UUID v4 sin dependencias (suficiente para idempotencia por sesión).
-const uuidv4 = () => {
+export const uuidv4 = () => {
   const hex = () => Math.floor(Math.random() * 0x10000).toString(16).padStart(4, "0");
   return `${hex()}${hex()}-${hex()}-4${hex().slice(1)}-${(8 + Math.floor(Math.random() * 4)).toString(16)}${hex().slice(1)}-${hex()}${hex()}${hex()}`;
 };

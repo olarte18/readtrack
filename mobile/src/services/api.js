@@ -1,6 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { API_URL } from "../utils/config";
-import { markOnline, markOffline, getConnectivity } from "./connectivity";
+import { markOnline, markOffline, getConnectivity, markGrace, inGrace } from "./connectivity";
 import { emitAchievements } from "./achievementsBus";
 import { recordCelebrated } from "./achievementsSnapshot";
 
@@ -15,10 +15,29 @@ const getHeaders = async () => {
 const DEFAULT_TIMEOUT = 10000;
 const RETRY_DELAYS = [1500, 3000];
 
+// Un error de red que llega en menos de este tiempo es una conexión cortada de
+// verdad (avión, sin datos): el fetch se rechaza en milisegundos. Un error que
+// tarda más es un cuelgue: el server aceptó la conexión pero tarda en responder
+// (p. ej. el cold start de Render) y merece la ventana de gracia antes de
+// declarar offline.
+const QUICK_FAIL_MS = 3000;
+
+// Si el server tarda en responder (Render dormido despierta en ~1 min), se
+// espera hasta esta ventana antes de prender el modo offline. Durante la gracia
+// se sirve la caché al instante y un probe de fondo busca la señal.
+const OFFLINE_GRACE_MS = 90000;
+
+const GRACE_PROBE_INTERVAL = 15000;
+const GRACE_PROBE_TIMEOUT = 4000;
+
+export { QUICK_FAIL_MS, OFFLINE_GRACE_MS };
+
 // Tras una caída de red marcamos offline; durante esta ventana las lecturas con
 // caché se sirven al instante sin tocar la red (nada de gris). Pasada la ventana
 // se vuelve a probar la red (pull-to-refresh, re-foco): si ya hay señal se vuelve
-// a network-first, si sigue caída se re-marca offline.
+// a network-first, si sigue caída se re-marca offline. Distinto es el cuelgue
+// (server que tarda, p. ej. cold start de Render): entra la ventana de gracia
+// (OFFLINE_GRACE_MS), que sirve caché al instante sin prender el indicador.
 const OFFLINE_RECHECK_MS = 8000;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -61,6 +80,51 @@ const isOfflineLocked = () => {
   return !online && lastFailure != null && Date.now() - lastFailure < OFFLINE_RECHECK_MS;
 };
 
+// Un GET a /health corto: existe señal si responde dentro del timeout.
+async function probeHealth() {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), GRACE_PROBE_TIMEOUT);
+  try {
+    const res = await fetch(`${API_URL}/health`, { signal: controller.signal });
+    return res.ok;
+  } catch {
+    return false;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+let graceProbing = false;
+
+// Marca la ventana de gracia (una sola vez por caída) y arranca el probe de
+// fondo: si el server responde volvemos a online; si la gracia expira sin
+// respuesta y nada más se recuperó, recién ahí se declara offline (aparece el
+// indicador "Sin conexión").
+function enterGrace() {
+  if (inGrace() || graceProbing) return;
+  markGrace(OFFLINE_GRACE_MS);
+  graceProbing = true;
+  const deadline = Date.now() + OFFLINE_GRACE_MS;
+  const loop = async () => {
+    const ok = await probeHealth();
+    if (ok) {
+      markOnline();
+      graceProbing = false;
+      return;
+    }
+    if (inGrace()) {
+      setTimeout(loop, GRACE_PROBE_INTERVAL);
+      return;
+    }
+    graceProbing = false;
+    // La gracia terminó sin que nadie la cerrara con un éxito (sigue online):
+    // es el deadline. Si ya hubo un markOnline/markOffline por otro lado, no
+    // tocamos nada.
+    if (Date.now() >= deadline && getConnectivity().online) markOffline();
+  };
+  setTimeout(loop, GRACE_PROBE_TIMEOUT);
+}
+
 // Devuelve el dato cacheado (puede ser objeto o array) marcado como servido de
 // caché SIN cambiar su tipo: esparcir un array lo degrada a objeto con claves
 // numéricas y rompe .length/.filter en las pantallas.
@@ -74,7 +138,7 @@ const withFromCache = (data) => {
 
 const getWithCache = async (path, options = {}) => {
   const cached = await readCached(path);
-  if (cached != null && isOfflineLocked()) {
+  if (cached != null && (isOfflineLocked() || inGrace())) {
     return withFromCache(cached);
   }
   // Revisión periódica de señal: si tenemos caché y sabemos que la red estaba
@@ -84,6 +148,7 @@ const getWithCache = async (path, options = {}) => {
   // (un fallo → caché al instante); los reintentos quedan para GETs sin caché.
   const probing = cached != null && !getConnectivity().online;
   const probeOptions = probing ? { timeout: 4000, retry: false } : { retry: false };
+  const startedAt = Date.now();
   try {
     const data = await request(path, { ...probeOptions, ...options });
     writeCached(path, data);
@@ -92,7 +157,12 @@ const getWithCache = async (path, options = {}) => {
     if (isNetworkError(err)) {
       const fresh = cached ?? (await readCached(path));
       if (fresh != null) {
-        markOffline();
+        const waitMs = Date.now() - startedAt;
+        if (waitMs < QUICK_FAIL_MS) {
+          markOffline(); // conexión rota de verdad: al toque
+        } else {
+          enterGrace(); // cuelgue: el server puede estar despertando, no prender offline
+        }
         return withFromCache(fresh);
       }
     }
@@ -149,6 +219,7 @@ const request = async (path, options = {}) => {
   const maxRetries = retry === false ? 0 : (retries ?? (isGet ? 2 : 0));
   let attempt = 0;
   let refreshTried = false;
+  const startedAt = Date.now();
 
   while (true) {
     // Sabemos que no hay señal recientemente: fallar al instante en lugar de
@@ -199,7 +270,16 @@ const request = async (path, options = {}) => {
         await sleep(RETRY_DELAYS[attempt - 1] ?? RETRY_DELAYS[RETRY_DELAYS.length - 1]);
         continue;
       }
-      if (retryable) markOffline(); // el indicador se prende ante el primer fallo
+      if (retryable) {
+        const waitMs = Date.now() - startedAt;
+        if (waitMs < QUICK_FAIL_MS) {
+          markOffline(); // conexión rota de verdad (avión, sin datos): al toque
+        } else if (Date.now() >= startedAt + OFFLINE_GRACE_MS) {
+          markOffline(); // la gracia se agotó sin que el server respondiera
+        } else {
+          enterGrace(); // cuelgue: el server puede estar despertando, no prender offline
+        }
+      }
       throw err;
     }
   }
@@ -245,9 +325,10 @@ export const warmup = () => {
       if (res.ok) markOnline();
     })
     .catch((err) => {
-      // El arranque sin señal se conoce desde el primer frame: los reads de la
-      // primera pantalla sirven la caché sin esperar el timeout.
-      if (isNetworkError(err)) markOffline();
+      // Un cuelgue al arrancar puede ser el cold start de Render: entra la
+      // ventana de gracia (caché al instante, sin banner) y un probe de fondo
+      // recién declara offline si el server no responde a tiempo.
+      if (isNetworkError(err)) enterGrace();
     })
     .finally(() => clearTimeout(timer));
 };
