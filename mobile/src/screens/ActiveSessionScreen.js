@@ -9,6 +9,7 @@ import { BlurView } from "expo-blur";
 import { useTheme } from "../contexts/ThemeContext";
 import { getHiResCover } from "../utils/covers";
 import { AppAlert } from "../components/AppAlert";
+import ValueDial from "../components/ValueDial";
 import { updateBook, addReadingSession, getReadingSpeed, isNetworkError, QUICK_FAIL_MS, OFFLINE_GRACE_MS } from "../services/api";
 import { enqueue, uuidv4 } from "../services/offline";
 import { markOffline } from "../services/connectivity";
@@ -58,6 +59,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const hasNative = !!AlarmNative;
 
   const startPage = book.current_page ?? 0;
+  const dialMax = bound != null ? Math.max(bound, startPage) : null;
   const startTime = useRef(Date.now());
   const appState = useRef(AppState.currentState);
   const backgroundTime = useRef(null);
@@ -522,18 +524,28 @@ export default function ActiveSessionScreen({ route, navigation }) {
       >
         <View style={styles.modalCard}>
           <Text style={styles.modalTitle}>¿En qué {modeLabel(book)} quedaste?</Text>
-          <View style={styles.customInputBox}>
-            <TextInput
-              style={styles.customInput}
-              value={endPage}
-              onChangeText={(t) => setEndPage(t.replace(/[^0-9]/g, ""))}
-              keyboardType="numeric"
-              maxLength={readingMode === "page" ? 4 : 3}
-              autoFocus
-              selectTextOnFocus
+          {dialMax != null ? (
+            <ValueDial
+              min={startPage}
+              max={dialMax}
+              value={endPageVal}
+              onChange={(v) => setEndPage(String(v))}
+              unit={modeUnit(book)}
             />
-            <Text style={styles.customUnit}>{modeUnit(book)}</Text>
-          </View>
+          ) : (
+            <View style={styles.customInputBox}>
+              <TextInput
+                style={styles.customInput}
+                value={endPage}
+                onChangeText={(t) => setEndPage(t.replace(/[^0-9]/g, ""))}
+                keyboardType="numeric"
+                maxLength={readingMode === "page" ? 4 : 3}
+                autoFocus
+                selectTextOnFocus
+              />
+              <Text style={styles.customUnit}>{modeUnit(book)}</Text>
+            </View>
+          )}
           <Text style={styles.pagesEndHint}>
             Leíste {deltaLabel(book, modeDelta)}
           </Text>
