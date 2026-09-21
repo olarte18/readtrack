@@ -19,7 +19,7 @@ async function addBook(token, overrides = {}) {
 }
 
 // Inserta una sesión con created_at UTC controlado (12:00 UTC cae en el mismo día Bogotá).
-async function insertSession(userId, userBookId, isoUtc, durationSeconds, pagesRead = 0) {
+async function insertSession(userId, userBookId, isoUtc, durationSeconds, pagesRead = 10) {
   await pool.query(
     `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at)
      VALUES ($1, $2, 100, $3, $4, $5::timestamp)`,

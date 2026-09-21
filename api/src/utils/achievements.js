@@ -1,6 +1,7 @@
 const pool = require("../db/connection");
 const cache = require("./cache");
 const { computeStreaks } = require("./streaks");
+const { getQualifyingDates } = require("./streakDays");
 const { appYear, SQL } = require("./dates");
 
 const SECRET_SECONDS = 3 * 60 * 60;
@@ -14,12 +15,7 @@ async function computeProgress(userId) {
   const progress = new Map();
   const targets = new Map();
 
-  const { rows: dates } = await pool.query(
-    `SELECT DISTINCT ${SQL.toChar()} AS date
-     FROM reading_sessions WHERE user_id = $1`,
-    [userId]
-  );
-  progress.set("en_racha", computeStreaks(dates.map((r) => r.date)).best);
+  progress.set("en_racha", computeStreaks(await getQualifyingDates(userId)).best);
 
   const { rows: months } = await pool.query(
     `SELECT ${SQL.toChar("created_at", "YYYY-MM")} AS ym,

@@ -28,7 +28,7 @@ async function bogotaDateDaysAgo(daysBack) {
 }
 
 // Inserta una sesión en un día concreto (hora 12:00 UTC, que cae en el mismo día Bogotá).
-async function insertSessionOnDay(userId, userBookId, daysBack, durationSeconds, pagesRead = 0) {
+async function insertSessionOnDay(userId, userBookId, daysBack, durationSeconds, pagesRead = 10) {
   const date = await bogotaDateDaysAgo(daysBack);
   await pool.query(
     `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at)

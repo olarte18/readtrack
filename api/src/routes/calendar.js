@@ -5,6 +5,7 @@ const authMiddleware = require("../middleware/auth");
 const { globalUserLimiter } = require("../middleware/rateLimit");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
+const { getQualifyingDates } = require("../utils/streakDays");
 const { appYear, SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
@@ -39,12 +40,7 @@ router.get("/:year/:month", async (req, res) => {
     [req.userId, start]
   );
 
-  const { rows: sessionDates } = await pool.query(
-    `SELECT DISTINCT ${SQL.toChar()} AS date
-     FROM reading_sessions
-     WHERE user_id = $1`,
-    [req.userId]
-  );
+  const sessionDates = await getQualifyingDates(req.userId);
 
   const { rows: dailyGoalRows } = await pool.query(
     "SELECT value FROM reading_goals WHERE user_id = $1 AND year = $2 AND type = 'daily'",
@@ -89,7 +85,7 @@ router.get("/:year/:month", async (req, res) => {
     days: [...dayMap.values()],
     daily_goal_minutes: dailyGoalRows[0]?.value ?? null,
     hasSessionToday,
-    streak: computeStreaks(sessionDates.map((r) => r.date)),
+    streak: computeStreaks(sessionDates),
   };
   cache.set(cacheKey, payload, 60000);
   res.json(payload);

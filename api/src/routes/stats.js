@@ -7,6 +7,7 @@ const { validate } = require("../utils/validators");
 const httpError = require("../utils/httpError");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
+const { getQualifyingDates } = require("../utils/streakDays");
 const { SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
@@ -18,12 +19,8 @@ router.get("/streak", async (req, res) => {
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
-  const { rows } = await pool.query(
-    `SELECT DISTINCT ${SQL.toChar()} AS date
-     FROM reading_sessions WHERE user_id = $1`,
-    [req.userId]
-  );
-  const streak = computeStreaks(rows.map((r) => r.date));
+  const dates = await getQualifyingDates(req.userId);
+  const streak = computeStreaks(dates);
 
   // ¿Hubo al menos una sesión hoy (hora Bogotá)? No depende de los minutos
   // (una sesión corta de <1 min iba a dar 0 minutos y apagaba la racha).

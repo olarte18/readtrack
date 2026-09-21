@@ -7,6 +7,7 @@ const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
+const { getQualifyingDates } = require("../utils/streakDays");
 const { getGoalCompletion } = require("../utils/goalProgress");
 const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
 const { SQL } = require("../utils/dates");
@@ -31,12 +32,7 @@ async function sessionPayload(req, session, body) {
 
   let streak = null;
   if (prior[0].n === 0) {
-    const { rows: dates } = await pool.query(
-      `SELECT DISTINCT ${SQL.toChar()} AS date
-       FROM reading_sessions WHERE user_id = $1`,
-      [req.userId]
-    );
-    streak = computeStreaks(dates.map((r) => r.date)).current;
+    streak = computeStreaks(await getQualifyingDates(req.userId)).current;
   }
 
   const goalJustCompleted = await getGoalCompletion(req.userId, {
