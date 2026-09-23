@@ -71,6 +71,12 @@ router.post("/", async (req, res) => {
     }
   }
 
+  const owned = await pool.query(
+    "SELECT id FROM user_books WHERE id = $1 AND user_id = $2",
+    [data.user_book_id, req.userId]
+  );
+  if (owned.rows.length === 0) throw httpError(404, "Libro no encontrado");
+
   const { rows } = await pool.query(
     "INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read, client_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
     [data.user_book_id, req.userId, data.page, data.start_page, data.duration_seconds, data.pages_read, data.client_id ?? null]
@@ -168,6 +174,12 @@ router.get("/:user_book_id", async (req, res) => {
 });
 
 router.get("/:user_book_id/speed", async (req, res) => {
+  const owned = await pool.query(
+    "SELECT 1 FROM user_books WHERE id = $1 AND user_id = $2",
+    [req.params.user_book_id, req.userId]
+  );
+  if (owned.rows.length === 0) throw httpError(404, "Libro no encontrado");
+
   const { rows } = await pool.query(
     `SELECT 
       AVG(pages_read::float / NULLIF(duration_seconds, 0) * 3600) AS avg_pages_per_hour,
