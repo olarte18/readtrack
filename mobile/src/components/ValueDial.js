@@ -1,14 +1,16 @@
-import { useState, useRef, useMemo, useCallback } from "react";
+import { useState, useRef, useLayoutEffect, useMemo, useCallback } from "react";
 import { View, Text, FlatList, StyleSheet } from "react-native";
 import * as Haptics from "expo-haptics";
 import { useTheme } from "../contexts/ThemeContext";
 
-const ROW_HEIGHT = 52;
+const ROW_HEIGHT = 56;
 const VISIBLE_ROWS = 3;
+const TOP_PAD = (ROW_HEIGHT * VISIBLE_ROWS - ROW_HEIGHT) / 2;
 
 // Rueda vertical tipo odómetro: arriba los valores anteriores, abajo los
 // siguientes; la fila del centro es el valor actual. Hace snap fila a fila,
-// sin teclado, y notifica con haptics al cambiar.
+// sin teclado. El highlight sigue el scroll en vivo pero el valor se notifica
+// al padre una sola vez cuando la rueda se asienta (con un haptic sutil).
 export default function ValueDial({ min, max, value, onChange, unit }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
@@ -23,25 +25,40 @@ export default function ValueDial({ min, max, value, onChange, unit }) {
 
   const initialIndex = Math.max(0, Math.min(value - safeMin, safeMax - safeMin));
   const [active, setActive] = useState(initialIndex);
-  const lastIndex = useRef(initialIndex);
+  const committedIndex = useRef(initialIndex);
+  const listRef = useRef(null);
   const dataRef = useRef(data);
   dataRef.current = data;
 
+  // Centra la fila actual al montar (el snap por offset vive en multiples de ROW_HEIGHT).
+  useLayoutEffect(() => {
+    listRef.current?.scrollToOffset({ offset: initialIndex * ROW_HEIGHT, animated: false });
+  }, [initialIndex]);
+
   const getItemLayout = useCallback(
-    (_, index) => ({ length: ROW_HEIGHT, offset: ROW_HEIGHT * index, index }),
+    (_, index) => ({ length: ROW_HEIGHT, offset: TOP_PAD + ROW_HEIGHT * index, index }),
     []
   );
   const keyExtractor = useCallback((item) => String(item), []);
+  const snapOffsets = useMemo(() => data.map((_, i) => i * ROW_HEIGHT), [data]);
 
+  const computeIndex = (offset) =>
+    Math.max(0, Math.min(Math.round(offset / ROW_HEIGHT), dataRef.current.length - 1));
+
+  // Solo anima el highlight: no toca al padre mientras el dedo se mueve.
   const handleScroll = (e) => {
-    const offset = e.nativeEvent.contentOffset.y;
-    const index = Math.max(0, Math.min(Math.round(offset / ROW_HEIGHT), dataRef.current.length - 1));
-    if (index === lastIndex.current) return;
-    lastIndex.current = index;
+    setActive(computeIndex(e.nativeEvent.contentOffset.y));
+  };
+
+  // Al asentar el snap: notifica el valor al padre una vez y vibra sutil.
+  const handleSettle = (e) => {
+    const index = computeIndex(e.nativeEvent.contentOffset.y);
     setActive(index);
+    if (index === committedIndex.current) return;
+    committedIndex.current = index;
     onChange?.(dataRef.current[index]);
     try {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      Haptics.selectionAsync();
     } catch {}
   };
 
@@ -67,18 +84,24 @@ export default function ValueDial({ min, max, value, onChange, unit }) {
   return (
     <View style={styles.wrap}>
       <FlatList
+        ref={listRef}
         data={data}
         horizontal={false}
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         getItemLayout={getItemLayout}
-        initialScrollIndex={initialIndex}
-        snapToInterval={ROW_HEIGHT}
-        snapToAlignment="center"
-        decelerationRate="fast"
+        snapToOffsets={snapOffsets}
+        bounces={false}
+        alwaysBounceVertical={false}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={handleScroll}
+        onScrollEndDrag={handleSettle}
+        onMomentumScrollEnd={handleSettle}
+        overScrollMode="never"
+        initialNumToRender={15}
+        maxToRenderPerBatch={12}
+        windowSize={7}
         extraData={active}
         contentContainerStyle={styles.content}
         style={styles.list}
@@ -100,7 +123,7 @@ const createStyles = (colors) =>
       maxWidth: 200,
     },
     list: { width: "100%" },
-    content: { paddingVertical: ROW_HEIGHT },
+    content: { paddingTop: TOP_PAD, paddingBottom: TOP_PAD },
     row: {
       height: ROW_HEIGHT,
       alignItems: "center",
@@ -117,7 +140,7 @@ const createStyles = (colors) =>
     unit: { fontSize: 16, color: colors.accent, fontWeight: "600" },
     centerBand: {
       position: "absolute",
-      top: ROW_HEIGHT,
+      top: TOP_PAD,
       left: 0,
       right: 0,
       height: ROW_HEIGHT,
