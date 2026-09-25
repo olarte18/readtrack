@@ -446,3 +446,69 @@ describe("POST /reading-sessions — idempotencia con client_id", () => {
     expect(a.body.id).not.toBe(b.body.id);
   });
 });
+
+describe("feedback de racha al guardar (streakState)", () => {
+  async function addPageBook(token) {
+    const res = await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ google_id: "s" + Math.random(), title: "Racha", author: "Autor", pages: 300, reading_mode: "page" });
+    return res.body;
+  }
+
+  async function save(token, userBookId, body) {
+    const res = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: userBookId, page: 100, duration_seconds: 1800, pages_read: 0, ...body });
+    expect(res.status).toBe(201);
+    return res.body;
+  }
+
+  test("primera sesión del día que no califica: casi, con lo que falta", async () => {
+    const { token } = await registerUser();
+    const book = await addPageBook(token);
+
+    const saved = await save(token, book.id, { duration_seconds: 120, pages_read: 0 });
+
+    expect(saved.first_today).toBe(true);
+    expect(saved.streak).toBe(0);
+    expect(saved.streakState).toEqual({
+      kind: "almost",
+      missing: { mode: "page", seconds: 180, pages: 2 }, // faltan 3 min y 2 páginas
+      current: 0,
+    });
+  });
+
+  test("primera sesión del día que califica al instante: activada", async () => {
+    const { token } = await registerUser();
+    const book = await addPageBook(token);
+
+    const saved = await save(token, book.id, { duration_seconds: 360, pages_read: 2 });
+
+    expect(saved.streakState).toEqual({ kind: "activated", days: 1 });
+  });
+
+  test("casi → activada: la segunda sesión del día cruza el umbral", async () => {
+    const { token } = await registerUser();
+    const book = await addPageBook(token);
+
+    const first = await save(token, book.id, { duration_seconds: 120, pages_read: 0 });
+    expect(first.streakState.kind).toBe("almost");
+
+    const second = await save(token, book.id, { duration_seconds: 240, pages_read: 2 });
+
+    expect(second.streakState).toEqual({ kind: "activated", days: 1 });
+    expect(second.first_today).toBe(false); // ya no es la primera del día
+  });
+
+  test("el día ya califica: sesiones siguientes sin feedback de racha", async () => {
+    const { token } = await registerUser();
+    const book = await addPageBook(token);
+    await save(token, book.id, { duration_seconds: 360, pages_read: 2 });
+
+    const later = await save(token, book.id, { duration_seconds: 600, pages_read: 5 });
+
+    expect(later.streakState).toBeNull();
+  });
+});

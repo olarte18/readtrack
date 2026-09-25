@@ -42,15 +42,46 @@ export function localToday(items = []) {
 const sumSeconds = (items) => items.reduce((acc, i) => acc + (i.payload?.session?.duration_seconds ?? 0), 0);
 const sumPages = (items) => items.reduce((acc, i) => acc + (i.payload?.session?.pages_read ?? 0), 0);
 
+// Reglas mínimas del server para que un día cuente (streakDays.js): page exige
+// 5 min Y 2 páginas; percentage/chapter, 7 min. Suma diaria por modo.
+const PAGE_MIN_SECONDS = 300;
+const OTHER_MIN_SECONDS = 420;
+const PAGE_ADVANCE = 2;
+
+// ¿Las sesiones locales de hoy califican el día para la racha? Aplica la misma
+// regla por modo (reading_mode se encola en ActiveSessionScreen al guardar),
+// asumiendo "page" para las sesiones encoladas antes de ese cambio.
+function localQualifiesToday(local) {
+  const byMode = {};
+  for (const item of local) {
+    const s = item.payload?.session ?? {};
+    const mode = s.reading_mode ?? "page";
+    byMode[mode] = byMode[mode] || { seconds: 0, pages: 0 };
+    byMode[mode].seconds += s.duration_seconds ?? 0;
+    byMode[mode].pages += s.pages_read ?? 0;
+  }
+  return Object.entries(byMode).some(
+    ([mode, g]) =>
+      (mode === "page" && g.seconds >= PAGE_MIN_SECONDS && g.pages >= PAGE_ADVANCE) ||
+      ((mode === "percentage" || mode === "chapter") && g.seconds >= OTHER_MIN_SECONDS)
+  );
+}
+
 // /stats/streak — el server cuenta "hoy" solo si ya hay una sesión sincronizada.
 // Una sesión local de hoy (aún no sincronizada) enciende hasSessionToday y suma
 // 1 a current (que en caché contaba hasta ayer). best se actualiza si hace falta.
+// todayCounts (hoy califica) se arrastra del server y se enciende con las
+// sesiones locales si cumplen la regla: el flame no miente offline.
 export function streakWithLocal(cached, items = []) {
   if (!cached) return cached;
   const local = localToday(items);
+  const qualifies = localQualifiesToday(local);
   const has = cached.hasSessionToday === true || local.length > 0;
-  const current = cached.hasSessionToday === true ? cached.current : cached.current + (local.length > 0 ? 1 : 0);
-  return { ...cached, hasSessionToday: has, current, best: Math.max(cached.best ?? 0, current) };
+  const todayCounts = cached.todayCounts === true || qualifies;
+  // Si el server ya contó hoy, current incluye el día: no sumar de nuevo.
+  const countedToday = cached.todayCounts === true || cached.hasSessionToday === true;
+  const current = countedToday ? cached.current : cached.current + (qualifies ? 1 : 0);
+  return { ...cached, hasSessionToday: has, todayCounts, current, best: Math.max(cached.best ?? 0, current) };
 }
 
 // /calendar/:y/:m — suma las sesiones locales de hoy a la celda y actualiza
@@ -78,7 +109,14 @@ export function calendarWithLocal(cached, items = []) {
     }
   }
 
-  return { ...cached, days, hasSessionToday: true, streak: streakWithLocal(cached.streak, local) };
+  const streak = streakWithLocal(cached.streak, local);
+  return {
+    ...cached,
+    days,
+    hasSessionToday: true,
+    todayCounts: streak.todayCounts === true,
+    streak,
+  };
 }
 
 // /goals — suma los minutos de las sesiones locales de hoy a la meta diaria y

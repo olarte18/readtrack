@@ -425,6 +425,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         updates.finished_at = finishedAt;
       }
       const navigateSummary = ({ offline = false, saved = null } = {}) => {
+        const streakState = saved?.streakState;
         navigation.replace("SessionSummary", {
           book,
           pagesRead: pages,
@@ -433,7 +434,11 @@ export default function ActiveSessionScreen({ route, navigation }) {
           endPage: page,
           speed: pagesPerHour,
           completed,
-          streakInfo: offline ? null : saved?.first_today ? { days: saved.streak ?? 1 } : null,
+          streakInfo:
+            offline || streakState?.kind !== "activated"
+              ? null
+              : { days: streakState.days ?? 1 },
+          streakAlmost: offline || streakState?.kind !== "almost" ? null : streakState,
           goalJustCompleted: offline ? [] : saved?.goalJustCompleted ?? [],
           offline,
         });
@@ -473,6 +478,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
                   duration_seconds: readSeconds,
                   pages_read: pages,
                   book_completed: completed,
+                  reading_mode: book.reading_mode ?? "page",
                 },
               },
             });

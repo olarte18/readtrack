@@ -136,11 +136,19 @@ export default function CalendarScreen() {
   const dayMap = {};
   (data?.days ?? []).forEach((d) => { dayMap[d.date] = d; });
   const selectedDay = selectedDate ? dayMap[selectedDate] : null;
-  const hasSessionToday = data?.hasSessionToday === true;
+  // El fuego se enciende solo si HOY califica para la racha (todayCounts).
+  // hasSessionToday queda como respaldo para clientes con el server viejo.
+  const streakActiveToday = data?.todayCounts === true || data?.hasSessionToday === true;
+
+  const infoFor = (day) =>
+    dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`];
 
   const dayStyleFor = (day) => {
-    const info = dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`];
+    const info = infoFor(day);
     if (!info) return styles.dayCellIdle;
+    // Por elección del usuario, un día con sesiones que NO califica para la
+    // racha se ve como un día sin sesión (sigue consultable al tocarlo).
+    if (info.counts === false) return styles.dayCellIdle;
     if (info.minutes >= SECRET_MINUTES) return styles.dayCellSecret;
     const dailyGoal = data?.daily_goal_minutes ?? 30;
     if (info.minutes >= dailyGoal) return styles.dayCellComplete;
@@ -155,8 +163,8 @@ export default function CalendarScreen() {
 
       <View style={styles.streakCard}>
         <View style={styles.streakItem}>
-          <Ionicons name="flame" size={28} color={hasSessionToday ? colors.accent : colors.textMuted} />
-          <Text style={[styles.streakNumber, { color: hasSessionToday ? colors.text : colors.textMuted }]}>{data?.streak?.current ?? 0}</Text>
+          <Ionicons name="flame" size={28} color={streakActiveToday ? colors.accent : colors.textMuted} />
+          <Text style={[styles.streakNumber, { color: streakActiveToday ? colors.text : colors.textMuted }]}>{data?.streak?.current ?? 0}</Text>
           <Text style={styles.streakLabel}>días de racha</Text>
         </View>
         <View style={styles.streakDivider} />
@@ -214,7 +222,7 @@ export default function CalendarScreen() {
                         <Text
                           style={[
                             styles.dayText,
-                            dayMap[`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`] && styles.dayTextActive,
+                            infoFor(day) && infoFor(day).counts !== false && styles.dayTextActive,
                           ]}
                         >
                           {day}

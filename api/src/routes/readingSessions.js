@@ -7,7 +7,7 @@ const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
-const { getQualifyingDates } = require("../utils/streakDays");
+const { getQualifyingDates, getDayProgress, appToday } = require("../utils/streakDays");
 const { getGoalCompletion } = require("../utils/goalProgress");
 const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
 const { SQL } = require("../utils/dates");
@@ -30,9 +30,30 @@ async function sessionPayload(req, session, body) {
     [req.userId, session.id]
   );
 
+  // Estado para el feedback de racha: "activada" cuando esta sesión cruzó el
+  // umbral del día, "casi" si es la primera del día y aún no califica.
+  // (El conteo real siempre usa getQualifyingDates; esto solo alimenta el UX.)
+  const today = await appToday();
+  const before = await getDayProgress(req.userId, today, { excludeId: session.id });
+  const after = await getDayProgress(req.userId, today);
+  let streakState = null;
+  let currentStreak = null;
+  if (after.qualifies && !before.qualifies) {
+    currentStreak = computeStreaks(await getQualifyingDates(req.userId)).current;
+    streakState = { kind: "activated", days: currentStreak };
+  } else if (!after.qualifies && prior[0].n === 0) {
+    if (currentStreak === null) {
+      currentStreak = computeStreaks(await getQualifyingDates(req.userId)).current;
+    }
+    streakState = { kind: "almost", missing: after.missing, current: currentStreak };
+  }
+
   let streak = null;
   if (prior[0].n === 0) {
-    streak = computeStreaks(await getQualifyingDates(req.userId)).current;
+    if (currentStreak === null) {
+      currentStreak = computeStreaks(await getQualifyingDates(req.userId)).current;
+    }
+    streak = currentStreak;
   }
 
   const goalJustCompleted = await getGoalCompletion(req.userId, {
@@ -40,7 +61,7 @@ async function sessionPayload(req, session, body) {
     bookCompleted: !!body.book_completed,
   });
 
-  return { ...session, first_today: prior[0].n === 0, streak, goalJustCompleted };
+  return { ...session, first_today: prior[0].n === 0, streak, streakState, goalJustCompleted };
 }
 
 router.post("/", async (req, res) => {

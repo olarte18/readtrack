@@ -41,6 +41,43 @@ async function bogotaDaysAgo(daysBack) {
 }
 
 describe("GET /calendar/:year/:month", () => {
+  test("marca counts=false los días que no califican para la racha", async () => {
+    const { token, user } = await registerUser();
+    const libro = await addBook(token, { reading_mode: "page" });
+
+    // 2 min y 0 páginas: hay sesión pero el día no suma a la racha.
+    await insertSession(user.id, libro.id, "2025-03-01 12:00:00", 120, 0);
+
+    const res = await request(app).get("/calendar/2025/3").set(authHeader(token));
+    expect(res.status).toBe(200);
+    const dia = res.body.days.find((d) => d.date === "2025-03-01");
+    expect(dia).toMatchObject({ minutes: 2, pages: 0, counts: false });
+  });
+
+  test("marca counts=true los días que sí califican", async () => {
+    const { token, user } = await registerUser();
+    const libro = await addBook(token, { reading_mode: "page" });
+
+    await insertSession(user.id, libro.id, "2025-03-01 12:00:00", 600, 4);
+
+    const res = await request(app).get("/calendar/2025/3").set(authHeader(token));
+    const dia = res.body.days.find((d) => d.date === "2025-03-01");
+    expect(dia).toMatchObject({ minutes: 10, pages: 4, counts: true });
+  });
+
+  test("todayCounts refleja si hoy califica (no solo si hubo sesión)", async () => {
+    const { token, user } = await registerUser();
+    const libro = await addBook(token, { reading_mode: "page" });
+
+    await insertSession(user.id, libro.id, new Date().toISOString(), 120, 0);
+
+    const today = await bogotaToday();
+    const res = await request(app)
+      .get(`/calendar/${today.slice(0, 4)}/${Number(today.slice(5, 7))}`)
+      .set(authHeader(token));
+    expect(res.body.hasSessionToday).toBe(true);
+    expect(res.body.todayCounts).toBe(false);
+  });
   test("agrega minutos y páginas por día y detalla por libro", async () => {
     const { token, user } = await registerUser();
     const libro1 = await addBook(token, { title: "Libro 1", author: "Autor 1" });

@@ -5,7 +5,7 @@ const authMiddleware = require("../middleware/auth");
 const { globalUserLimiter } = require("../middleware/rateLimit");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
-const { getQualifyingDates } = require("../utils/streakDays");
+const { getQualifyingDates, appToday } = require("../utils/streakDays");
 const { appYear, SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
@@ -41,6 +41,9 @@ router.get("/:year/:month", async (req, res) => {
   );
 
   const sessionDates = await getQualifyingDates(req.userId);
+  const streakDates = new Set(sessionDates);
+  const today = await appToday();
+  const todayCounts = streakDates.has(today);
 
   const { rows: dailyGoalRows } = await pool.query(
     "SELECT value FROM reading_goals WHERE user_id = $1 AND year = $2 AND type = 'daily'",
@@ -62,7 +65,13 @@ router.get("/:year/:month", async (req, res) => {
   const dayMap = new Map();
   for (const row of rows) {
     if (!dayMap.has(row.date)) {
-      dayMap.set(row.date, { date: row.date, minutes: 0, pages: 0, books: [] });
+      dayMap.set(row.date, {
+        date: row.date,
+        minutes: 0,
+        pages: 0,
+        books: [],
+        counts: streakDates.has(row.date), // día que suma a la racha (regla mínima)
+      });
     }
     const day = dayMap.get(row.date);
     const minutes = parseInt(row.minutes) || 0;
@@ -85,6 +94,7 @@ router.get("/:year/:month", async (req, res) => {
     days: [...dayMap.values()],
     daily_goal_minutes: dailyGoalRows[0]?.value ?? null,
     hasSessionToday,
+    todayCounts,
     streak: computeStreaks(sessionDates),
   };
   cache.set(cacheKey, payload, 60000);

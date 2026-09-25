@@ -140,3 +140,52 @@ describe("regla de día de racha según modo (streakDays)", () => {
     expect(res.best).toBe(1);
   });
 });
+
+// Feedback para el UX: /stats/streak ahora distingue "hubo una sesión hoy"
+// (hasSessionToday) de "hoy califica para la racha" (todayCounts); así el
+// flame solo se enciende cuando el día suma de verdad.
+describe("todayCounts en /stats/streak", () => {
+  async function addBook(token, mode = "page") {
+    const res = await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ google_id: "g" + Math.random(), title: "Libro", author: "Autor", pages: 300, reading_mode: mode });
+    expect(res.status).toBe(201);
+    return res.body;
+  }
+
+  async function saveSession(token, userBookId, body) {
+    const res = await request(app)
+      .post("/reading-sessions")
+      .set(authHeader(token))
+      .send({ user_book_id: userBookId, page: 100, duration_seconds: 1800, pages_read: 0, ...body });
+    expect(res.status).toBe(201);
+    return res.body;
+  }
+
+  test("sin sesiones: ni hasSessionToday ni todayCounts", async () => {
+    const { token } = await registerUser();
+    expect(await getStreak(token)).toMatchObject({ hasSessionToday: false, todayCounts: false });
+  });
+
+  test("sesión que no califica: hasSessionToday=true, todayCounts=false", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+    await saveSession(token, book.id, { duration_seconds: 120, pages_read: 0 });
+
+    expect(await getStreak(token)).toMatchObject({ hasSessionToday: true, todayCounts: false });
+  });
+
+  test("sesión que sí califica: todayCounts=true e invalida la caché previa", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    // Primera lectura consulta la API (queda cacheada 60s con hoy NO calificando).
+    expect(await getStreak(token)).toMatchObject({ todayCounts: false });
+    await saveSession(token, book.id, { duration_seconds: 360, pages_read: 2 });
+
+    // Guardar la sesión invalida stats:<uid>:*; la siguiente lectura debe
+    // ver hoy calificando (si la invalidación fallara volvería la caché vieja).
+    expect(await getStreak(token)).toMatchObject({ todayCounts: true, hasSessionToday: true, current: 1 });
+  });
+});

@@ -7,7 +7,7 @@ const { validate } = require("../utils/validators");
 const httpError = require("../utils/httpError");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
-const { getQualifyingDates } = require("../utils/streakDays");
+const { getQualifyingDates, appToday } = require("../utils/streakDays");
 const { SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
@@ -15,12 +15,16 @@ router.use(globalUserLimiter);
 
 // GET /stats/streak — racha actual y récord, sin cargar el calendario completo
 router.get("/streak", async (req, res) => {
-  const cacheKey = `stats:streak:${req.userId}`;
+  // La clave empieza con `stats:<uid>` para que guardar una sesión la invalide
+  // (cache.delPrefix borra por prefijo) y el flame no quede obsoleto.
+  const cacheKey = `stats:${req.userId}:streak`;
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
   const dates = await getQualifyingDates(req.userId);
   const streak = computeStreaks(dates);
+  const today = await appToday();
+  const todayCounts = dates.includes(today);
 
   // ¿Hubo al menos una sesión hoy (hora Bogotá)? No depende de los minutos
   // (una sesión corta de <1 min iba a dar 0 minutos y apagaba la racha).
@@ -34,7 +38,7 @@ router.get("/streak", async (req, res) => {
   );
   const hasSessionToday = todaySessions[0].n > 0;
 
-  const payload = { ...streak, hasSessionToday };
+  const payload = { ...streak, hasSessionToday, todayCounts };
   cache.set(cacheKey, payload, 60000);
   res.json(payload);
 });

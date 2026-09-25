@@ -39,7 +39,7 @@ const goalDescription = (goal) => {
 export default function SessionSummaryScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
-  const { book, readSeconds, endPage, speed, streakInfo, completed, goalJustCompleted = [], delta, offline } = route.params;
+  const { book, readSeconds, endPage, speed, streakInfo, streakAlmost, completed, goalJustCompleted = [], delta, offline } = route.params;
   const [rating, setRating] = useState(0);
 
   const handleRate = async (stars) => {
@@ -52,6 +52,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
   };
 
   const [streakVisible, setStreakVisible] = useState(!!streakInfo);
+  const [almostVisible, setAlmostVisible] = useState(!!streakAlmost);
   const [goalVisible, setGoalVisible] = useState(false);
   const goalShown = useRef(false);
   const flameScale = useRef(new Animated.Value(0)).current;
@@ -93,6 +94,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
 
   const closeStreak = () => {
     setStreakVisible(false);
+    setAlmostVisible(false);
     if (goalJustCompleted.length > 0 && !goalShown.current) {
       goalShown.current = true;
       setGoalVisible(true);
@@ -100,11 +102,26 @@ export default function SessionSummaryScreen({ route, navigation }) {
   };
 
   useEffect(() => {
-    if (goalShown.current || streakVisible || goalJustCompleted.length === 0) return;
+    if (goalShown.current || streakVisible || almostVisible || goalJustCompleted.length === 0) return;
     goalShown.current = true;
     const t = setTimeout(() => setGoalVisible(true), 450);
     return () => clearTimeout(t);
-  }, [streakVisible, goalJustCompleted.length]);
+  }, [streakVisible, almostVisible, goalJustCompleted.length]);
+
+  // Mensaje del modal "casi activas tu racha": lo que falta para que el día
+  // califique, según el modo y el déficit que devuelve el server (missing).
+  const almostMessage = () => {
+    const m = streakAlmost?.missing;
+    if (!m) return "";
+    const min = Math.ceil(m.seconds / 60);
+    if (m.mode === "page") {
+      const bits = [];
+      if (min > 0) bits.push(`${min} ${min === 1 ? "minuto" : "minutos"}`);
+      if (m.pages > 0) bits.push(`${m.pages} ${m.pages === 1 ? "página" : "páginas"}`);
+      return bits.length > 0 ? `Te faltan ${bits.join(" y ")} para activarla` : "";
+    }
+    return `Te faltan ${Math.max(1, min)} ${min <= 1 ? "minuto" : "minutos"} para activarla`;
+  };
 
   const frac = progressFraction(book, endPage);
   const remainingValue =
@@ -209,37 +226,59 @@ export default function SessionSummaryScreen({ route, navigation }) {
         <Text style={styles.finishBtnText}>Listo</Text>
       </TouchableOpacity>
 
-      <Modal visible={streakVisible} transparent animationType="fade">
+      <Modal visible={streakVisible || almostVisible} transparent animationType="fade">
         <View style={styles.streakOverlay}>
           <View style={styles.streakCard}>
-            <Animated.View
-              style={{
-                transform: [
-                  { scale: flameScale },
-                  {
-                    rotate: flameRotate.interpolate({
-                      inputRange: [0, 1],
-                      outputRange: ["-10deg", "10deg"],
-                    }),
-                  },
-                ],
-              }}
-            >
-              <Ionicons name="flame" size={96} color={colors.star} />
-            </Animated.View>
-            <Text style={styles.streakTitle}>¡Se activó tu racha!</Text>
-            <Text style={styles.streakNumber}>{streakInfo?.days ?? 1}</Text>
-            <Text style={styles.streakDays}>
-              {(streakInfo?.days ?? 1) === 1 ? "día seguido" : "días seguidos"} de lectura
-            </Text>
-            <Text style={styles.streakCheer}>
-              {(streakInfo?.days ?? 1) === 1
-                ? "El fuego está encendido, no lo dejes apagar 🔥"
-                : "Sigue así, el fuego crece cada día más 🔥"}
-            </Text>
-            <TouchableOpacity style={styles.streakBtn} onPress={closeStreak}>
-              <Text style={styles.streakBtnText}>¡Vamos!</Text>
-            </TouchableOpacity>
+            {streakVisible ? (
+              <>
+                <Animated.View
+                  style={{
+                    transform: [
+                      { scale: flameScale },
+                      {
+                        rotate: flameRotate.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: ["-10deg", "10deg"],
+                        }),
+                      },
+                    ],
+                  }}
+                >
+                  <Ionicons name="flame" size={96} color={colors.star} />
+                </Animated.View>
+                <Text style={styles.streakTitle}>¡Se activó tu racha!</Text>
+                <Text style={styles.streakNumber}>{streakInfo?.days ?? 1}</Text>
+                <Text style={styles.streakDays}>
+                  {(streakInfo?.days ?? 1) === 1 ? "día seguido" : "días seguidos"} de lectura
+                </Text>
+                <Text style={styles.streakCheer}>
+                  {(streakInfo?.days ?? 1) === 1
+                    ? "El fuego está encendido, no lo dejes apagar 🔥"
+                    : "Sigue así, el fuego crece cada día más 🔥"}
+                </Text>
+                <TouchableOpacity style={styles.streakBtn} onPress={closeStreak}>
+                  <Text style={styles.streakBtnText}>¡Vamos!</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <>
+                <Ionicons name="flame-outline" size={96} color={colors.textDim} />
+                <Text style={styles.streakTitle}>Casi activas tu racha</Text>
+                <Text style={styles.almostText}>{almostMessage()}</Text>
+                {streakAlmost?.current > 0 && (
+                  <Text style={styles.streakDays}>
+                    Tu racha de {streakAlmost.current}{" "}
+                    {streakAlmost.current === 1 ? "día" : "días"} sigue intacta
+                  </Text>
+                )}
+                <Text style={styles.streakCheer}>
+                  Esta sesión aún no cuenta para tu racha
+                </Text>
+                <TouchableOpacity style={styles.streakBtn} onPress={closeStreak}>
+                  <Text style={styles.streakBtnText}>Entendido</Text>
+                </TouchableOpacity>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -333,6 +372,14 @@ const createStyles = (colors) =>
       borderColor: colors.accent + "55",
     },
     streakTitle: { fontSize: 22, fontWeight: "bold", color: colors.text, marginTop: 12 },
+    almostText: {
+      fontSize: 16,
+      fontWeight: "600",
+      color: colors.text,
+      textAlign: "center",
+      marginTop: 10,
+      marginBottom: 6,
+    },
     goalSubtitle: { fontSize: 14, color: colors.textMuted, marginTop: 4, marginBottom: 12 },
     goalList: { marginBottom: 12, alignItems: "center" },
     goalItem: { fontSize: 16, fontWeight: "600", color: colors.accent, textAlign: "center", marginVertical: 3 },

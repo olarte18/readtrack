@@ -72,7 +72,9 @@ export default function ReadingScreen({ navigation }) {
   const dailyGoal = goals?.goals?.find((g) => g.type === "daily");
   const dailyPct =
     dailyGoal?.value > 0 ? Math.round(((goals?.progress?.daily ?? 0) / dailyGoal.value) * 100) : null;
-  const hasSessionToday = streak?.hasSessionToday === true;
+  // El fuego se enciende solo si HOY califica para la racha (todayCounts).
+  // hasSessionToday queda como respaldo para clientes con el server viejo.
+  const streakActiveToday = streak?.todayCounts === true || streak?.hasSessionToday === true;
 
   return (
     <View style={styles.container}>
@@ -81,13 +83,13 @@ export default function ReadingScreen({ navigation }) {
         <TouchableOpacity
           style={[
             styles.streakChip,
-            { borderColor: hasSessionToday ? colors.star + "55" : colors.border }
+            { borderColor: streakActiveToday ? colors.star + "55" : colors.border }
           ]}
           onPress={() => navigation.navigate("Main", { screen: "Calendar" })}
           activeOpacity={0.7}
         >
-          <Ionicons name="flame" size={20} color={hasSessionToday ? colors.star : colors.textMuted} />
-          <Text style={[styles.streakValue, { color: hasSessionToday ? colors.text : colors.textMuted }]}>{streak?.current ?? 0}</Text>
+          <Ionicons name="flame" size={20} color={streakActiveToday ? colors.star : colors.textMuted} />
+          <Text style={[styles.streakValue, { color: streakActiveToday ? colors.text : colors.textMuted }]}>{streak?.current ?? 0}</Text>
           <View style={styles.streakDivider} />
           <Ionicons name="trophy" size={14} color={colors.textMuted} />
           <Text style={styles.streakBest}>{streak?.best ?? 0}</Text>
