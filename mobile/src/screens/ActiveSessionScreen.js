@@ -69,6 +69,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const permissionWarnedRef = useRef(false);
   const alarmHintRef = useRef(false);
   const brightnessRef = useRef(null);
+  const wasRunningBefore = useRef(false);
 
   const alarm = useAudioPlayer(require("../../assets/alarm.wav"));
 
@@ -298,20 +299,24 @@ export default function ActiveSessionScreen({ route, navigation }) {
     }
   };
 
-  const togglePause = () => {
-    if (!isTimer) {
-      setRunning((r) => !r);
-      if (hasNative) setAlarmSessionPaused(running);
-      return;
-    }
+  const pauseClock = () => {
     if (running) {
-      if (hasNative) {
-        setAlarmSessionPaused(true);
+      if (isTimer) {
+        if (hasNative) {
+          setAlarmSessionPaused(true);
+        } else {
+          cancelTimerAlarm();
+        }
+        setRunning(false);
       } else {
-        cancelTimerAlarm();
+        setRunning(false);
+        if (hasNative) setAlarmSessionPaused(true);
       }
-      setRunning(false);
-    } else {
+    }
+  };
+
+  const resumeClock = () => {
+    if (isTimer) {
       requestTimerPermission();
       if (hasNative) {
         setAlarmSessionPaused(false);
@@ -319,6 +324,17 @@ export default function ActiveSessionScreen({ route, navigation }) {
         scheduleTimerAlarm(seconds * 1000);
       }
       setRunning(true);
+    } else {
+      setRunning(true);
+      if (hasNative) setAlarmSessionPaused(false);
+    }
+  };
+
+  const togglePause = () => {
+    if (running) {
+      pauseClock();
+    } else {
+      resumeClock();
     }
   };
 
@@ -477,7 +493,17 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   const handleFinish = () => {
     setFinishExplicit(false);
+    // Congela el reloj mientras eliges el avance: no cuenta como tiempo de lectura.
+    wasRunningBefore.current = running;
+    pauseClock();
     setFinishVisible(true);
+  };
+
+  const closeFinish = (resume) => {
+    setFinishVisible(false);
+    if (resume && wasRunningBefore.current && !running) {
+      resumeClock();
+    }
   };
 
   // Cualquier intento de salir de la sesión (botón/gesto atrás en Android e iOS)
@@ -517,7 +543,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   };
 
   const finishModal = (
-    <Modal visible={finishVisible} transparent animationType="fade" onRequestClose={() => setFinishVisible(false)}>
+    <Modal visible={finishVisible} transparent animationType="fade" onRequestClose={() => closeFinish(true)}>
       <KeyboardAvoidingView
         style={styles.modalOverlay}
         behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -563,7 +589,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
           <View style={styles.modalBtnRow}>
             <TouchableOpacity
               style={[styles.modalBtn, styles.modalBtnCancel]}
-              onPress={() => setFinishVisible(false)}
+              onPress={() => closeFinish(true)}
             >
               <Text style={styles.modalBtnCancelText}>Cancelar</Text>
             </TouchableOpacity>
