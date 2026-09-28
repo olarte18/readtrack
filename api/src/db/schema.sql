@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS reading_sessions (
   start_page       INTEGER,
   duration_seconds INTEGER,
   pages_read       INTEGER,
+  started_at       TIMESTAMP,
   created_at       TIMESTAMP DEFAULT NOW()
 );
 -- Idempotencia de sesiones: el móvil genera un client_id por sesión; si se
@@ -135,6 +136,12 @@ CREATE TABLE IF NOT EXISTS reading_sessions (
 ALTER TABLE reading_sessions ADD COLUMN IF NOT EXISTS client_id UUID;
 CREATE UNIQUE INDEX IF NOT EXISTS reading_sessions_user_client_uidx
   ON reading_sessions (user_id, client_id) WHERE client_id IS NOT NULL;
+-- Inicio real de la sesión enviado por la app (para logros de horario).
+-- Las filas viejas heredan el inicio derivado: created_at − duración.
+ALTER TABLE reading_sessions ADD COLUMN IF NOT EXISTS started_at TIMESTAMP;
+UPDATE reading_sessions
+SET started_at = created_at - make_interval(secs => COALESCE(duration_seconds, 0))
+WHERE started_at IS NULL;
 
 CREATE TABLE IF NOT EXISTS reading_goals (
   id         SERIAL PRIMARY KEY,
@@ -268,6 +275,22 @@ INSERT INTO achievements (code, tier, name, description, leyenda, icon, grp, tar
   ('maraton_fin_de_semana','gold','Maratón de fin de semana','Lee más de 300 páginas los fines de semana','Convertiste dos días en una biblioteca completa.','sunny','volumen',300,FALSE,20),
   ('maraton_fin_de_semana','special','Maratón de fin de semana','Lee más de 600 páginas los fines de semana','El mundo esperó, tú seguiste leyendo.','sunny','volumen',600,TRUE,21),
   ('meta_anual','bronze','Meta cumplida','Cumple tu meta anual de lectura','Cumpliste lo que te prometiste.','ribbon','volumen',1,FALSE,22),
+  ('era_colosal','bronze','Era así de grande','Termina 1 libro de 1 000 o más páginas','Un libro puede pesar, pero tú también.','albums','volumen',1,FALSE,23),
+  ('era_colosal','silver','Era así de grande','Termina 3 libros de 1 000 o más páginas','Un tomo grueso nunca va a poder contigo.','albums','volumen',3,FALSE,24),
+  ('era_colosal','gold','Era así de grande','Termina 6 libros de 1 000 o más páginas','Los ladrillos ya no te impresionan.','albums','volumen',6,FALSE,25),
+  ('era_colosal','special','Era así de grande','Termina 10 libros de 1 000 o más páginas','La biblioteca tiene un asiento reservado para ti.','albums','volumen',10,TRUE,26),
+  ('aventurero','bronze','Aventurero','Termina 3 libros de fantasía','Los portales se abren para ti.','compass','variedad',3,FALSE,7),
+  ('aventurero','silver','Aventurero','Termina 10 libros de fantasía','Los dragones ya te reconocen por el nombre.','compass','variedad',10,FALSE,8),
+  ('aventurero','gold','Aventurero','Termina 25 libros de fantasía','Los mapas se dibujan con tus rutas.','compass','variedad',25,FALSE,9),
+  ('aventurero','special','Aventurero','Termina 50 libros de fantasía','Cada torre del reino guarda tu nombre.','compass','variedad',50,TRUE,10),
+  ('madrugador','bronze','Madrugador','Registra 5 sesiones antes de las 7:00 am','El día empieza y tú ya leíste.','alarm','horarios',5,FALSE,1),
+  ('madrugador','silver','Madrugador','Registra 15 sesiones antes de las 7:00 am','La mañana te debe una taza de café.','alarm','horarios',15,FALSE,2),
+  ('madrugador','gold','Madrugador','Registra 40 sesiones antes de las 7:00 am','El sol aprende de tus horas.','alarm','horarios',40,FALSE,3),
+  ('madrugador','special','Madrugador','Registra 100 sesiones antes de las 7:00 am','La madrugada es tuya.','alarm','horarios',100,TRUE,4),
+  ('nocturno','bronze','Nocturno','Registra 5 sesiones entre la medianoche y las 4:00 am','La noche te presta su silencio.','moon','horarios',5,FALSE,5),
+  ('nocturno','silver','Nocturno','Registra 15 sesiones entre la medianoche y las 4:00 am','Las estrellas ya te esperan despierto.','moon','horarios',15,FALSE,6),
+  ('nocturno','gold','Nocturno','Registra 40 sesiones entre la medianoche y las 4:00 am','La luz de la luna marca tus páginas.','moon','horarios',40,FALSE,7),
+  ('nocturno','special','Nocturno','Registra 100 sesiones entre la medianoche y las 4:00 am','El halo lunar te eligió como lector.','moon','horarios',100,TRUE,8),
   ('explorador','bronze','Explorador de géneros','Lee en 5 géneros distintos','Un mundo nuevo se abrió contigo.','grid','variedad',5,FALSE,1),
   ('explorador','silver','Explorador de géneros','Lee en 10 géneros distintos','Tus lecturas hablan varios idiomas.','grid','variedad',10,FALSE,2),
   ('autor_fiel','bronze','Autor fiel','Lee 3 libros del mismo autor','Encontraste una voz que vuelve.','people','variedad',3,FALSE,3),
@@ -309,6 +332,10 @@ WHERE (ua.code, ua.tier) NOT IN (
       ('lectura_expres','bronze'),('lectura_expres','silver'),('lectura_expres','gold'),('lectura_expres','special'),
       ('maraton_fin_de_semana','bronze'),('maraton_fin_de_semana','silver'),('maraton_fin_de_semana','gold'),('maraton_fin_de_semana','special'),
       ('meta_anual','bronze'),
+      ('era_colosal','bronze'),('era_colosal','silver'),('era_colosal','gold'),('era_colosal','special'),
+      ('aventurero','bronze'),('aventurero','silver'),('aventurero','gold'),('aventurero','special'),
+      ('madrugador','bronze'),('madrugador','silver'),('madrugador','gold'),('madrugador','special'),
+      ('nocturno','bronze'),('nocturno','silver'),('nocturno','gold'),('nocturno','special'),
       ('explorador','bronze'),('explorador','silver'),
       ('autor_fiel','bronze'),('autor_fiel','silver'),('autor_fiel','gold'),('autor_fiel','special'),
       ('critico','bronze'),('critico','silver'),
@@ -331,6 +358,10 @@ WHERE (a.code, a.tier) NOT IN (
     ('lectura_expres','bronze'),('lectura_expres','silver'),('lectura_expres','gold'),('lectura_expres','special'),
     ('maraton_fin_de_semana','bronze'),('maraton_fin_de_semana','silver'),('maraton_fin_de_semana','gold'),('maraton_fin_de_semana','special'),
     ('meta_anual','bronze'),
+    ('era_colosal','bronze'),('era_colosal','silver'),('era_colosal','gold'),('era_colosal','special'),
+    ('aventurero','bronze'),('aventurero','silver'),('aventurero','gold'),('aventurero','special'),
+    ('madrugador','bronze'),('madrugador','silver'),('madrugador','gold'),('madrugador','special'),
+    ('nocturno','bronze'),('nocturno','silver'),('nocturno','gold'),('nocturno','special'),
     ('explorador','bronze'),('explorador','silver'),
     ('autor_fiel','bronze'),('autor_fiel','silver'),('autor_fiel','gold'),('autor_fiel','special'),
     ('critico','bronze'),('critico','silver'),

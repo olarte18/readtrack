@@ -17,6 +17,9 @@ router.use(globalUserLimiter);
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
+// ISO 8601 con zona (p. ej. "2026-09-27T02:00:00.000Z"); siempre en UTC.
+const STARTED_AT_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:\d{2})?$/;
+
 // Envuelve una sesión recién creada con los extras que consume la app
 // (primera del día, racha, metas cumplidas) para no duplicar lógica entre
 // el insert normal y el reenvío idempotente.
@@ -72,10 +75,14 @@ router.post("/", async (req, res) => {
     duration_seconds: { type: "integer", min: 0 },
     pages_read: { type: "integer", min: 0 },
     client_id: { type: "string", max: 36 },
+    started_at: { type: "string", max: 36 },
   });
 
   if (data.client_id !== undefined && !UUID_RE.test(data.client_id)) {
     throw httpError(400, "client_id inválido");
+  }
+  if (data.started_at !== undefined && !STARTED_AT_RE.test(data.started_at)) {
+    throw httpError(400, "started_at inválido");
   }
 
   // Idempotencia: si este client_id ya se guardó (reintento de red o sync de la
@@ -99,8 +106,8 @@ router.post("/", async (req, res) => {
   if (owned.rows.length === 0) throw httpError(404, "Libro no encontrado");
 
   const { rows } = await pool.query(
-    "INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read, client_id) VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *",
-    [data.user_book_id, req.userId, data.page, data.start_page, data.duration_seconds, data.pages_read, data.client_id ?? null]
+    "INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read, client_id, started_at) VALUES ($1, $2, $3, $4, $5, $6, $7, $8::timestamp) RETURNING *",
+    [data.user_book_id, req.userId, data.page, data.start_page, data.duration_seconds, data.pages_read, data.client_id ?? null, data.started_at ?? null]
   );
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
@@ -118,8 +125,12 @@ router.patch("/:id", async (req, res) => {
     start_page: { type: "integer", min: 0 },
     duration_seconds: { type: "integer", min: 0 },
     pages_read: { type: "integer", min: 0 },
+    started_at: { type: "string", max: 36 },
   });
   if (Object.keys(data).length === 0) throw httpError(400, "No hay campos para actualizar");
+  if (data.started_at !== undefined && !STARTED_AT_RE.test(data.started_at)) {
+    throw httpError(400, "started_at inválido");
+  }
 
   const fields = Object.keys(data);
   const sets = fields.map((f, i) => `${f} = $${i + 1}`).join(", ");

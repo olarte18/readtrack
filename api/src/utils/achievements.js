@@ -69,6 +69,15 @@ async function computeProgress(userId) {
   );
   progress.set("tomo_pesado", heavyRows[0].n);
 
+  const { rows: colosalRows } = await pool.query(
+    `SELECT COUNT(DISTINCT ub.book_id)::int AS n
+     FROM user_books ub
+     JOIN books b ON b.id = ub.book_id
+     WHERE ub.user_id = $1 AND ub.status = 'completed' AND b.pages >= 1000`,
+    [userId]
+  );
+  progress.set("era_colosal", colosalRows[0].n);
+
   const { rows: shortRows } = await pool.query(
     `SELECT COUNT(DISTINCT ub.book_id)::int AS n
      FROM user_books ub
@@ -117,6 +126,25 @@ async function computeProgress(userId) {
   );
   progress.set("autor_fiel", authorRows[0]?.n ?? 0);
 
+  // Normalización amplia de fantasía: google/catálogos la etiquetan de varias
+  // formas en español e inglés (fantasía, fantasía épica, juvenil, epic
+  // fantasy, young adult...). El LIKE es lento sobre toda la tabla, así que se
+  // apoya en el filtro de usuario/status y solo matchea el género del libro.
+  const FANTASY_PATTERNS = [
+    "%fantasy%", "%fantas%", "%épica%", "%epica%", "%epic%",
+    "%juvenil%", "%young adult%", "%juvenile%", "%teen%",
+  ];
+
+  const { rows: fantasyRows } = await pool.query(
+    `SELECT COUNT(DISTINCT ub.book_id)::int AS n
+     FROM user_books ub
+     JOIN books b ON b.id = ub.book_id
+     WHERE ub.user_id = $1 AND ub.status = 'completed'
+       AND b.genre IS NOT NULL AND LOWER(b.genre) LIKE ANY($2::text[])`,
+    [userId, FANTASY_PATTERNS]
+  );
+  progress.set("aventurero", fantasyRows[0].n);
+
   const { rows: ratingRows } = await pool.query(
     `SELECT COUNT(DISTINCT book_id)::int AS n
      FROM user_books
@@ -159,6 +187,25 @@ async function computeProgress(userId) {
     [userId]
   );
   progress.set("dedicacion", dedRows[0] ? 1 : 0);
+
+  // Madrugador / Nocturno: hora local (Bogotá) en que empezó la sesión. El
+  // inicio real lo manda la app (started_at, UTC); las filas de antes lo
+  // heredan derivado de created_at − duración.
+  const sessionStart = "COALESCE(rs.started_at, rs.created_at - make_interval(secs => COALESCE(rs.duration_seconds, 0)))";
+  const startHour = `(${SQL.utcToApp(sessionStart)})::time`;
+  const { rows: horariosRows } = await pool.query(
+    `SELECT
+       COUNT(*) FILTER (WHERE start_hour < TIME '07:00')::int AS madrugador,
+       COUNT(*) FILTER (WHERE start_hour >= TIME '00:00' AND start_hour < TIME '04:00')::int AS nocturno
+     FROM (
+       SELECT ${startHour} AS start_hour
+       FROM reading_sessions rs
+       WHERE rs.user_id = $1
+     ) t`,
+    [userId]
+  );
+  progress.set("madrugador", horariosRows[0].madrugador);
+  progress.set("nocturno", horariosRows[0].nocturno);
 
   return { progress, targets };
 }

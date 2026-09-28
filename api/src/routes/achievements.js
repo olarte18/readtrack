@@ -14,6 +14,7 @@ const GROUP_LABELS = {
   volumen: "Volumen",
   variedad: "Variedad",
   interaccion: "Interacción",
+  horarios: "Horarios",
   secretos: "Secretos",
 };
 

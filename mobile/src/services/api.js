@@ -416,10 +416,10 @@ export const getStreak = async () => getWithCache("/stats/streak");
 
 export const getAllNotes = async () => request("/notes");
 
-export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read, book_completed, start_page, clientId) =>
+export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read, book_completed, start_page, clientId, started_at) =>
   request("/reading-sessions", {
     method: "POST",
-    body: JSON.stringify({ user_book_id, page, start_page, duration_seconds, pages_read, book_completed, ...(clientId ? { client_id: clientId } : {}) }),
+    body: JSON.stringify({ user_book_id, page, start_page, duration_seconds, pages_read, book_completed, ...(clientId ? { client_id: clientId } : {}), ...(started_at ? { started_at } : {}) }),
   });
 
 export const getReadingSessions = async (user_book_id, date) =>

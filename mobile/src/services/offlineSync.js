@@ -12,7 +12,7 @@ const submitItem = async (id, clientId, payload) => {
   const updates = payload?.update;
   if (updates && s?.user_book_id) await updateBook(s.user_book_id, updates);
   if (s) {
-    await addReadingSession(s.user_book_id, s.page, s.duration_seconds, s.pages_read, s.book_completed, s.start_page, clientId);
+    await addReadingSession(s.user_book_id, s.page, s.duration_seconds, s.pages_read, s.book_completed, s.start_page, clientId, s.started_at);
   }
 };
 

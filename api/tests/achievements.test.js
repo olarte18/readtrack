@@ -23,11 +23,11 @@ async function completeBook(token, id, overrides = {}) {
 }
 
 // created_at va en UTC; Bogotá = UTC-5 (las 12:00 de Bogotá son las 17:00 UTC).
-async function addSession(token, user, userBookId, created_at, duration_seconds = 600, pages_read = 10, page = 10) {
+async function addSession(token, user, userBookId, created_at, duration_seconds = 600, pages_read = 10, page = 10, started_at = null) {
   await pool.query(
-    `INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read, created_at)
-     VALUES ($1, $2, $3, $4, $5, $6, $7)`,
-    [userBookId, user.id, page, 0, duration_seconds, pages_read, created_at]
+    `INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read, created_at, started_at)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+    [userBookId, user.id, page, 0, duration_seconds, pages_read, created_at, started_at]
   );
 }
 
@@ -371,6 +371,126 @@ describe("maratón de fin de semana", () => {
     expect(item.unlocked).toBe(true);
     expect(item.target).toBe(150);
     expect(item.next_tier).toBe(true);
+  });
+});
+
+describe("era así de grande (1 000+ páginas)", () => {
+  test("un libro de exactamente 1 000 páginas desbloquea bronce", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token, { pages: 1000, title: "Colosal" });
+    await completeBook(token, book.body.id);
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    const item = findItem(res, "era_colosal", "bronze");
+    expect(item.unlocked).toBe(true);
+    expect(item.progress).toBe(1);
+    expect(item.target).toBe(3);
+    expect(item.next_tier).toBe(true);
+    // el escalón final (10) es secreto: no aparece
+    expect(findItem(res, "era_colosal", "special")).toBeNull();
+  });
+
+  test("tres libros de más de 1 000 páginas suben a plata", async () => {
+    const { token } = await registerUser();
+    for (const pages of [1000, 1500, 2099]) {
+      const book = await addBook(token, { pages, title: `Colosal ${pages}` });
+      await completeBook(token, book.body.id);
+    }
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    const item = findItem(res, "era_colosal", "silver");
+    expect(item.unlocked).toBe(true);
+    expect(item.progress).toBe(3);
+    expect(item.target).toBe(6);
+    expect(item.next_tier).toBe(true);
+  });
+
+  test("991 páginas no cuentan", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token, { pages: 991, title: "Casi" });
+    await completeBook(token, book.body.id);
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    expect(findItem(res, "era_colosal", "bronze").progress).toBe(0);
+  });
+});
+
+describe("aventurero: normalización de fantasía", () => {
+  test("fantasía en sus variantes cuenta aunque el género cambie", async () => {
+    const { token } = await registerUser();
+    const generos = ["Fantasía", "Fantasía épica", "Fantasy", "Epic Fantasy"];
+    for (const genre of generos) {
+      const book = await addBook(token, { genre, title: `Fant-${genre}` });
+      await completeBook(token, book.body.id);
+    }
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    const item = findItem(res, "aventurero", "bronze");
+    expect(item.unlocked).toBe(true);
+    expect(item.progress).toBe(4);
+    expect(item.target).toBe(10);
+    expect(item.next_tier).toBe(true);
+  });
+
+  test("etiquetas en inglés y juvenil/épica también cuentan", async () => {
+    const { token } = await registerUser();
+    const generos = ["Young Adult", "Juvenil", "Teen", "Épica"];
+    for (const genre of generos) {
+      const book = await addBook(token, { genre, title: `Gen-${genre}` });
+      await completeBook(token, book.body.id);
+    }
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    expect(findItem(res, "aventurero", "bronze").progress).toBe(4);
+  });
+
+  test("romance y ciencia ficción no cuentan", async () => {
+    const { token } = await registerUser();
+    for (const genre of ["Romance", "Ciencia ficción", "Historia"]) {
+      const book = await addBook(token, { genre, title: `Gen-${genre}` });
+      await completeBook(token, book.body.id);
+    }
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    expect(findItem(res, "aventurero", "bronze").progress).toBe(0);
+  });
+});
+
+describe("madrugador y nocturno (hora local de Bogotá)", () => {
+  test("5 sesiones antes de las 7:00 am (10:30 UTC) desbloquean madrugador", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+    for (let i = 0; i < 5; i++) {
+      await addSession(token, user, book.body.id, `2026-09-0${i + 1} 10:30:00`, 600, 5, 5, `2026-09-0${i + 1} 10:30:00`);
+    }
+    // 07:00 Bogotá en punto (12:00 UTC) es el límite excluido
+    await addSession(token, user, book.body.id, "2026-09-06 12:00:00", 600, 5, 5, "2026-09-06 12:00:00");
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    const item = findItem(res, "madrugador", "bronze");
+    expect(item.unlocked).toBe(true);
+    expect(item.progress).toBe(5);
+    expect(item.target).toBe(15);
+    expect(findItem(res, "nocturno", "bronze").progress).toBe(0);
+  });
+
+  test("nocturno cuenta dentro de [00:00, 04:00) y no en el límite exacto", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+    // 03:00 Bogotá = 08:00 UTC (cuenta)
+    for (let i = 0; i < 2; i++) {
+      await addSession(token, user, book.body.id, `2026-09-0${i + 1} 08:00:00`, 600, 5, 5, `2026-09-0${i + 1} 08:00:00`);
+    }
+    // 04:00 Bogotá en punto = 09:00 UTC (límite excluido)
+    await addSession(token, user, book.body.id, "2026-09-03 09:00:00", 600, 5, 5, "2026-09-03 09:00:00");
+    // Sin started_at: el inicio se deriva (created_at 05:50 UTC = 00:50 Bogotá)
+    await addSession(token, user, book.body.id, "2026-09-04 05:50:00", 600, 5, 5);
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    const item = findItem(res, "nocturno", "bronze");
+    expect(item.unlocked).toBe(false);
+    expect(item.progress).toBe(3);
+    expect(item.target).toBe(5);
   });
 });
 

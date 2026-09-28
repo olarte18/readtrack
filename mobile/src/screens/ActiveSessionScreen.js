@@ -99,6 +99,9 @@ export default function ActiveSessionScreen({ route, navigation }) {
       setSeconds(0);
       setRunning(false);
       setTimeUp(true);
+      // La sesión ya terminó: el inicio real fue lo que duró el temporizador
+      // atrás desde ahora (no el momento en que se reabrió la app).
+      startTime.current = Date.now() - (Number(route.params.alarmSeconds) || 0) * 1000;
       if (hasNative) cancelAlarmSession();
       return;
     }
@@ -284,6 +287,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
       return AppAlert.alert("Error", "Elige un tiempo válido entre 1 y 600 minutos");
     }
     alarmFiredRef.current = false;
+    startTime.current = Date.now();
     setDuration(min * 60);
     setSeconds(min * 60);
     setTimerStarted(true);
@@ -416,6 +420,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
     try {
       const completed = finishExplicit || isCompleted(book, page);
+      const startedAt = new Date(startTime.current).toISOString();
       const updates = { current_page: page };
       let finishedAt = null;
       if (completed) {
@@ -453,7 +458,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         const attemptStart = Date.now();
         try {
           await updateBook(book.id, updates);
-          const saved = await addReadingSession(book.id, page, readSeconds, pages, completed, startPage, clientId);
+          const saved = await addReadingSession(book.id, page, readSeconds, pages, completed, startPage, clientId, startedAt);
           try {
             Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           } catch {}
@@ -479,6 +484,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
                   pages_read: pages,
                   book_completed: completed,
                   reading_mode: book.reading_mode ?? "page",
+                  started_at: startedAt,
                 },
               },
             });
