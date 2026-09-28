@@ -177,6 +177,19 @@ describe("GET /calendar/:year/:month", () => {
     expect(d1).toMatchObject({ minutes: 60, pages: 4, counts: true });
   });
 
+  test("sesión sin duración (NULL) aparece en el calendario y cuenta (histórica)", async () => {
+    const { token, user } = await registerUser();
+    const libro = await addBook(token, { reading_mode: "page" });
+
+    // Cero segundos pero la sesión existió: el día debe aparecer con 0 minutos
+    // y el avance registrado; por grandfathered cuenta para la racha.
+    await insertSession(user.id, libro.id, "1999-12-29 17:00:00", null, 4, "1999-12-29 17:00:00");
+
+    const res = await request(app).get("/calendar/1999/12").set(authHeader(token));
+    const dia = res.body.days.find((d) => d.date === "1999-12-29");
+    expect(dia).toMatchObject({ minutes: 0, pages: 4, counts: true });
+  });
+
   test("mes vacío devuelve days vacío", async () => {
     const { token } = await registerUser();
     const res = await request(app).get("/calendar/2025/6").set(authHeader(token));

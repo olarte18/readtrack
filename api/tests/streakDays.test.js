@@ -151,6 +151,22 @@ describe("regla de día de racha según modo (streakDays)", () => {
     const res = await getStreak(token);
     expect(res.best).toBe(1);
   });
+
+  test("histérico: sesión sin duración (NULL) anterior al corte aún cuenta el día", async () => {
+    const { token, user } = await registerUser();
+    const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    // duration_seconds NULL: el lapso no se puede medir (0 s), pero la sesión
+    // existió. Por grandfathered su día debe contar igual que antes del deploy.
+    await insertSession(ub, user.id, {
+      page: 10,
+      start_page: 9,
+      duration_seconds: null,
+      created_at: "1999-12-29 12:00:00",
+      started_at: "1999-12-29 12:00:00",
+    });
+
+    expect((await getStreak(token)).best).toBe(1);
+  });
 });
 
 // Feedback para el UX: /stats/streak ahora distingue "hubo una sesión hoy"
@@ -269,6 +285,21 @@ describe("sesiones que cruzan la medianoche (sessionDays)", () => {
     });
 
     expect(await getStreak(token)).toMatchObject({ current: 0, best: 1 });
+  });
+
+  test("sin duración tras el corte: el día aparece pero NO califica (0 min)", async () => {
+    const { token, user } = await registerUser();
+    const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    // Post-corte: una sesión sin minutos no puede regalar el día de racha.
+    await insertSession(ub, user.id, {
+      page: 104,
+      start_page: 100,
+      duration_seconds: null,
+      created_at: "2026-10-03 17:00:00",
+      started_at: "2026-10-03 17:00:00",
+    });
+
+    expect(await getStreak(token)).toMatchObject({ current: 0, best: 0 });
   });
 
   test("reparto con mayor resto: 100 min y 4 páginas dan 5+3", async () => {

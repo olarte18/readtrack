@@ -97,6 +97,19 @@ async function bucketReadingDays(userId) {
            s.adv AS pages
     FROM spans_full s
     WHERE s.started_at IS NULL
+    UNION ALL
+    -- Sin duración (NULL o 0) pero con inicio real: el lapso del overlap es de
+    -- 0 s y el filtro end>start lo descarta. Aun así la sesión existió, así que
+    -- su día debe aparecer (con 0 minutos y el avance registrado). Para las
+    -- sesiones previas al corte esto restaura el grandfathered que contaba el
+    -- día; tras el corte una sesión de 0 min no califica igual.
+    SELECT s.session_id, s.user_book_id, s.mode, s.created_at,
+           TO_CHAR(${SQL.utcToApp("s.start_ts")}, 'YYYY-MM-DD') AS date,
+           0::bigint AS secs,
+           s.adv AS pages
+    FROM spans_full s
+    WHERE s.started_at IS NOT NULL
+      AND COALESCE(s.duration_seconds, 0) <= 0
     ORDER BY session_id, date
     `,
     [userId]
