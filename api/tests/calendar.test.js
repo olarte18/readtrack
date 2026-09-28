@@ -127,6 +127,24 @@ describe("GET /calendar/:year/:month", () => {
     expect(day).toMatchObject({ minutes: 20, pages: 4 });
   });
 
+  test("el título del día viene de la copia del usuario, no de un id espurio del catálogo", async () => {
+    const { token, user } = await registerUser();
+    // Desfasa la secuencia de books respecto a user_books: un registro de
+    // catálogo ocupa el id 1 de books, mientras que user_books arranca en 1.
+    // Así user_books.id != books.id para el mismo libro (como en producción).
+    await pool.query(
+      `INSERT INTO books (google_id, title, author) VALUES ('cat-espurio', 'Catálogo espurio', 'Anónimo')`
+    );
+
+    const libro = await addBook(token, { title: "Hijos de Dune", author: "Brian Herbert" });
+    await insertSession(user.id, libro.id, "2025-03-07 12:00:00", 600, 4);
+
+    const res = await request(app).get("/calendar/2025/3").set(authHeader(token));
+    const dia = res.body.days.find((d) => d.date === "2025-03-07");
+    expect(dia.books).toHaveLength(1);
+    expect(dia.books[0]).toMatchObject({ title: "Hijos de Dune", author: "Brian Herbert" });
+  });
+
   test("sesión que cruza la medianoche reparte minutos y páginas entre ambos días", async () => {
     const { token, user } = await registerUser();
     const libro = await addBook(token, { reading_mode: "page" });

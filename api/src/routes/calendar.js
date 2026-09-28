@@ -40,11 +40,17 @@ router.get("/:year/:month", async (req, res) => {
   const bookIds = [...new Set(monthBuckets.map((b) => b.user_book_id))];
   let booksMap = new Map();
   if (bookIds.length > 0) {
+    // El título vive en el catálogo (books); la sesión referencia la copia del
+    // usuario (user_books.id), así que el join es user_books -> books por
+    // book_id. NO casar user_books.id contra books.id (ids distintos).
     const { rows: bookRows } = await pool.query(
-      `SELECT id, title, author, cover FROM books WHERE id = ANY($1::int[])`,
-      [bookIds]
+      `SELECT ub.id AS user_book_id, b.title, b.author, b.cover
+       FROM user_books ub
+       JOIN books b ON b.id = ub.book_id
+       WHERE ub.id = ANY($1::int[]) AND ub.user_id = $2`,
+      [bookIds, req.userId]
     );
-    booksMap = new Map(bookRows.map((r) => [r.id, r]));
+    booksMap = new Map(bookRows.map((r) => [r.user_book_id, r]));
   }
 
   const dayMap = new Map();
