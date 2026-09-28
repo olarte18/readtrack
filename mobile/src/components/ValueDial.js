@@ -6,6 +6,9 @@ import { useTheme } from "../contexts/ThemeContext";
 const ROW_HEIGHT = 56;
 const VISIBLE_ROWS = 3;
 const TOP_PAD = (ROW_HEIGHT * VISIBLE_ROWS - ROW_HEIGHT) / 2;
+// Por encima de esta velocidad el gesto cuenta como fling (el momentum seguirá
+// rodando): el commit se delega a onMomentumScrollEnd con la posición final.
+const FLING_VELOCITY = 60;
 
 // Rueda vertical tipo odómetro: arriba los valores anteriores, abajo los
 // siguientes; la fila del centro es el valor actual. Hace snap fila a fila,
@@ -40,7 +43,6 @@ export default function ValueDial({ min, max, value, onChange, unit }) {
     []
   );
   const keyExtractor = useCallback((item) => String(item), []);
-  const snapOffsets = useMemo(() => data.map((_, i) => i * ROW_HEIGHT), [data]);
 
   const computeIndex = (offset) =>
     Math.max(0, Math.min(Math.round(offset / ROW_HEIGHT), dataRef.current.length - 1));
@@ -60,6 +62,16 @@ export default function ValueDial({ min, max, value, onChange, unit }) {
     try {
       Haptics.selectionAsync();
     } catch {}
+  };
+
+  // Al soltar el dedo: si hubo fling, deja que el momentum siga y que
+  // onMomentumScrollEnd commitee con la posición final (evita un commit
+  // intermedio y onChange duplicado). Si el dedo se detuvo, commitear aquí:
+  // un drag lento no siempre dispara onMomentumScrollEnd en iOS.
+  const handleDragEnd = (e) => {
+    const velocity = e.nativeEvent.velocity?.y ?? 0;
+    if (Math.abs(velocity) > FLING_VELOCITY) return;
+    handleSettle(e);
   };
 
   const renderItem = ({ item, index }) => {
@@ -90,18 +102,19 @@ export default function ValueDial({ min, max, value, onChange, unit }) {
         keyExtractor={keyExtractor}
         renderItem={renderItem}
         getItemLayout={getItemLayout}
-        snapToOffsets={snapOffsets}
+        snapToInterval={ROW_HEIGHT}
+        snapToAlignment="start"
         bounces={false}
         alwaysBounceVertical={false}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={handleScroll}
-        onScrollEndDrag={handleSettle}
+        onScrollEndDrag={handleDragEnd}
         onMomentumScrollEnd={handleSettle}
         overScrollMode="never"
-        initialNumToRender={15}
+        initialNumToRender={21}
         maxToRenderPerBatch={12}
-        windowSize={7}
+        windowSize={11}
         extraData={active}
         contentContainerStyle={styles.content}
         style={styles.list}
