@@ -18,12 +18,13 @@ async function addBook(token, overrides = {}) {
   return res.body;
 }
 
-// Inserta una sesión con created_at UTC controlado (12:00 UTC cae en el mismo día Bogotá).
-async function insertSession(userId, userBookId, isoUtc, durationSeconds, pagesRead = 10) {
+// Inserta una sesión con created_at UTC controlado (12:00 UTC cae en el mismo
+// día Bogotá). started_at opcional; sin él el inicio se deriva del created_at.
+async function insertSession(userId, userBookId, isoUtc, durationSeconds, pagesRead = 10, startedAt = null) {
   await pool.query(
-    `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at)
-     VALUES ($1, $2, 100, $3, $4, $5::timestamp)`,
-    [userBookId, userId, pagesRead, durationSeconds, isoUtc]
+    `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at, started_at)
+     VALUES ($1, $2, 100, $3, $4, $5::timestamp, $6::timestamp)`,
+    [userBookId, userId, pagesRead, durationSeconds, isoUtc, startedAt]
   );
 }
 
@@ -69,7 +70,17 @@ describe("GET /calendar/:year/:month", () => {
     const { token, user } = await registerUser();
     const libro = await addBook(token, { reading_mode: "page" });
 
-    await insertSession(user.id, libro.id, new Date().toISOString(), 120, 0);
+    // started_at hace ~10s: el lapso cae entero en hoy aunque corramos justo
+    // después de la medianoche de Bogotá.
+    const now = new Date();
+    await insertSession(
+      user.id,
+      libro.id,
+      now.toISOString(),
+      120,
+      0,
+      new Date(now.getTime() - 10000).toISOString()
+    );
 
     const today = await bogotaToday();
     const res = await request(app)
@@ -114,6 +125,22 @@ describe("GET /calendar/:year/:month", () => {
     const day = res.body.days.find((d) => d.date === "2025-03-05");
     expect(day.books).toHaveLength(2);
     expect(day).toMatchObject({ minutes: 20, pages: 4 });
+  });
+
+  test("sesión que cruza la medianoche reparte minutos y páginas entre ambos días", async () => {
+    const { token, user } = await registerUser();
+    const libro = await addBook(token, { reading_mode: "page" });
+
+    // 23:30 (31/03) -> 00:30 (01/04) en Bogotá = 04:30 -> 05:30 UTC.
+    await insertSession(user.id, libro.id, "2025-04-01 05:30:00", 3600, 4, "2025-04-01 04:30:00");
+
+    const res31 = await request(app).get("/calendar/2025/3").set(authHeader(token));
+    const d31 = res31.body.days.find((d) => d.date === "2025-03-31");
+    expect(d31).toMatchObject({ minutes: 30, pages: 2, counts: true });
+
+    const res1 = await request(app).get("/calendar/2025/4").set(authHeader(token));
+    const d1 = res1.body.days.find((d) => d.date === "2025-04-01");
+    expect(d1).toMatchObject({ minutes: 30, pages: 2, counts: true });
   });
 
   test("mes vacío devuelve days vacío", async () => {

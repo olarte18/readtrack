@@ -286,6 +286,39 @@ describe("logros secretos", () => {
     expect(item).toBeDefined();
     expect(item.unlocked).toBe(true);
   });
+
+  test("dedicación NO se desbloquea si las 3 horas cruzan la medianoche", async () => {
+    const { token, user } = await registerUser();
+    const book = await pool.query("INSERT INTO books (title, author, genre) VALUES ($1,$2,$3) RETURNING id", ["Libro", "Autor", "Ficción"]);
+    const ub = await pool.query("INSERT INTO user_books (book_id, user_id) VALUES ($1,$2) RETURNING id", [book.rows[0].id, user.id]);
+
+    // 23:00 (30/09) -> 02:00 (01/10) Bogotá = 04:00 -> 07:00 UTC del 01/10:
+    // 1 hora el día 30 y 2 el día 1; ningún día llega a 3 horas. Los secretos
+    // no aparecen en la respuesta hasta desbloquearse, así que se ve ausente.
+    await addSession(token, user, ub.rows[0].id, "2026-10-01 07:00:00", 10800, 100, 100, "2026-10-01 04:00:00");
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    expect(allItems(res).some((i) => i.code === "dedicacion")).toBe(false);
+  });
+
+  test("mes perfecto: una sesión que cruza la frontera del mes cubre ambos días", async () => {
+    const { token, user } = await registerUser();
+    const book = await pool.query("INSERT INTO books (title, author, genre) VALUES ($1,$2,$3) RETURNING id", ["Libro", "Autor", "Ficción"]);
+    const ub = await pool.query("INSERT INTO user_books (book_id, user_id) VALUES ($1,$2) RETURNING id", [book.rows[0].id, user.id]);
+
+    // Febrero 2026 tiene 28 días; 12:00 Bogotá = 17:00 UTC del mismo día.
+    for (let dd = 1; dd <= 27; dd++) {
+      await addSession(token, user, ub.rows[0].id, `2026-02-${String(dd).padStart(2, "0")} 17:00:00`, 600, 5);
+    }
+    // El día 28 lo cubre una sesión que termina dentro del 01/03:
+    // 23:00 (28/02) -> 01:00 (01/03) Bogotá = 04:00 -> 06:00 UTC del 01/03.
+    await addSession(token, user, ub.rows[0].id, "2026-03-01 06:00:00", 7200, 5, 5, "2026-03-01 04:00:00");
+
+    const res = await request(app).get("/achievements").set(authHeader(token));
+    const item = findItem(res, "mes_perfecto", "special");
+    expect(item).toBeDefined();
+    expect(item.unlocked).toBe(true);
+  });
 });
 
 describe("seen y meta_anual", () => {

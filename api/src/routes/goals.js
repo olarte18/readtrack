@@ -7,10 +7,26 @@ const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
 const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
+const { bucketReadingDays, appBoundaries, dayMs } = require("../utils/sessionDays");
 const { APP_TZ, appYear, SQL } = require("../utils/dates");
 
 const TYPES = ["annual", "monthly", "weekly", "daily"];
 const METRICS = ["books", "minutes", "hours"];
+
+// Inicio/fin (ms, medianoche UTC de cada fecha app) del periodo pedido para
+// /goals/detail. El año sin `year` usa el año actual Bogotá; monthly y weekly
+// se anclan a los límites actuales.
+function periodMs(data, boundaries) {
+  if (data.type === "annual") {
+    const year = data.year !== undefined ? data.year : appYear();
+    const startMs = Date.parse(`${year}-01-01T00:00:00Z`);
+    return { startMs, endMs: Date.parse(`${year + 1}-01-01T00:00:00Z`) };
+  }
+  if (data.type === "monthly") {
+    return { startMs: dayMs(boundaries.month), endMs: Infinity };
+  }
+  return { startMs: dayMs(boundaries.week), endMs: dayMs(boundaries.week) + 7 * 86400000 };
+}
 
 router.use(authMiddleware);
 router.use(globalUserLimiter);
@@ -37,24 +53,6 @@ router.get("/", async (req, res) => {
     [req.userId, APP_TZ]
   );
 
-  const { rows: weeklyProgress } = await pool.query(
-    `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
-     FROM reading_sessions
-     WHERE user_id = $1
-     AND ${SQL.utcToApp()}
-       >= date_trunc('week', ${SQL.nowInApp()})`,
-    [req.userId]
-  );
-
-  const { rows: dailyProgress } = await pool.query(
-    `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
-     FROM reading_sessions
-     WHERE user_id = $1
-     AND ${SQL.utcToApp()}
-       >= date_trunc('day', ${SQL.nowInApp()})`,
-    [req.userId]
-  );
-
   const { rows: monthlyBooksProgress } = await pool.query(
     `SELECT COUNT(*) AS books
      FROM user_books
@@ -65,37 +63,42 @@ router.get("/", async (req, res) => {
     [req.userId, APP_TZ]
   );
 
-  const { rows: monthlyMinutesProgress } = await pool.query(
-    `SELECT COALESCE(SUM(duration_seconds) / 60, 0) AS minutes
-     FROM reading_sessions
-     WHERE user_id = $1
-     AND ${SQL.utcToApp()}
-       >= date_trunc('month', ${SQL.nowInApp()})`,
-    [req.userId]
-  );
-
-  const { rows: calendar } = await pool.query(
-    `SELECT DATE(created_at) AS date, 
-            COALESCE(SUM(duration_seconds) / 60, 0) AS minutes,
-            COALESCE(SUM(pages_read), 0) AS pages
-     FROM reading_sessions
-     WHERE user_id = $1
-     AND created_at >= NOW() - INTERVAL '90 days'
-     GROUP BY DATE(created_at)
-     ORDER BY date ASC`,
-    [req.userId]
-  );
+  // Minutos por periodo según los lapsos de las sesiones (sessionDays): una
+  // sesión que cruza la medianoche ya repartió el tiempo entre los días.
+  const [boundaries, buckets] = await Promise.all([appBoundaries(), bucketReadingDays(req.userId)]);
+  const weekMs = dayMs(boundaries.week);
+  const monthPrefix = boundaries.month.slice(0, 7);
+  const calCutMs = dayMs(boundaries.day) - 90 * 86400000;
+  let dailySeconds = 0;
+  let weeklySeconds = 0;
+  let monthlySeconds = 0;
+  const calDays = new Map(); // date -> { date, minutes, pages }
+  for (const b of buckets) {
+    const secs = Number(b.secs);
+    if (b.date === boundaries.day) dailySeconds += secs;
+    if (dayMs(b.date) >= weekMs) weeklySeconds += secs;
+    if (b.date.slice(0, 7) === monthPrefix) monthlySeconds += secs;
+    if (dayMs(b.date) >= calCutMs) {
+      const d = calDays.get(b.date) ?? { date: b.date, minutes: 0, pages: 0 };
+      d.minutes += Math.round(secs / 60);
+      d.pages += Number(b.pages);
+      calDays.set(b.date, d);
+    }
+  }
+  const weeklyMinutes = Math.round(weeklySeconds / 60);
+  const monthlyMinutes = Math.round(monthlySeconds / 60);
+  const calendar = [...calDays.values()].sort((a, b) => (a.date < b.date ? -1 : 1));
 
   const payload = {
     goals,
     progress: {
       annual: parseInt(annualProgress[0].books),
-      weekly_minutes: parseInt(weeklyProgress[0].minutes),
-      weekly: Math.round(parseInt(weeklyProgress[0].minutes) / 60),
+      weekly_minutes: weeklyMinutes,
+      weekly: Math.round(weeklyMinutes / 60),
       monthly_books: parseInt(monthlyBooksProgress[0].books),
-      monthly_minutes: parseInt(monthlyMinutesProgress[0].minutes),
-      monthly_hours: Math.round(parseInt(monthlyMinutesProgress[0].minutes) / 60),
-      daily: Math.round(parseInt(dailyProgress[0].minutes)),
+      monthly_minutes: monthlyMinutes,
+      monthly_hours: Math.round(monthlyMinutes / 60),
+      daily: Math.round(dailySeconds / 60),
     },
     calendar,
     year,
@@ -131,12 +134,10 @@ router.get("/detail", async (req, res) => {
   let startExpr;
   let intervalUnit;
   let label;
-  let endCond = "";
   if (data.type === "annual" && data.year !== undefined) {
     startExpr = `date_trunc('year', '${data.year}-01-01 00:00:00'::timestamp)`;
     intervalUnit = "year";
     label = String(data.year);
-    endCond = `\n         AND ${SQL.utcToApp("rs.created_at")} < (${startExpr} + INTERVAL '1 year')`;
   } else if (data.type === "annual") {
     startExpr = `date_trunc('year', ${SQL.nowInApp()})`;
     intervalUnit = "year";
@@ -170,25 +171,37 @@ router.get("/detail", async (req, res) => {
     books = completed.map((r) => ({ ...r, minutes: null }));
     progress = books.length;
   } else {
-    const { rows: byBook } = await pool.query(
-      `SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.reading_mode,
-              b.id AS db_id, b.title, b.author, b.cover, b.pages,
-              COALESCE(SUM(rs.duration_seconds), 0) / 60 AS minutes,
-              COALESCE(SUM(rs.pages_read), 0) AS pages_read
-       FROM reading_sessions rs
-       JOIN user_books ub ON ub.id = rs.user_book_id
-       JOIN books b ON b.id = ub.book_id
-       WHERE rs.user_id = $1
-         AND ${SQL.utcToApp("rs.created_at")} >= ${startExpr}${endCond}
-       GROUP BY ub.id, b.id
-       ORDER BY minutes DESC`,
-      [req.userId]
-    );
-    books = byBook.map((r) => ({
-      ...r,
-      minutes: parseInt(r.minutes),
-      pages_read: parseInt(r.pages_read),
-    }));
+    // Minutos por libro del periodo, según los lapsos de las sesiones
+    // (sessionDays reparte los cruces de medianoche entre los días que toca).
+    const boundaries = await appBoundaries();
+    const buckets = await bucketReadingDays(req.userId);
+    const { startMs, endMs } = periodMs(data, boundaries);
+    const grouped = new Map(); // user_book_id -> { seconds, pages }
+    for (const b of buckets) {
+      const m = dayMs(b.date);
+      if (m < startMs || (endMs !== Infinity && m >= endMs)) continue;
+      const g = grouped.get(b.user_book_id) ?? { seconds: 0, pages: 0 };
+      g.seconds += Number(b.secs);
+      g.pages += Number(b.pages);
+      grouped.set(b.user_book_id, g);
+    }
+
+    if (grouped.size > 0) {
+      const ids = [...grouped.keys()];
+      const { rows: meta } = await pool.query(
+        `SELECT ub.id, ub.status, ub.current_page, ub.rating, ub.started_at, ub.finished_at, ub.reading_mode,
+                b.id AS db_id, b.title, b.author, b.cover, b.pages
+         FROM user_books ub
+         JOIN books b ON b.id = ub.book_id
+         WHERE ub.user_id = $1 AND ub.id = ANY($2::int[])`,
+        [req.userId, ids]
+      );
+      const metaMap = new Map(meta.map((r) => [r.id, r]));
+      books = [...grouped.entries()]
+        .map(([id, g]) => ({ ...metaMap.get(id), minutes: Math.round(g.seconds / 60), pages_read: Math.round(g.pages) }))
+        .filter((b) => b.id !== undefined)
+        .sort((a, b) => b.minutes - a.minutes);
+    }
     progress = books.reduce((acc, b) => acc + b.minutes, 0);
   }
 

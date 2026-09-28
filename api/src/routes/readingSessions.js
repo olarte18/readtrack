@@ -10,6 +10,7 @@ const { computeStreaks } = require("../utils/streaks");
 const { getQualifyingDates, getDayProgress, appToday } = require("../utils/streakDays");
 const { getGoalCompletion } = require("../utils/goalProgress");
 const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
+const { bucketReadingDays } = require("../utils/sessionDays");
 const { SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
@@ -37,16 +38,17 @@ async function sessionPayload(req, session, body) {
   // umbral del día, "casi" si es la primera del día y aún no califica.
   // (El conteo real siempre usa getQualifyingDates; esto solo alimenta el UX.)
   const today = await appToday();
-  const before = await getDayProgress(req.userId, today, { excludeId: session.id });
-  const after = await getDayProgress(req.userId, today);
+  const buckets = await bucketReadingDays(req.userId);
+  const before = await getDayProgress(req.userId, today, { excludeId: session.id, buckets });
+  const after = await getDayProgress(req.userId, today, { buckets });
   let streakState = null;
   let currentStreak = null;
   if (after.qualifies && !before.qualifies) {
-    currentStreak = computeStreaks(await getQualifyingDates(req.userId)).current;
+    currentStreak = computeStreaks(await getQualifyingDates(req.userId, buckets)).current;
     streakState = { kind: "activated", days: currentStreak };
   } else if (!after.qualifies && prior[0].n === 0) {
     if (currentStreak === null) {
-      currentStreak = computeStreaks(await getQualifyingDates(req.userId)).current;
+      currentStreak = computeStreaks(await getQualifyingDates(req.userId, buckets)).current;
     }
     streakState = { kind: "almost", missing: after.missing, current: currentStreak };
   }
@@ -54,7 +56,7 @@ async function sessionPayload(req, session, body) {
   let streak = null;
   if (prior[0].n === 0) {
     if (currentStreak === null) {
-      currentStreak = computeStreaks(await getQualifyingDates(req.userId)).current;
+      currentStreak = computeStreaks(await getQualifyingDates(req.userId, buckets)).current;
     }
     streak = currentStreak;
   }

@@ -144,6 +144,52 @@ describe("GET /goals — monthly_books con zona Bogotá", () => {
   });
 });
 
+describe("GET /goals — daily con sesiones que cruzan la medianoche", () => {
+  test("sesión de 23:30 a 00:30 aporta a hoy solo sus minutos", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+    const today = await bogotaDate();
+
+    // 23:30 de ayer -> 00:30 de hoy (Bogotá) = 04:30 -> 05:30 UTC de hoy.
+    await pool.query(
+      `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at, started_at)
+       VALUES ($1, $2, 104, 0, 3600, $3::timestamp, $4::timestamp)`,
+      [book.id, user.id, `${today} 05:30:00`, `${today} 04:30:00`]
+    );
+    await request(app)
+      .post("/goals")
+      .set(authHeader(token))
+      .send({ type: "daily", metric: "minutes", value: 30 });
+
+    const res = await request(app).get("/goals").set(authHeader(token));
+    expect(res.body.progress.daily).toBe(30);
+  });
+
+  test("una sesión entera de ayer no cuenta en daily", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+
+    const { rows: yesterdayRows } = await pool.query(
+      `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Bogota')::date - INTERVAL '1 day', 'YYYY-MM-DD') AS d`
+    );
+    const yesterday = yesterdayRows[0].d;
+
+    // 12:00 Bogotá de ayer (=17:00 UTC), 60 min entero del día anterior.
+    await pool.query(
+      `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at)
+       VALUES ($1, $2, 104, 0, 3600, $3::timestamp)`,
+      [book.id, user.id, `${yesterday} 17:00:00`]
+    );
+    await request(app)
+      .post("/goals")
+      .set(authHeader(token))
+      .send({ type: "daily", metric: "minutes", value: 30 });
+
+    const res = await request(app).get("/goals").set(authHeader(token));
+    expect(res.body.progress.daily).toBe(0);
+  });
+});
+
 describe("GET /goals/status", () => {
   test("hasGoals false sin metas guardadas", async () => {
     const { token } = await registerUser();

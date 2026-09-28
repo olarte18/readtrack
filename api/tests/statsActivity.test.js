@@ -16,11 +16,11 @@ async function addBook(token) {
 }
 
 // inserta una sesión con created_at (UTC) controlado, fuera del flujo de "ahora"
-async function insertSession(userId, userBookId, isoUtc, durationSeconds, pagesRead = 0) {
+async function insertSession(userId, userBookId, isoUtc, durationSeconds, pagesRead = 0, startedAt = null) {
   await pool.query(
-    `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at)
-     VALUES ($1, $2, 100, $3, $4, $5::timestamp)`,
-    [userBookId, userId, pagesRead, durationSeconds, isoUtc]
+    `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at, started_at)
+     VALUES ($1, $2, 100, $3, $4, $5::timestamp, $6::timestamp)`,
+    [userBookId, userId, pagesRead, durationSeconds, isoUtc, startedAt]
   );
 }
 
@@ -153,6 +153,21 @@ describe("GET /stats/activity", () => {
   test("view=year rechaza años fuera de rango", async () => {
     const { token } = await registerUser();
     expect((await request(app).get("/stats/activity?view=year&year=1800").set(authHeader(token))).status).toBe(400);
+  });
+
+  test("sesión que cruza la medianoche reparte el tiempo entre ambos meses", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+
+    // 23:30 (31/03) -> 00:30 (01/04) en Bogotá = 04:30 -> 05:30 UTC del 01/04.
+    await insertSession(user.id, book.id, "2025-04-01 05:30:00", 3600, 4, "2025-04-01 04:30:00");
+
+    const mar = await request(app).get("/stats/activity?view=month&year=2025&month=3").set(authHeader(token));
+    expect(mar.body.buckets[30]).toMatchObject({ label: "31", minutes: 30, pages: 2, sessions: 1 });
+
+    const abr = await request(app).get("/stats/activity?view=month&year=2025&month=4").set(authHeader(token));
+    expect(abr.body.buckets[0]).toMatchObject({ label: "1", minutes: 30, pages: 2, sessions: 1 });
+    expect(abr.body.totals).toMatchObject({ minutes: 30, pages: 2, sessions: 1, active_days: 1 });
   });
 });
 

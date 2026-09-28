@@ -2,6 +2,7 @@ const pool = require("../db/connection");
 const cache = require("./cache");
 const { computeStreaks } = require("./streaks");
 const { getQualifyingDates } = require("./streakDays");
+const { bucketReadingDays } = require("./sessionDays");
 const { appYear, SQL } = require("./dates");
 
 const SECRET_SECONDS = 3 * 60 * 60;
@@ -15,25 +16,31 @@ async function computeProgress(userId) {
   const progress = new Map();
   const targets = new Map();
 
-  progress.set("en_racha", computeStreaks(await getQualifyingDates(userId)).best);
+  // Los lapsos diarios de las sesiones (sessionDays) sirven a la racha, al mes
+  // perfecto y a la dedicación: una sesión que cruza la medianoche aporta a los
+  // días que toca.
+  const buckets = await bucketReadingDays(userId);
+  progress.set("en_racha", computeStreaks(await getQualifyingDates(userId, buckets)).best);
 
-  const { rows: months } = await pool.query(
-    `SELECT ${SQL.toChar("created_at", "YYYY-MM")} AS ym,
-            COUNT(DISTINCT ${SQL.toChar()})::int AS n
-     FROM reading_sessions
-     WHERE user_id = $1
-     GROUP BY 1`,
-    [userId]
-  );
+  const months = new Map(); // YYYY-MM -> Set(days)
+  const daySeconds = new Map(); // YYYY-MM-DD -> segundos
+  for (const b of buckets) {
+    const ym = b.date.slice(0, 7);
+    if (!months.has(ym)) months.set(ym, new Set());
+    months.get(ym).add(b.date);
+    daySeconds.set(b.date, (daySeconds.get(b.date) ?? 0) + Number(b.secs));
+  }
+
   let perfectMonth = 0;
-  for (const { ym, n } of months) {
+  for (const [ym, days] of months) {
     const [y, m] = ym.split("-").map(Number);
-    if (n >= new Date(y, m, 0).getDate()) {
+    if (days.size >= new Date(y, m, 0).getDate()) {
       perfectMonth = 1;
       break;
     }
   }
   progress.set("mes_perfecto", perfectMonth);
+  progress.set("dedicacion", [...daySeconds.values()].some((s) => s >= SECRET_SECONDS) ? 1 : 0);
 
   const { rows: books } = await pool.query(
     `SELECT COUNT(DISTINCT book_id)::int AS n
@@ -173,20 +180,6 @@ async function computeProgress(userId) {
     [userId]
   );
   progress.set("abandono", abandRows[0] ? 1 : 0);
-
-  const { rows: dedRows } = await pool.query(
-    `SELECT 1 AS hit
-     FROM (
-       SELECT ${SQL.toChar()} AS d, SUM(duration_seconds) AS s
-       FROM reading_sessions
-       WHERE user_id = $1
-       GROUP BY 1
-     ) t
-     WHERE s >= ${SECRET_SECONDS}
-     LIMIT 1`,
-    [userId]
-  );
-  progress.set("dedicacion", dedRows[0] ? 1 : 0);
 
   // Madrugador / Nocturno: hora local (Bogotá) en que empezó la sesión. El
   // inicio real lo manda la app (started_at, UTC); las filas de antes lo

@@ -8,7 +8,7 @@ const httpError = require("../utils/httpError");
 const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
 const { getQualifyingDates, appToday } = require("../utils/streakDays");
-const { SQL } = require("../utils/dates");
+const { bucketReadingDays, dayMs } = require("../utils/sessionDays");
 
 router.use(authMiddleware);
 router.use(globalUserLimiter);
@@ -21,22 +21,17 @@ router.get("/streak", async (req, res) => {
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
-  const dates = await getQualifyingDates(req.userId);
+  const buckets = await bucketReadingDays(req.userId);
+  const dates = await getQualifyingDates(req.userId, buckets);
   const streak = computeStreaks(dates);
   const today = await appToday();
   const todayCounts = dates.includes(today);
 
   // ¿Hubo al menos una sesión hoy (hora Bogotá)? No depende de los minutos
-  // (una sesión corta de <1 min iba a dar 0 minutos y apagaba la racha).
-  const { rows: todaySessions } = await pool.query(
-    `SELECT COUNT(*)::int AS n
-     FROM reading_sessions
-     WHERE user_id = $1
-       AND ${SQL.utcToApp()}
-         >= date_trunc('day', ${SQL.nowInApp()})`,
-    [req.userId]
-  );
-  const hasSessionToday = todaySessions[0].n > 0;
+  // (una sesión corta de <1 min iba a dar 0 minutos y apagaba la racha). Una
+  // sesión que cruza la medianoche ya repartió su tiempo: basta con que toque
+  // hoy.
+  const hasSessionToday = buckets.some((b) => b.date === today);
 
   const payload = { ...streak, hasSessionToday, todayCounts };
   cache.set(cacheKey, payload, 60000);
@@ -167,19 +162,18 @@ router.get("/activity", async (req, res) => {
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
-  const dayExpr = `${SQL.toChar("rs.created_at")}`;
-  const subExpr = `${SQL.toChar("rs.created_at", "MM")}`;
-  const ddExpr = `${SQL.toChar("rs.created_at", "DD")}`;
-  const AGG = `COALESCE(SUM(rs.duration_seconds), 0)::float / 60 AS minutes,
-              COALESCE(SUM(rs.pages_read), 0)::int AS pages,
-              COUNT(*)::int AS sessions,
-              COUNT(DISTINCT ${dayExpr})::int AS active_days`;
+  const dayTotals = new Map(); // date -> { seconds, pages, sessions:Set }
+  for (const b of await bucketReadingDays(req.userId)) {
+    let d = dayTotals.get(b.date);
+    if (!d) { d = { seconds: 0, pages: 0, sessions: new Set() }; dayTotals.set(b.date, d); }
+    d.seconds += Number(b.secs);
+    d.pages += Number(b.pages);
+    d.sessions.add(b.session_id);
+  }
 
-  let groupExpr;
-  let sql;
-  let params;
   let bucketKeys;
   let labelOf;
+  let keep = null; // (date) => clave de bucket cuando el día entra en la vista
   let dailyGoal = null;
   let monthlyGoal = null;
   let monthlyGoalMetric = null;
@@ -188,16 +182,11 @@ router.get("/activity", async (req, res) => {
   let booksByMonth = new Map();
 
   if (data.view === "year") {
-    groupExpr = subExpr;
-    sql = `SELECT ${groupExpr} AS bucket, ${AGG}
-           FROM reading_sessions rs
-           WHERE rs.user_id = $1
-             AND EXTRACT(YEAR FROM ${SQL.utcToApp("rs.created_at")}) = $2
-           GROUP BY 1`;
-    params = [req.userId, data.year];
     const labels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"];
     bucketKeys = labels.map((_, i) => String(i + 1).padStart(2, "0"));
     labelOf = (k) => labels[Number(k) - 1];
+    const yearStr = String(data.year);
+    keep = (date) => (date.slice(0, 4) === yearStr ? date.slice(5, 7) : null);
     const { rows: monthlyRows } = await pool.query(
       `SELECT metric, value FROM reading_goals
        WHERE user_id = $1 AND year = $2 AND type = 'monthly'`,
@@ -222,37 +211,31 @@ router.get("/activity", async (req, res) => {
     );
     booksByMonth = new Map(booksRows.map((r) => [r.mm, r.books]));
   } else if (data.view === "month") {
-    groupExpr = ddExpr;
     const start = `${data.year}-${String(data.month).padStart(2, "0")}`;
-    sql = `SELECT ${groupExpr} AS bucket, ${AGG}
-           FROM reading_sessions rs
-           WHERE rs.user_id = $1
-             AND ${SQL.toChar("rs.created_at", "YYYY-MM")} = $2
-           GROUP BY 1`;
-    params = [req.userId, start];
-    const n = new Date(data.year, data.month, 0).getDate();
-    bucketKeys = Array.from({ length: n }, (_, i) => String(i + 1).padStart(2, "0"));
+    bucketKeys = Array.from({ length: new Date(data.year, data.month, 0).getDate() }, (_, i) =>
+      String(i + 1).padStart(2, "0")
+    );
     labelOf = (k) => String(Number(k));
+    keep = (date) => (date.slice(0, 7) === start ? date.slice(8, 10) : null);
     const { rows: dailyRows } = await pool.query(
       "SELECT value FROM reading_goals WHERE user_id = $1 AND year = $2 AND type = 'daily'",
       [req.userId, data.year]
     );
     dailyGoal = dailyRows[0]?.value ?? null;
   } else {
-    groupExpr = dayExpr;
     const anchor = new Date(`${rawDate}T12:00:00Z`);
     const dow = (anchor.getUTCDay() + 6) % 7; // lunes = 0
     const monday = new Date(anchor.getTime() - dow * 86400000);
     weekStart = monday.toISOString().slice(0, 10);
+    const weekMs = dayMs(weekStart);
     bucketKeys = Array.from({ length: 7 }, (_, i) => {
       const d = new Date(monday.getTime() + i * 86400000);
       return d.toISOString().slice(0, 10);
     });
-    sql = `SELECT ${groupExpr} AS bucket, ${AGG}
-           FROM reading_sessions rs
-           WHERE rs.user_id = $1 AND ${dayExpr}::date >= $2::date AND ${dayExpr}::date < $2::date + 7
-           GROUP BY 1`;
-    params = [req.userId, weekStart];
+    keep = (date) => {
+      const m = dayMs(date);
+      return m >= weekMs && m < weekMs + 7 * 86400000 ? date : null;
+    };
     const WEEK = ["L", "M", "X", "J", "V", "S", "D"];
     labelOf = (k) => WEEK[bucketKeys.indexOf(k) % 7];
     const { rows: dailyRows } = await pool.query(
@@ -262,16 +245,26 @@ router.get("/activity", async (req, res) => {
     dailyGoal = dailyRows[0]?.value ?? null;
   }
 
-  const { rows } = await pool.query(sql, params);
-  const byKey = new Map(rows.map((r) => [r.bucket, r]));
+  const byKey = new Map();
+  for (const [date, d] of dayTotals) {
+    const k = keep(date);
+    if (k === null) continue;
+    const acc = byKey.get(k) ?? { seconds: 0, pages: 0, sessions: new Set(), active_days: 0 };
+    acc.seconds += d.seconds;
+    acc.pages += d.pages;
+    for (const id of d.sessions) acc.sessions.add(id);
+    acc.active_days += 1;
+    byKey.set(k, acc);
+  }
+
   const buckets = bucketKeys.map((k) => {
-    const r = byKey.get(k);
+    const acc = byKey.get(k);
     return {
       label: labelOf(k),
-      minutes: Math.round(r ? r.minutes : 0),
-      pages: r ? parseInt(r.pages, 10) : 0,
-      sessions: r ? parseInt(r.sessions, 10) : 0,
-      active_days: r ? parseInt(r.active_days, 10) : 0,
+      minutes: acc ? Math.round(acc.seconds / 60) : 0,
+      pages: acc ? acc.pages : 0,
+      sessions: acc ? acc.sessions.size : 0,
+      active_days: acc ? acc.active_days : 0,
       ...(data.view === "year" ? { books: booksByMonth.get(k) ?? 0 } : {}),
     };
   });

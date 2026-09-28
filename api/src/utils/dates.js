@@ -30,6 +30,13 @@ const SQL = {
   nowInApp: () => `NOW() AT TIME ZONE '${APP_TZ}'`,
   // TO_CHAR(col convertida, fmt)
   toChar: (col = "created_at", fmt = "YYYY-MM-DD") => `TO_CHAR(${SQL.utcToApp(col)}, '${fmt}')`,
+  // Instante UTC (timestamptz) del inicio del día de `col` (naive UTC) en la
+  // zona de la app. La hoja de cálculo de sesiones la usa para partir la
+  // actividad por día local.
+  dayStartUtc: (col = "created_at") =>
+    `date_trunc('day', ${SQL.utcToApp(col)}) AT TIME ZONE '${APP_TZ}'`,
+  // Columna timestamptz (p. ej. un límite de día) → hora local de la app.
+  tstzToApp: (col) => `${col} AT TIME ZONE '${APP_TZ}'`,
 };
 
 module.exports = { APP_TZ, appYear, appDay, SQL };

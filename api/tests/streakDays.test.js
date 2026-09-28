@@ -18,12 +18,21 @@ async function seedUserBook(userId, { title = "Libro", mode, pages = null, chapt
 async function insertSession(
   userBookId,
   userId,
-  { page, start_page = page, duration_seconds, pages_read = null, created_at = null }
+  { page, start_page = page, duration_seconds, pages_read = null, created_at = null, started_at = null }
 ) {
+  // Por defecto hoy a las 12:00 Bogotá (=17:00 UTC): lejos de la medianoche
+  // para que una sesión no cruce el borde del día por accidente.
+  let createdAt = created_at;
+  if (createdAt === null) {
+    const { rows } = await pool.query(
+      `SELECT TO_CHAR(NOW() AT TIME ZONE 'America/Bogota', 'YYYY-MM-DD') AS d`
+    );
+    createdAt = `${rows[0].d} 17:00:00`;
+  }
   await pool.query(
-    `INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read, created_at)
-     VALUES ($1,$2,$3,$4,$5,$6,COALESCE($7::timestamp, NOW()))`,
-    [userBookId, userId, page, start_page, duration_seconds, pages_read, created_at]
+    `INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, duration_seconds, pages_read, created_at, started_at)
+     VALUES ($1,$2,$3,$4,$5,$6,$7::timestamp,$8::timestamp)`,
+    [userBookId, userId, page, start_page, duration_seconds, pages_read, createdAt, started_at]
   );
 }
 
@@ -129,11 +138,14 @@ describe("regla de día de racha según modo (streakDays)", () => {
   test("histérico: sesión corta anterior al corte aún cuenta el día", async () => {
     const { token, user } = await registerUser();
     const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    // Antes del corte de la regla (en tests: 2000-01-01 00:00 UTC). Se usa una
+    // fecha con margen holgado para que nunca se corra el borde por la zona
+    // horaria del host.
     await insertSession(ub, user.id, {
       page: 10,
       start_page: 9,
       duration_seconds: 30,
-      created_at: "1999-12-31 23:59:00",
+      created_at: "1999-12-29 12:00:00",
     });
 
     const res = await getStreak(token);
@@ -158,7 +170,16 @@ describe("todayCounts en /stats/streak", () => {
     const res = await request(app)
       .post("/reading-sessions")
       .set(authHeader(token))
-      .send({ user_book_id: userBookId, page: 100, duration_seconds: 1800, pages_read: 0, ...body });
+      .send({
+        user_book_id: userBookId,
+        page: 100,
+        duration_seconds: 1800,
+        pages_read: 0,
+        // started_at hace ~10s atrás: el lapso cae entero en hoy aunque la suite
+        // corra cerca de la medianoche de Bogotá.
+        started_at: new Date(Date.now() - 10000).toISOString(),
+        ...body,
+      });
     expect(res.status).toBe(201);
     return res.body;
   }
@@ -187,5 +208,109 @@ describe("todayCounts en /stats/streak", () => {
     // Guardar la sesión invalida stats:<uid>:*; la siguiente lectura debe
     // ver hoy calificando (si la invalidación fallara volvería la caché vieja).
     expect(await getStreak(token)).toMatchObject({ todayCounts: true, hasSessionToday: true, current: 1 });
+  });
+});
+
+// Sesiones que cruzan la medianoche de Bogotá: reparten tiempo y páginas entre
+// los días que tocan en vez de regalar todo al día del created_at. Las marcas
+// se guardan en UTC "naive": 23:30 Bogotá del día D = 04:30 UTC del D+1.
+// Fechas de octubre 2026: posteriores al corte de la regla (no grandfathered).
+describe("sesiones que cruzan la medianoche (sessionDays)", () => {
+  // 23:30 (02/10) -> 00:30 (03/10) en Bogotá.
+  const START_2330 = "2026-10-03 04:30:00"; // = 02/10 23:30 Bogotá
+  const CREATED_0030 = "2026-10-03 05:30:00"; // = 03/10 00:30 Bogotá
+
+  test("60 min y 4 páginas cruzando: 2+2 páginas y ambos días cuentan", async () => {
+    const { token, user } = await registerUser();
+    const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    await insertSession(ub, user.id, {
+      page: 104,
+      start_page: 100,
+      duration_seconds: 3600,
+      created_at: CREATED_0030,
+      started_at: START_2330,
+    });
+
+    expect(await getStreak(token)).toMatchObject({ current: 0, best: 2 });
+  });
+
+  test("la contigüidad entre días no se rompe al cruzar", async () => {
+    const { token, user } = await registerUser();
+    const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    await insertSession(ub, user.id, {
+      page: 12,
+      start_page: 10,
+      duration_seconds: 360,
+      created_at: "2026-10-01 17:00:00", // 12:00 Bogotá del 01/10
+    });
+    await insertSession(ub, user.id, {
+      page: 104,
+      start_page: 100,
+      duration_seconds: 3600,
+      created_at: CREATED_0030,
+      started_at: START_2330,
+    });
+
+    // Días 01, 02 y 03 consecutivos -> best 3.
+    expect(await getStreak(token)).toMatchObject({ current: 0, best: 3 });
+  });
+
+  test("sin started_at el cruce se deriva de created_at - duración", async () => {
+    const { token, user } = await registerUser();
+    const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    await insertSession(ub, user.id, {
+      page: 104,
+      start_page: 100,
+      duration_seconds: 3600,
+      created_at: CREATED_0030, // sin started_at
+    });
+
+    expect(await getStreak(token)).toMatchObject({ current: 0, best: 2 });
+  });
+
+  test("reparto con mayor resto: 100 min y 4 páginas dan 5+3", async () => {
+    const { token, user } = await registerUser();
+    const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    // 23:00 (03/10) -> 00:40 (04/10) Bogotá: 60 min y luego 40 min.
+    await insertSession(ub, user.id, {
+      page: 108,
+      start_page: 100,
+      duration_seconds: 6000,
+      created_at: "2026-10-04 05:40:00", // = 04/10 00:40 Bogotá
+      started_at: "2026-10-04 04:00:00", // = 03/10 23:00 Bogotá
+    });
+
+    // Ambos días califican (5p/60min y 3p/40min) -> best 2.
+    expect(await getStreak(token)).toMatchObject({ current: 0, best: 2 });
+  });
+
+  test("páginas que se parten por la mitad: cada día cuenta las suyas, sin duplicar", async () => {
+    const { token, user } = await registerUser();
+    const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    // 2 páginas en 60 min: cada día se queda con 1 -> ningún día califica.
+    await insertSession(ub, user.id, {
+      page: 102,
+      start_page: 100,
+      duration_seconds: 3600,
+      created_at: "2026-10-05 05:30:00", // = 05/10 00:30 Bogotá
+      started_at: "2026-10-05 04:30:00", // = 04/10 23:30 Bogotá
+    });
+
+    expect(await getStreak(token)).toMatchObject({ current: 0, best: 0 });
+  });
+
+  test("sesión que termina justo a medianoche queda entera en el día anterior", async () => {
+    const { token, user } = await registerUser();
+    const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    // 23:00 -> 00:00 exacto.
+    await insertSession(ub, user.id, {
+      page: 104,
+      start_page: 100,
+      duration_seconds: 3600,
+      created_at: "2026-10-06 05:00:00", // = 06/10 00:00 Bogotá
+      started_at: "2026-10-06 04:00:00", // = 05/10 23:00 Bogotá
+    });
+
+    expect(await getStreak(token)).toMatchObject({ current: 0, best: 1 });
   });
 });

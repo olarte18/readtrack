@@ -1,5 +1,6 @@
 const pool = require("../db/connection");
 const { SQL } = require("./dates");
+const { bucketReadingDays } = require("./sessionDays");
 
 // A partir de esta fecha (UTC, hora del deploy) un día solo cuenta para la
 // racha si las sesiones nuevas cumplen el mínimo del modo. Las sesiones
@@ -12,43 +13,44 @@ const PAGE_MIN_SECONDS = 300; // 5 min
 const OTHER_MIN_SECONDS = 420; // 7 min (% y capítulo)
 const PAGE_ADVANCE = 2; // páginas nativas (o equivalentes)
 
-// Semilla del avance de una sesión: pages_read cuando viene, si no el delta
-// page - start_page (0 si no hay start_page: no se puede medir avance).
-const ADVANCE_EXPR = `COALESCE(rs.pages_read,
-  GREATEST(rs.page - COALESCE(rs.start_page, rs.page), 0))`;
+// Instante del corte de la regla (ms): una sesión creada después solo cuenta
+// para la racha si su día cumple el mínimo del modo.
+const RULE_SINCE_MS = Date.parse(`${STREAK_RULE_SINCE.replace(" ", "T")}Z`);
 
 // Fechas YYYY-MM-DD (hora Bogotá) que cuentan como día de racha según las
-// reglas mínimas: un día califica si algún grupo (fecha, modo) de sus
-// sesiones nuevas cumple el mínimo de duración y avance del modo, o si tuvo
-// alguna sesión anterior al corte (histórico intacto).
-async function getQualifyingDates(userId) {
-  const { rows } = await pool.query(
-    `
-    WITH agg AS (
-      SELECT ${SQL.toChar("rs.created_at")} AS date,
-             ub.reading_mode AS mode,
-             SUM(rs.duration_seconds)::bigint AS dur,
-             SUM(${ADVANCE_EXPR}) AS adv
-      FROM reading_sessions rs
-      JOIN user_books ub ON ub.id = rs.user_book_id
-      WHERE rs.user_id = $1 AND rs.created_at >= $2::timestamp
-      GROUP BY 1, 2
-    ),
-    grandfathered AS (
-      SELECT DISTINCT ${SQL.toChar()} AS date
-      FROM reading_sessions
-      WHERE user_id = $1 AND created_at < $2::timestamp
-    )
-    SELECT date FROM grandfathered
-    UNION
-    SELECT date FROM agg
-    WHERE (mode = 'page'      AND dur >= $3 AND adv >= $4)
-       OR (mode = 'percentage' AND dur >= $5)
-       OR (mode = 'chapter'    AND dur >= $5)
-    `,
-    [userId, STREAK_RULE_SINCE, PAGE_MIN_SECONDS, PAGE_ADVANCE, OTHER_MIN_SECONDS]
-  );
-  return rows.map((r) => r.date);
+// reglas mínimas: un día califica si algún grupo (fecha, modo) de los lapsos
+// de sus sesiones (sessionDays) que inician después del corte cumple el
+// mínimo de duración y avance del modo, o si tuvo alguna sesión anterior al
+// corte (histórico intacto). Acepta los buckets ya calculados para no repetir
+// la consulta.
+async function getQualifyingDates(userId, buckets = null) {
+  const list = buckets ?? (await bucketReadingDays(userId));
+  const grandfathered = new Set();
+  const agg = new Map();
+
+  for (const row of list) {
+    if (row.created_at.getTime() < RULE_SINCE_MS) {
+      grandfathered.add(row.date);
+      continue;
+    }
+    const key = `${row.date}|${row.mode ?? ""}`;
+    const g = agg.get(key) ?? { seconds: 0, pages: 0 };
+    g.seconds += Number(row.secs);
+    g.pages += Number(row.pages);
+    agg.set(key, g);
+  }
+
+  const dates = new Set(grandfathered);
+  for (const [key, g] of agg) {
+    const sep = key.indexOf("|");
+    const date = key.slice(0, sep);
+    const mode = key.slice(sep + 1);
+    const qualifies =
+      (mode === "page" && g.seconds >= PAGE_MIN_SECONDS && g.pages >= PAGE_ADVANCE) ||
+      ((mode === "percentage" || mode === "chapter") && g.seconds >= OTHER_MIN_SECONDS);
+    if (qualifies) dates.add(date);
+  }
+  return [...dates];
 }
 
 // Fecha de hoy en hora Bogotá, como 'YYYY-MM-DD'.
@@ -59,53 +61,50 @@ async function appToday() {
   return rows[0].d;
 }
 
-// Progreso del día para el modal de feedback: agrupa las sesiones de `date`
-// por modo y decide si el día califica (mismas reglas que getQualifyingDates,
-// contando además las sesiones grandfathered). Opcionalmente excluye una sesión
-// (para saber si fue ella la que cruzó el umbral). Regresa
+// Progreso del día para el modal de feedback: agrupa los lapsos de las
+// sesiones de `date` por modo y decide si el día califica (mismas reglas que
+// getQualifyingDates, contando además las sesiones grandfathered).
+// Opcionalmente excluye una sesión (para saber si fue ella la que cruzó el
+// umbral) o recibe los buckets ya calculados. Regresa
 // { qualifies, groups: [{ mode, seconds, pages, qualifies }], missing },
 // donde `missing` (solo si no califica y no hay grandfathered) es el requisito
 // más corto para calificar: { mode, seconds, pages } con lo que FALTA.
-async function getDayProgress(userId, date, { excludeId = null } = {}) {
-  const params = [userId, date, STREAK_RULE_SINCE];
-  let exclude = "";
-  if (excludeId != null) {
-    params.push(excludeId);
-    exclude = `AND rs.id <> $${params.length}`;
-  }
-  const { rows } = await pool.query(
-    `SELECT ub.reading_mode AS mode,
-            COALESCE(SUM(rs.duration_seconds), 0)::bigint AS dur,
-            COALESCE(SUM(${ADVANCE_EXPR}), 0)::bigint AS adv,
-            COALESCE(BOOL_OR(rs.created_at < $3::timestamp), false) AS grandfathered
-     FROM reading_sessions rs
-     JOIN user_books ub ON ub.id = rs.user_book_id
-     WHERE rs.user_id = $1
-       AND ${SQL.toChar("rs.created_at")} = $2
-       ${exclude}
-     GROUP BY 1`,
-    params
+async function getDayProgress(userId, date, { excludeId = null, buckets = null } = {}) {
+  const list = buckets ?? (await bucketReadingDays(userId));
+  const rows = list.filter(
+    (r) => r.date === date && (excludeId === null || r.session_id !== excludeId)
   );
 
   if (rows.length === 0) return { qualifies: false, groups: [], missing: null };
-  if (rows.some((r) => r.grandfathered)) {
+
+  const byMode = new Map();
+  for (const r of rows) {
+    const key = r.mode ?? "";
+    const g = byMode.get(key) ?? { seconds: 0, pages: 0, grandfathered: false };
+    g.seconds += Number(r.secs);
+    g.pages += Number(r.pages);
+    if (r.created_at.getTime() < RULE_SINCE_MS) g.grandfathered = true;
+    byMode.set(key, g);
+  }
+
+  if ([...byMode.values()].some((g) => g.grandfathered)) {
     return {
       qualifies: true,
-      groups: rows.map((r) => ({
-        mode: r.mode,
-        seconds: Number(r.dur),
-        pages: Number(r.adv),
+      groups: [...byMode.entries()].map(([mode, g]) => ({
+        mode: mode || null,
+        seconds: g.seconds,
+        pages: g.pages,
         qualifies: true,
       })),
       missing: null,
     };
   }
 
-  const groups = rows.map((r) => {
+  const groups = [...byMode.entries()].map(([mode, g]) => {
     const qualifies =
-      (r.mode === "page" && Number(r.dur) >= PAGE_MIN_SECONDS && Number(r.adv) >= PAGE_ADVANCE) ||
-      ((r.mode === "percentage" || r.mode === "chapter") && Number(r.dur) >= OTHER_MIN_SECONDS);
-    return { mode: r.mode, seconds: Number(r.dur), pages: Number(r.adv), qualifies };
+      (mode === "page" && g.seconds >= PAGE_MIN_SECONDS && g.pages >= PAGE_ADVANCE) ||
+      ((mode === "percentage" || mode === "chapter") && g.seconds >= OTHER_MIN_SECONDS);
+    return { mode: mode || null, seconds: g.seconds, pages: g.pages, qualifies };
   });
 
   const qualifies = groups.some((g) => g.qualifies);

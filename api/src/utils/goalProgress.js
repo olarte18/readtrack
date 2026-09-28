@@ -1,5 +1,6 @@
 const pool = require("../db/connection");
-const { APP_TZ, appYear, SQL } = require("./dates");
+const { APP_TZ, appYear } = require("./dates");
+const { bucketReadingDays, appBoundaries, dayMs } = require("./sessionDays");
 
 // Devuelve solo las metas que se superaron JUSTO con la sesión que se acaba de
 // guardar: compara el progreso actual contra el progreso anterior (sin esta
@@ -80,27 +81,23 @@ async function computeProgress(userId) {
   result.annual = parseInt(books[0].annual);
   result.monthly_books = parseInt(books[0].monthly_books);
 
-  const { rows: seconds } = await pool.query(
-    `SELECT
-       COALESCE(SUM(duration_seconds) FILTER (
-         WHERE ${SQL.utcToApp()}
-           >= date_trunc('day', ${SQL.nowInApp()})
-       ), 0) AS daily_seconds,
-       COALESCE(SUM(duration_seconds) FILTER (
-         WHERE ${SQL.utcToApp()}
-           >= date_trunc('week', ${SQL.nowInApp()})
-       ), 0) AS weekly_seconds,
-       COALESCE(SUM(duration_seconds) FILTER (
-         WHERE ${SQL.utcToApp()}
-           >= date_trunc('month', ${SQL.nowInApp()})
-       ), 0) AS monthly_seconds
-     FROM reading_sessions
-     WHERE user_id = $1`,
-    [userId]
-  );
-  result.daily = Math.round(parseInt(seconds[0].daily_seconds) / 60);
-  result.weekly = Math.round(parseInt(seconds[0].weekly_seconds) / 60);
-  result.monthly_minutes = Math.round(parseInt(seconds[0].monthly_seconds) / 60);
+  // Minutos por periodo según los lapsos de las sesiones (sessionDays): una
+  // sesión cruzando medianoche ya repartió el tiempo entre los días que toca.
+  const [boundaries, buckets] = await Promise.all([appBoundaries(), bucketReadingDays(userId)]);
+  const weekMs = dayMs(boundaries.week);
+  const monthPrefix = boundaries.month.slice(0, 7);
+  let dailySeconds = 0;
+  let weeklySeconds = 0;
+  let monthlySeconds = 0;
+  for (const b of buckets) {
+    const secs = Number(b.secs);
+    if (b.date === boundaries.day) dailySeconds += secs;
+    if (dayMs(b.date) >= weekMs) weeklySeconds += secs;
+    if (b.date.slice(0, 7) === monthPrefix) monthlySeconds += secs;
+  }
+  result.daily = Math.round(dailySeconds / 60);
+  result.weekly = Math.round(weeklySeconds / 60);
+  result.monthly_minutes = Math.round(monthlySeconds / 60);
 
   return result;
 }
