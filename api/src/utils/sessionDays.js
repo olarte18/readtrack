@@ -20,13 +20,17 @@ async function appBoundaries() {
   return rows[0];
 }
 
-// Partida cada sesión de lectura en la actividad diaria (hora Bogotá) según el
-// intervalo real [inicio, inicio + duración]: una sesión que cruza la
-// medianoche aporta cada parte al día que le toca. El avance de páginas se
-// reparte proporcional al tiempo con el método del mayor resto (cada día se
-// lleva su piso y el resto va al bucket con más tiempo; así la suma se
-// conserva). Regresa [{ session_id, user_book_id, mode, created_at, date,
-// seconds, pages }], ordenado por (session_id, date).
+// Partida cada sesión de lectura en la actividad diaria (hora Bogotá):
+//  - Sesiones con `started_at` real (las nuevas): se parten según el intervalo
+//    [inicio, inicio + duración]; una sesión que cruza la medianoche aporta
+//    cada parte al día que le toca. El avance de páginas se reparte
+//    proporcional al tiempo con el método del mayor resto (cada día se lleva
+//    su piso y el resto va al bucket con más tiempo; así la suma se conserva).
+//  - Sesiones sin `started_at` (historial previo a ese campo): toda la sesión
+//    se atribuye al día Bogotá de `created_at`, igual que antes del split. Así
+//    el historial y la racha no cambian de día retroactivamente.
+// Regresa [{ session_id, user_book_id, mode, created_at, date, seconds,
+// pages }], ordenado por (session_id, date).
 async function bucketReadingDays(userId) {
   const { rows } = await pool.query(
     `
@@ -35,27 +39,34 @@ async function bucketReadingDays(userId) {
              rs.user_book_id,
              ub.reading_mode AS mode,
              rs.created_at,
-             COALESCE(rs.started_at,
-               rs.created_at - make_interval(secs => COALESCE(rs.duration_seconds, 0))) AS start_ts,
-             COALESCE(rs.started_at,
-               rs.created_at - make_interval(secs => COALESCE(rs.duration_seconds, 0)))
-               + make_interval(secs => COALESCE(rs.duration_seconds, 0)) AS end_ts,
+             rs.started_at,
+             rs.duration_seconds,
              COALESCE(rs.pages_read,
                GREATEST(rs.page - COALESCE(rs.start_page, rs.page), 0))::bigint AS adv
       FROM reading_sessions rs
       JOIN user_books ub ON ub.id = rs.user_book_id
       WHERE rs.user_id = $1
     ),
+    spans_full AS (
+      SELECT s.*,
+             COALESCE(s.started_at,
+               s.created_at - make_interval(secs => COALESCE(s.duration_seconds, 0))) AS start_ts,
+             COALESCE(s.started_at,
+               s.created_at - make_interval(secs => COALESCE(s.duration_seconds, 0)))
+               + make_interval(secs => COALESCE(s.duration_seconds, 0)) AS end_ts
+      FROM spans s
+    ),
     days AS (
       SELECT s.*, b.day AS day_ts,
              s.start_ts AT TIME ZONE 'UTC' AS start_tsz,
              s.end_ts AT TIME ZONE 'UTC' AS end_tsz
-      FROM spans s
+      FROM spans_full s
       CROSS JOIN LATERAL generate_series(
         ${SQL.dayStartUtc("s.start_ts")},
         s.end_ts AT TIME ZONE 'UTC',
         interval '1 day'
       ) AS b(day)
+      WHERE s.started_at IS NOT NULL
     ),
     overlap AS (
       SELECT d.*,
@@ -79,6 +90,13 @@ async function bucketReadingDays(userId) {
     SELECT session_id, user_book_id, mode, created_at, date, secs,
            floor_pages + CASE WHEN rn = 1 THEN adv - floor_sum ELSE 0 END AS pages
     FROM split
+    UNION ALL
+    SELECT s.session_id, s.user_book_id, s.mode, s.created_at,
+           TO_CHAR(${SQL.utcToApp("s.created_at")}, 'YYYY-MM-DD') AS date,
+           EXTRACT(EPOCH FROM (s.end_ts - s.start_ts))::bigint AS secs,
+           s.adv AS pages
+    FROM spans_full s
+    WHERE s.started_at IS NULL
     ORDER BY session_id, date
     `,
     [userId]

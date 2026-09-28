@@ -199,6 +199,39 @@ describe("GET /reading-sessions/:user_book_id", () => {
     expect(resOld.body[0].page).toBe(50);
   });
 
+  test("filtra por fecha con el día-bucket, alineado al calendario", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    // Sesión con started_at que cruza la medianoche de Bogotá:
+    // 23:30 (01/06) -> 00:30 (02/06) = 04:30 -> 05:30 UTC del 02/06.
+    const { rows: [cruzada] } = await pool.query(
+      `INSERT INTO reading_sessions (user_book_id, user_id, page, start_page, pages_read, duration_seconds, created_at, started_at)
+       VALUES ($1, (SELECT id FROM users WHERE email = 'test@example.com'), 104, 100, 4, 3600, '2025-06-02 05:30:00', '2025-06-02 04:30:00')
+       RETURNING id`,
+      [book.id]
+    );
+    // Sesión sin started_at: íntegra al día de created_at (02/06, 00:30 Bogotá).
+    await pool.query(
+      `INSERT INTO reading_sessions (user_book_id, user_id, page, pages_read, duration_seconds, created_at)
+       VALUES ($1, (SELECT id FROM users WHERE email = 'test@example.com'), 60, 10, 1800, '2025-06-02 05:30:00')`,
+      [book.id]
+    );
+
+    const res01 = await request(app).get(`/reading-sessions/${book.id}?date=2025-06-01`).set(authHeader(token));
+    expect(res01.status).toBe(200);
+    expect(res01.body).toHaveLength(1);
+    expect(res01.body[0].id).toBe(cruzada.id);
+    expect(res01.body[0].seconds).toBe(1800); // la porción que ve el tile del 01/06
+    expect(res01.body[0].pages).toBe(2);
+
+    const res02 = await request(app).get(`/reading-sessions/${book.id}?date=2025-06-02`).set(authHeader(token));
+    expect(res02.status).toBe(200);
+    expect(res02.body).toHaveLength(2); // la cruzada (porción 02/06) + la de created_at
+    const q1 = res02.body.find((r) => r.id === cruzada.id);
+    expect(q1).toMatchObject({ seconds: 1800, pages: 2 });
+  });
+
   test("rechaza fecha con formato inválido", async () => {
     const { token } = await registerUser();
     const book = await addBook(token);

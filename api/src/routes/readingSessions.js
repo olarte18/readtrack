@@ -185,24 +185,46 @@ router.patch("/:id", async (req, res) => {
 });
 
 router.get("/:user_book_id", async (req, res) => {
-  const params = [req.params.user_book_id, req.userId];
-  let dateFilter = "";
   if (req.query.date) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) {
       return res.status(400).json({ error: "Fecha inválida" });
     }
-    dateFilter =
-      `AND ${SQL.toChar("rs.created_at")} = $3`;
-    params.push(req.query.date);
+    // Lista del día alineada con los tiles del calendario: solo las sesiones
+    // cuyo día-bucket (bucketReadingDays) coincide con la fecha pedida. Para
+    // sesiones nuevas con started_at que cruzan medianoche el tile muestra la
+    // porción del día, así que se devuelve esa porción en seconds/pages (los
+    // campos editables de la sesión se conservan completos).
+    const bookId = Number(req.params.user_book_id);
+    const buckets = await bucketReadingDays(req.userId);
+    const matched = buckets.filter((b) => b.user_book_id === bookId && b.date === req.query.date);
+    if (matched.length === 0) return res.json([]);
+
+    const ids = [...new Set(matched.map((b) => b.session_id))];
+    const portion = new Map();
+    for (const b of matched) portion.set(b.session_id, { seconds: Number(b.secs), pages: Number(b.pages) });
+
+    const { rows } = await pool.query(
+      `SELECT rs.id, rs.page, rs.start_page, rs.pages_read, rs.duration_seconds,
+              ${SQL.toChar("rs.created_at")} AS date_bogota,
+              ${SQL.toChar("rs.created_at", "HH24:MI")} AS time_bogota
+       FROM reading_sessions rs
+       WHERE rs.id = ANY($1::int[]) AND rs.user_id = $2
+       ORDER BY rs.created_at ASC`,
+      [ids, req.userId]
+    );
+    return res.json(
+      rows.map((r) => ({ ...r, seconds: portion.get(r.id).seconds, pages: portion.get(r.id).pages }))
+    );
   }
+
   const { rows } = await pool.query(
     `SELECT rs.id, rs.page, rs.start_page, rs.pages_read, rs.duration_seconds,
             ${SQL.toChar("rs.created_at")} AS date_bogota,
             ${SQL.toChar("rs.created_at", "HH24:MI")} AS time_bogota
      FROM reading_sessions rs
-     WHERE rs.user_book_id = $1 AND rs.user_id = $2 ${dateFilter}
+     WHERE rs.user_book_id = $1 AND rs.user_id = $2
      ORDER BY rs.created_at ASC`,
-    params
+    [req.params.user_book_id, req.userId]
   );
   res.json(rows);
 });

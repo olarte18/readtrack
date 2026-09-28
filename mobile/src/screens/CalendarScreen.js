@@ -72,8 +72,8 @@ export default function CalendarScreen() {
       setSessions(list.map((s) => ({
         ...s,
         pageStr: String(s.page ?? 0),
-        readStr: String(s.pages_read ?? 0),
-        minutesStr: String(Math.round((s.duration_seconds ?? 0) / 60)),
+        readStr: String(s.pages ?? s.pages_read ?? 0),
+        minutesStr: String(Math.round((s.seconds ?? s.duration_seconds ?? 0) / 60)),
       })));
     } catch {
       AppAlert.alert("Error", "No se pudieron cargar las sesiones");

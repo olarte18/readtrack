@@ -143,6 +143,22 @@ describe("GET /calendar/:year/:month", () => {
     expect(d1).toMatchObject({ minutes: 30, pages: 2, counts: true });
   });
 
+  test("sin started_at la sesión que cruza solo aparece el día de created_at", async () => {
+    const { token, user } = await registerUser();
+    const libro = await addBook(token, { reading_mode: "page" });
+
+    // Cruzaría la medianoche (23:30 31/03 -> 00:30 01/04) si se derivara el
+    // inicio, pero al no haber started_at TODO va al día de created_at.
+    await insertSession(user.id, libro.id, "2025-04-01 05:30:00", 3600, 4);
+
+    const res31 = await request(app).get("/calendar/2025/3").set(authHeader(token));
+    expect(res31.body.days.some((d) => d.date === "2025-03-31")).toBe(false);
+
+    const res1 = await request(app).get("/calendar/2025/4").set(authHeader(token));
+    const d1 = res1.body.days.find((d) => d.date === "2025-04-01");
+    expect(d1).toMatchObject({ minutes: 60, pages: 4, counts: true });
+  });
+
   test("mes vacío devuelve days vacío", async () => {
     const { token } = await registerUser();
     const res = await request(app).get("/calendar/2025/6").set(authHeader(token));

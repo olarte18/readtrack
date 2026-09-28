@@ -255,9 +255,12 @@ describe("sesiones que cruzan la medianoche (sessionDays)", () => {
     expect(await getStreak(token)).toMatchObject({ current: 0, best: 3 });
   });
 
-  test("sin started_at el cruce se deriva de created_at - duración", async () => {
+  test("sin started_at: la sesión íntegra cuenta el día de created_at (historial estable)", async () => {
     const { token, user } = await registerUser();
     const ub = await seedUserBook(user.id, { mode: "page", pages: 300 });
+    // Cruzaría la medianoche si se derivara el inicio (created_at − duración),
+    // pero al no haber started_at NO se parte: todo va al día de created_at
+    // (03/10 00:30 Bogotá) y un solo día califica.
     await insertSession(ub, user.id, {
       page: 104,
       start_page: 100,
@@ -265,7 +268,7 @@ describe("sesiones que cruzan la medianoche (sessionDays)", () => {
       created_at: CREATED_0030, // sin started_at
     });
 
-    expect(await getStreak(token)).toMatchObject({ current: 0, best: 2 });
+    expect(await getStreak(token)).toMatchObject({ current: 0, best: 1 });
   });
 
   test("reparto con mayor resto: 100 min y 4 páginas dan 5+3", async () => {
