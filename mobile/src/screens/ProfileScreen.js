@@ -174,6 +174,11 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.menuLabel}>Importar biblioteca</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Export")}>
+          <Ionicons name="share-outline" size={22} color={colors.accent} />
+          <Text style={styles.menuLabel}>Exportar datos</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Achievements")}>
           <Ionicons name="medal-outline" size={22} color={colors.accent} />
           <Text style={styles.menuLabel}>Logros</Text>

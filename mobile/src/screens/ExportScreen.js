@@ -1,0 +1,131 @@
+import { useState, useEffect } from "react";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import * as Sharing from "expo-sharing";
+import { File, Paths } from "expo-file-system";
+import { AppAlert } from "../components/AppAlert";
+import { useTheme } from "../contexts/ThemeContext";
+import { exportBackup } from "../services/api";
+
+export default function ExportScreen({ navigation }) {
+  const { colors } = useTheme();
+  const styles = createStyles(colors);
+  const [loading, setLoading] = useState(true);
+  const [sharing, setSharing] = useState(false);
+  const [backup, setBackup] = useState(null); // el "plan" completo (GET /export)
+
+  useEffect(() => {
+    let active = true;
+    (async () => {
+      try {
+        const data = await exportBackup();
+        if (active) setBackup(data);
+      } catch (e) {
+        AppAlert.alert("Error", e.message || "No se pudo generar el respaldo");
+      } finally {
+        if (active) setLoading(false);
+      }
+    })();
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const sessions = (backup?.books ?? []).reduce((acc, b) => acc + (b.sessionDays?.length ?? 0), 0);
+  const archived = (backup?.books ?? []).filter((b) => b.isArchived).length;
+
+  const shareBackup = async () => {
+    if (!backup) return;
+    setSharing(true);
+    try {
+      const name = `readtrack-respaldo-${backup.exportedAt ? backup.exportedAt.slice(0, 10) : new Date().toISOString().slice(0, 10)}.json`;
+      const file = new File(Paths.cache, name);
+      file.write(JSON.stringify(backup), { encoding: "utf8" });
+      if (!(await Sharing.isAvailableAsync())) {
+        AppAlert.alert("No disponible", "Compartir archivos no está disponible en este dispositivo");
+        return;
+      }
+      await Sharing.shareAsync(file.uri, {
+        mimeType: "application/json",
+        dialogTitle: "Respaldo de ReadTrack",
+        UTI: "public.json",
+      });
+    } catch (e) {
+      AppAlert.alert("Error", e.message || "No se pudo compartir el respaldo");
+    } finally {
+      setSharing(false);
+    }
+  };
+
+  return (
+    <ScrollView contentContainerStyle={styles.container}>
+      <Text style={styles.title}>Exportar datos</Text>
+      <Text style={styles.subtitle}>
+        Genera un respaldo completo de tu biblioteca: libros (incluidos archivados), sesiones de lectura, notas,
+        ciclos y metas. Podrás restaurarlo en otro teléfono desde "Importar biblioteca".
+      </Text>
+
+      {loading ? (
+        <ActivityIndicator color={colors.accent} style={{ marginVertical: 40 }} />
+      ) : (
+        <>
+          <View style={styles.summaryCard}>
+            <Text style={styles.summaryHighlight}>{(backup?.books ?? []).length} libros</Text>
+            <View style={styles.statGrid}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{sessions}</Text>
+                <Text style={styles.statLabel}>sesiones</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{backup?.notes?.length ?? 0}</Text>
+                <Text style={styles.statLabel}>notas</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{backup?.goals?.length ?? 0}</Text>
+                <Text style={styles.statLabel}>metas</Text>
+              </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{archived}</Text>
+                <Text style={styles.statLabel}>archivados</Text>
+              </View>
+            </View>
+            {backup?.exportedAt && (
+              <Text style={styles.summaryText}>Generado el {backup.exportedAt.slice(0, 10)}</Text>
+            )}
+          </View>
+
+          <TouchableOpacity style={styles.shareBtn} onPress={shareBackup} disabled={sharing}>
+            {sharing ? (
+              <ActivityIndicator color={colors.onAccent} />
+            ) : (
+              <Ionicons name="share-outline" size={22} color={colors.onAccent} />
+            )}
+            <Text style={styles.shareBtnText}>Compartir respaldo</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.doneBtnText}>Listo</Text>
+          </TouchableOpacity>
+        </>
+      )}
+    </ScrollView>
+  );
+}
+
+const createStyles = (colors) =>
+  StyleSheet.create({
+    container: { flexGrow: 1, backgroundColor: colors.background, paddingTop: 60, paddingHorizontal: 20 },
+    title: { fontSize: 24, fontWeight: "bold", color: colors.text, marginBottom: 6 },
+    subtitle: { fontSize: 14, color: colors.textDim, lineHeight: 20, marginBottom: 24 },
+    summaryCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 16 },
+    summaryText: { fontSize: 13, color: colors.textMuted, marginTop: 8, textAlign: "center" },
+    summaryHighlight: { fontWeight: "bold", color: colors.accent, fontSize: 18, marginBottom: 4 },
+    statGrid: { flexDirection: "row", flexWrap: "wrap", gap: 10, marginVertical: 8 },
+    statItem: { flexGrow: 1, minWidth: "22%", backgroundColor: colors.surfaceAlt, borderRadius: 10, padding: 10, alignItems: "center" },
+    statNumber: { fontSize: 18, fontWeight: "bold", color: colors.accent },
+    statLabel: { fontSize: 10, color: colors.textMuted, textAlign: "center", marginTop: 2 },
+    shareBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, marginTop: 20 },
+    shareBtnText: { color: colors.onAccent, fontSize: 16, fontWeight: "bold" },
+    doneBtn: { alignItems: "center", marginTop: 14, paddingVertical: 8 },
+    doneBtnText: { color: colors.textDim, fontSize: 14 },
+  });

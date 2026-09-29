@@ -11,6 +11,7 @@ const readingSessionsRouter = require("./routes/readingSessions");
 const goalsRouter = require("./routes/goals");
 const calendarRouter = require("./routes/calendar");
 const importsRouter = require("./routes/imports");
+const exportRouter = require("./routes/export");
 const achievementsRouter = require("./routes/achievements");
 const errorHandler = require("./middleware/errorHandler");
 const { booksLimiter } = require("./middleware/rateLimit");
@@ -43,6 +44,7 @@ app.use("/reading-sessions", readingSessionsRouter);
 app.use("/goals", goalsRouter);
 app.use("/calendar", calendarRouter);
 app.use("/import", importsRouter);
+app.use("/export", exportRouter);
 app.use("/achievements", achievementsRouter);
 app.get("/health", async (req, res) => {
   try {

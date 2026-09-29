@@ -517,6 +517,8 @@ export const importBookmory = async (fileBase64) =>
     body: JSON.stringify({ file_base64: fileBase64 }),
   });
 
+export const exportBackup = async () => request("/export", { method: "GET", retry: false });
+
 export const requestRegistrationCode = async (email) =>
   request("/auth/request-register-code", {
     method: "POST",
