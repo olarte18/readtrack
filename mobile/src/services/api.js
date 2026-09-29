@@ -3,9 +3,17 @@ import { API_URL } from "../utils/config";
 import { markOnline, markOffline, getConnectivity, markGrace, inGrace } from "./connectivity";
 import { emitAchievements } from "./achievementsBus";
 import { recordCelebrated } from "./achievementsSnapshot";
+import {
+  getAccessToken,
+  getUserId,
+  getRefreshToken,
+  setTokenPair,
+  clearAuthState,
+  clearUserId,
+} from "./secureStorage";
 
 const getHeaders = async () => {
-  const token = await AsyncStorage.getItem("token");
+  const token = await getAccessToken();
   return {
     "Content-Type": "application/json",
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -47,8 +55,10 @@ const isNetworkError = (err) =>
 
 export { isNetworkError };
 
-const cacheKey = (path) =>
-  AsyncStorage.getItem("token").then((token) => (token ? `cache:${token}:${path}` : null));
+const cacheKey = async (path) => {
+  const userId = await getUserId();
+  return userId ? `cache:${userId}:${path}` : null;
+};
 
 const readCached = async (path) => {
   const key = await cacheKey(path);
@@ -172,13 +182,12 @@ const getWithCache = async (path, options = {}) => {
 
 let refreshingPromise = null;
 
-const clearAuth = () =>
-  AsyncStorage.multiRemove(["token", "refreshToken"]).catch(() => {});
+const clearAuth = () => clearAuthState().then(() => clearUserId()).catch(() => {});
 
 const refreshAccessToken = async () => {
   if (!refreshingPromise) {
     refreshingPromise = (async () => {
-      const refreshToken = await AsyncStorage.getItem("refreshToken");
+      const refreshToken = await getRefreshToken();
       if (!refreshToken) throw new Error("Sin refresh token");
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), DEFAULT_TIMEOUT);
@@ -195,10 +204,7 @@ const refreshAccessToken = async () => {
       }
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || "Sesión expirada");
-      await AsyncStorage.multiSet([
-        ["token", data.token],
-        ["refreshToken", data.refreshToken],
-      ]);
+      await setTokenPair(data.token, data.refreshToken);
       return data.token;
     })().catch(async (err) => {
       // Si el refresh falla por red, la sesión sigue en pie para operar offline
@@ -298,22 +304,37 @@ export const getLibrary = async () => {
     }
     throw err;
   }
-  const token = await AsyncStorage.getItem("token");
-  if (token) {
-    // JSON.stringify de un array ignora la propiedad fromCache → caché legacy limpia.
-    await AsyncStorage.setItem(`library:${token}`, JSON.stringify(data));
+  const userId = await getUserId();
+  if (userId) {
+    // JSON.stringify de un array ignora la propiedad fromCache → caché limpia.
+    await AsyncStorage.setItem(`library:${userId}`, JSON.stringify(data));
   }
   return data;
 };
 
 export const getLibraryCached = async () => {
   try {
-    const token = await AsyncStorage.getItem("token");
-    if (!token) return null;
-    const raw = await AsyncStorage.getItem(`library:${token}`);
+    const userId = await getUserId();
+    if (!userId) return null;
+    const raw = await AsyncStorage.getItem(`library:${userId}`);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
+  }
+};
+
+// Limpieza de la caché y biblioteca guardadas de un usuario concreto, al hacer
+// logout: no dejar datos de lectura del usuario anterior en un dispositivo
+// compartido.
+export const clearUserCachedData = async (userId) => {
+  if (!userId) return;
+  try {
+    const keys = await AsyncStorage.getAllKeys();
+    const prefix = `cache:${userId}:`;
+    const stale = keys.filter((k) => k.startsWith(prefix) || k === `library:${userId}`);
+    if (stale.length > 0) await AsyncStorage.multiRemove(stale);
+  } catch {
+    // best-effort
   }
 };
 
