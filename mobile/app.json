@@ -56,7 +56,13 @@
         }
       ],
       "./plugins/withAlarm",
-      "expo-secure-store"
+      [
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false
+        }
+      ],
+      "./plugins/withNoBackup"
     ],
     "extra": {
       "eas": {
