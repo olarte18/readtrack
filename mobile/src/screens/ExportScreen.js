@@ -5,13 +5,14 @@ import * as Sharing from "expo-sharing";
 import { File, Paths } from "expo-file-system";
 import { AppAlert } from "../components/AppAlert";
 import { useTheme } from "../contexts/ThemeContext";
-import { exportBackup } from "../services/api";
+import { exportBackup, exportLibraryCsv } from "../services/api";
 
 export default function ExportScreen({ navigation }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState(false);
+  const [sharingCsv, setSharingCsv] = useState(false);
   const [backup, setBackup] = useState(null); // el "plan" completo (GET /export)
 
   useEffect(() => {
@@ -57,12 +58,36 @@ export default function ExportScreen({ navigation }) {
     }
   };
 
+  const shareCsv = async () => {
+    setSharingCsv(true);
+    try {
+      const { csv } = await exportLibraryCsv();
+      const name = `readtrack-biblioteca-${new Date().toISOString().slice(0, 10)}.csv`;
+      const file = new File(Paths.cache, name);
+      file.write(csv, { encoding: "utf8" });
+      if (!(await Sharing.isAvailableAsync())) {
+        AppAlert.alert("No disponible", "Compartir archivos no está disponible en este dispositivo");
+        return;
+      }
+      await Sharing.shareAsync(file.uri, {
+        mimeType: "text/csv",
+        dialogTitle: "Biblioteca de ReadTrack",
+        UTI: "public.comma-separated-values-text",
+      });
+    } catch (e) {
+      AppAlert.alert("Error", e.message || "No se pudo compartir la biblioteca");
+    } finally {
+      setSharingCsv(false);
+    }
+  };
+
   return (
     <ScrollView contentContainerStyle={styles.container}>
       <Text style={styles.title}>Exportar datos</Text>
       <Text style={styles.subtitle}>
         Genera un respaldo completo de tu biblioteca: libros (incluidos archivados), sesiones de lectura, notas,
-        ciclos y metas. Podrás restaurarlo en otro teléfono desde "Importar biblioteca".
+        ciclos y metas. Podrás restaurarlo en otro teléfono desde "Importar biblioteca". También puedes descargar
+        la biblioteca en CSV estilo Goodreads para llevarla a otra app.
       </Text>
 
       {loading ? (
@@ -100,8 +125,21 @@ export default function ExportScreen({ navigation }) {
             ) : (
               <Ionicons name="share-outline" size={22} color={colors.onAccent} />
             )}
-            <Text style={styles.shareBtnText}>Compartir respaldo</Text>
+            <Text style={styles.shareBtnText}>Compartir respaldo completo (JSON)</Text>
           </TouchableOpacity>
+
+          <TouchableOpacity style={styles.csvBtn} onPress={shareCsv} disabled={sharingCsv}>
+            {sharingCsv ? (
+              <ActivityIndicator color={colors.accent} />
+            ) : (
+              <Ionicons name="document-text-outline" size={20} color={colors.accent} />
+            )}
+            <Text style={styles.csvBtnText}>Compartir biblioteca (CSV)</Text>
+          </TouchableOpacity>
+          <Text style={styles.csvHint}>
+            El CSV lleva título, autor, rating, fechas, estante y reseña. Para una copia con todo (sesiones,
+            notas y metas), usa el respaldo JSON.
+          </Text>
 
           <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()}>
             <Text style={styles.doneBtnText}>Listo</Text>
@@ -126,6 +164,9 @@ const createStyles = (colors) =>
     statLabel: { fontSize: 10, color: colors.textMuted, textAlign: "center", marginTop: 2 },
     shareBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.accent, borderRadius: 12, paddingVertical: 16, marginTop: 20 },
     shareBtnText: { color: colors.onAccent, fontSize: 16, fontWeight: "bold" },
+    csvBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, backgroundColor: colors.surface, borderRadius: 12, paddingVertical: 14, marginTop: 12, borderWidth: 1, borderColor: colors.surfaceAlt },
+    csvBtnText: { color: colors.accent, fontSize: 15, fontWeight: "bold" },
+    csvHint: { fontSize: 12, color: colors.textDim, textAlign: "center", marginTop: 8, lineHeight: 16 },
     doneBtn: { alignItems: "center", marginTop: 14, paddingVertical: 8 },
     doneBtnText: { color: colors.textDim, fontSize: 14 },
   });

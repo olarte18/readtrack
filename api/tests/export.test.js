@@ -197,6 +197,92 @@ describe("round-trip export → import", () => {
   });
 });
 
+describe("GET /export/csv", () => {
+  test("exige autenticación", async () => {
+    const res = await request(app).get("/export/csv");
+    expect(res.status).toBe(401);
+  });
+
+  test("devuelve el encabezado para un usuario sin libros", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).get("/export/csv").set(authHeader(token));
+    expect(res.status).toBe(200);
+    const header = res.body.csv.split("\n");
+    expect(header[0]).toContain("Exclusive Shelf");
+    expect(header).toHaveLength(1);
+  });
+
+  test("mapea estados a estantes de Goodreads y escapa comas y comillas", async () => {
+    const { token } = await registerUser();
+    await request(app)
+      .post("/import/readtrack")
+      .set(authHeader(token))
+      .send({
+        plan: {
+          books: [
+            {
+              bid: "u1",
+              title: "Doc, el libro",
+              author: "Autor, Hijo",
+              pages: 300,
+              status: "completed",
+              currentPage: 300,
+              rating: 4,
+              startedAt: "2026-01-01",
+              finishedAt: "2026-03-15",
+              review: 'Bueno, "muy bueno".',
+              readingMode: "page",
+              isArchived: false,
+              createdAtMs: null,
+              categories: [],
+              cycles: [],
+              sessionDays: [],
+            },
+            {
+              bid: "u2",
+              title: "En cola",
+              author: "Autor Dos",
+              pages: 100,
+              status: "wishlist",
+              currentPage: 0,
+              rating: null,
+              startedAt: null,
+              finishedAt: null,
+              review: null,
+              readingMode: "page",
+              isArchived: false,
+              createdAtMs: null,
+              categories: [],
+              cycles: [],
+              sessionDays: [],
+            },
+          ],
+          notes: [],
+          goals: [],
+        },
+      });
+
+    const res = await request(app).get("/export/csv").set(authHeader(token));
+    expect(res.status).toBe(200);
+    const lines = res.body.csv.split("\n");
+    expect(lines[0]).toBe(
+      "Book Id,Title,Author,ISBN,ISBN13,My Rating,Number of Pages,Year Published,Date Read,Exclusive Shelf,My Review"
+    );
+    expect(lines).toHaveLength(3);
+
+    expect(lines[1]).toContain('"Doc, el libro"');
+    expect(lines[1]).toContain('"Autor, Hijo"');
+    expect(lines[1]).toContain("4");
+    expect(lines[1]).toContain("300");
+    expect(lines[1]).toContain("2026-03-15");
+    expect(lines[1]).toContain(",read,");
+    expect(lines[1]).toContain('"Bueno, ""muy bueno""."');
+
+    expect(lines[2]).toContain("En cola");
+    expect(lines[2]).toContain(",to-read,");
+  });
+});
+
 describe("POST /import/readtrack", () => {
   test("rechaza respaldos sin lista de libros", async () => {
     const { token } = await registerUser();

@@ -519,6 +519,8 @@ export const importBookmory = async (fileBase64) =>
 
 export const exportBackup = async () => request("/export", { method: "GET", retry: false });
 
+export const exportLibraryCsv = async () => request("/export/csv", { method: "GET", retry: false });
+
 export const requestRegistrationCode = async (email) =>
   request("/auth/request-register-code", {
     method: "POST",
