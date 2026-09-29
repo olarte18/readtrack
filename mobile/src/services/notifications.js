@@ -126,7 +126,7 @@ export async function markAlarmHintSeen() {
   }
 }
 
-export async function scheduleAlarm(msFromNow, { title, body } = {}) {
+export async function scheduleAlarm(msFromNow, { title, body, url } = {}) {
   if (AlarmNative) {
     try {
       await AlarmNative.schedule(Date.now() + msFromNow);
@@ -141,6 +141,7 @@ export async function scheduleAlarm(msFromNow, { title, body } = {}) {
         title: title || "ReadTrack",
         body: body || "",
         sound: SOUND_FILE,
+        ...(url ? { data: { url } } : {}),
       },
       trigger: {
         type: Notifications.SchedulableTriggerInputTypes.DATE,
@@ -151,6 +152,26 @@ export async function scheduleAlarm(msFromNow, { title, body } = {}) {
   } catch {
     return null;
   }
+}
+
+/**
+ * Reenvía el tap de una notificación con `data.url` al sistema de linking
+ * (p. ej. recordatorio de racha, "Tiempo cumplido" fallback). Maneja también
+ * la respuesta inicial (arranque en frío desde la notificación). Devuelve la
+ * función para desuscribirse.
+ */
+export function bindNotificationTap(onUrl) {
+  const forward = (response) => {
+    try {
+      const url = response?.notification?.request?.content?.data?.url;
+      if (typeof url === "string" && url) onUrl(url);
+    } catch (_) {}
+  };
+  const subscription = Notifications.addNotificationResponseReceivedListener(forward);
+  Notifications.getLastNotificationResponseAsync()
+    .then(forward)
+    .catch(() => {});
+  return () => subscription.remove();
 }
 
 export async function cancelAlarm(id) {
@@ -197,6 +218,7 @@ export async function startAlarmSession({ mode, durationMs, book }) {
     return await scheduleAlarm(durationMs, {
       title: "Tiempo cumplido",
       body: `¡Terminaste tu sesión de ${Math.max(1, Math.round(durationMs / 60000))} minutos!`,
+      url: `readtrack://session?bookId=${encodeURIComponent(String(book.id))}&seconds=${Math.max(1, Math.round(durationMs / 1000))}`,
     });
   } catch {
     return null;

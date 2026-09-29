@@ -6,16 +6,22 @@ import { useTheme } from "../contexts/ThemeContext";
 
 /**
  * Puente del deep-link `readtrack://session?bookId=…&seconds=…` (botón
- * "Ver resumen" de la alarma). Busca el libro en la biblioteca y reanuda el
- * flujo de guardar la sesión en ActiveSession; si no lo encuentra (o falla),
- * cae a la pestaña Leyendo.
+ * "Ver resumen" de la alarma) y `readtrack://session?bookId=…&resume=1`
+ * (tap en la notificación de sesión en curso).
+ * - Con `resume=1`: busca el libro y reabre/revela la sesión activa sin
+ *   cancelar el servicio nativo (la sesión sigue viva).
+ * - Sin `resume`: reanuda el flujo de guardar la sesión en ActiveSession.
+ * Si el libro no está (o algo falla), cae a la pestaña Leyendo.
  */
 export default function AlarmDeepLinkScreen({ route, navigation }) {
   const { colors } = useTheme();
   const { bookId, seconds } = route.params ?? {};
+  const resume = route.params?.resume === "1";
 
   useEffect(() => {
-    cancelAlarmSession();
+    // Reanudar (notificación de sesión): la sesión sigue viva, no se cancela.
+    // "Ver resumen" (alarma cumplida): se detiene el servicio nativo.
+    if (!resume) cancelAlarmSession();
     (async () => {
       try {
         const library = await getLibrary();
@@ -32,6 +38,14 @@ export default function AlarmDeepLinkScreen({ route, navigation }) {
         );
         if (hasActiveSession) {
           navigation.goBack();
+          return;
+        }
+        if (resume) {
+          navigation.replace("ActiveSession", {
+            book,
+            mode: route.params?.mode === "timer" ? "timer" : "stopwatch",
+            resume: true,
+          });
           return;
         }
         navigation.replace("ActiveSession", {

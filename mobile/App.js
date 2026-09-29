@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { NavigationContainer } from "@react-navigation/native";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
-import { ActivityIndicator, View, AppState, Text, Platform } from "react-native";
+import { ActivityIndicator, View, AppState, Text, Platform, Linking } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import { AuthProvider, useAuth } from "./src/contexts/AuthContext";
 import { ThemeProvider, useTheme } from "./src/contexts/ThemeContext";
@@ -41,7 +41,7 @@ import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
 import { warmup, getStreak } from "./src/services/api";
 import { initOfflineSync } from "./src/services/offlineSync";
 import { getConnectivity, subscribe } from "./src/services/connectivity";
-import { configureNotifications } from "./src/services/notifications";
+import { configureNotifications, bindNotificationTap } from "./src/services/notifications";
 import StreakReminderModal from "./src/components/StreakReminderModal";
 import { shouldShowStreakPrompt, reconcileStreakReminder } from "./src/services/streakReminder";
 
@@ -52,6 +52,7 @@ const linking = {
   prefixes: ["readtrack://"],
   config: {
     screens: {
+      Main: { screens: { Reading: "reading" } },
       AlarmLink: "session",
     },
   },
@@ -167,6 +168,16 @@ function AppShell() {
     });
     return () => sub.remove();
   }, [user]);
+
+  // Tap en notificaciones (recordatorio de racha, "Tiempo cumplido" fallback):
+  // reenvía la URL al sistema de linking para navegar dentro de la app.
+  useEffect(
+    () =>
+      bindNotificationTap((url) => {
+        Linking.openURL(url).catch(() => {});
+      }),
+    []
+  );
 
   return (
     <>

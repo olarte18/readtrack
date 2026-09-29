@@ -105,6 +105,29 @@ export default function ActiveSessionScreen({ route, navigation }) {
       if (hasNative) cancelAlarmSession();
       return;
     }
+    // Tap en la notificación de sesión: la sesión sigue viva en el servicio
+    // nativo; reconcilia con él para mostrar el estado real (pausa, tiempo).
+    if (route.params?.resume && hasNative) {
+      getAlarmSessionState()
+        .then((st) => {
+          if (!st?.active) return;
+          if (st.mode === "timer") {
+            setDuration(Math.max(0, Math.round(Number(st.durationMs) / 1000)));
+            setTimerStarted(true);
+            if (st.fired) {
+              setSeconds(0);
+              setRunning(false);
+              setTimeUp(true);
+              return;
+            }
+          }
+          setSeconds(Math.max(0, Math.round(Number(st.seconds) || 0)));
+          setRunning(!st.paused);
+          startTime.current = Date.now() - (Number(st.seconds) || 0) * 1000;
+        })
+        .catch(() => {});
+      return;
+    }
     // Cronómetro: servicio en primer plano + notificación de bloqueo desde ya.
     if (!isTimer && hasNative) {
       startAlarmSession({ mode: "stopwatch", durationMs: 0, book });
@@ -238,6 +261,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     const id = await scheduleAlarm(msFromNow, {
       title: "Tiempo cumplido",
       body: `¡Terminaste tu sesión de ${Math.max(1, Math.round(msFromNow / 60000))} minutos!`,
+      url: `readtrack://session?bookId=${encodeURIComponent(String(book.id))}&seconds=${Math.max(1, Math.round(msFromNow / 1000))}`,
     });
     if (id !== null) alarmIdRef.current = id;
   };

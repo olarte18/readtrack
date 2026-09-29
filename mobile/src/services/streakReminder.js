@@ -99,7 +99,7 @@ async function scheduleOneShot(target, streak) {
     content: {
       title: "Tu racha de lectura",
       body: streakBody(streak),
-      data: { kind: "streak-reminder" },
+      data: { kind: "streak-reminder", url: "readtrack://reading" },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DATE,

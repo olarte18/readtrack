@@ -9,6 +9,7 @@ import android.app.Notification
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.net.Uri
 import android.os.Build
 import android.os.Handler
 import android.os.IBinder
@@ -30,6 +31,7 @@ class AlarmSessionService : Service() {
     const val SESSION_NOTIFICATION_ID = 8002
     const val REQUEST_PAUSE = 8200
     const val REQUEST_RESUME = 8201
+    const val REQUEST_SESSION_OPEN = 8202
     private const val TAG = "ReadTrackAlarm"
 
     fun scheduleExactAlarm(context: Context) {
@@ -80,6 +82,31 @@ class AlarmSessionService : Service() {
       } catch (_: Exception) {}
     }
 
+    /**
+     * Tap en el cuerpo de la notificación de sesión: abre la app directamente
+     * en la sesión en curso a través del deep-link `readtrack://session`.
+     * El flag `resume` evita que el puente cancele el servicio; el estado real
+     * (tiempo/modo/pausa) lo reconcilia el JS con el servicio nativo.
+     */
+    private fun sessionOpenIntent(context: Context): PendingIntent {
+      val id = AlarmSessionState.bookId(context)
+      val url = if (!id.isNullOrEmpty()) {
+        "readtrack://session?bookId=${Uri.encode(id)}&resume=1&mode=${AlarmSessionState.mode(context)}"
+      } else {
+        "readtrack://"
+      }
+      return PendingIntent.getActivity(
+        context,
+        REQUEST_SESSION_OPEN,
+        Intent(Intent.ACTION_VIEW, Uri.parse(url)).addFlags(
+          Intent.FLAG_ACTIVITY_NEW_TASK or
+            Intent.FLAG_ACTIVITY_SINGLE_TOP or
+            Intent.FLAG_ACTIVITY_CLEAR_TOP
+        ),
+        PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      )
+    }
+
     fun buildSessionNotification(context: Context): Notification {
       val paused = AlarmSessionState.isPaused(context)
       val timer = AlarmSessionState.isTimer(context)
@@ -106,6 +133,7 @@ class AlarmSessionService : Service() {
 
       val builder = NotificationCompat.Builder(context, SESSION_CHANNEL_ID)
         .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
+        .setContentIntent(sessionOpenIntent(context))
         .setContentTitle(title)
         .setContentText(text)
         .setSubText(AlarmSessionState.bookTitle(context) ?: "")
