@@ -118,13 +118,13 @@ export default function BookSessionsScreen({ route, navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={24} color={colors.text} />
+        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Volver" onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={24} color={colors.text} accessible={false} />
         </TouchableOpacity>
         {cover ? (
-          <Image source={{ uri: cover }} style={styles.miniCover} />
+          <Image source={{ uri: cover }} style={styles.miniCover} accessible={false} importantForAccessibility="no-hide-descendants" />
         ) : (
-          <View style={[styles.miniCover, styles.noCover]}>
+          <View style={[styles.miniCover, styles.noCover]} accessible={false} importantForAccessibility="no-hide-descendants">
             <Ionicons name="book" size={18} color={colors.textDim} />
           </View>
         )}
@@ -139,6 +139,9 @@ export default function BookSessionsScreen({ route, navigation }) {
           <TouchableOpacity
             key={f.key}
             style={[styles.filterPill, sortKey === f.key && styles.filterPillActive]}
+            accessibilityRole="button"
+            accessibilityLabel={`Ordenar por ${f.label}${sortKey === f.key ? ". Seleccionado" : ""}`}
+            accessibilityState={{ selected: sortKey === f.key }}
             onPress={() => setSortKey(f.key)}
           >
             <Text style={[styles.filterPillText, sortKey === f.key && styles.filterPillTextActive]}>
@@ -150,9 +153,11 @@ export default function BookSessionsScreen({ route, navigation }) {
       <View style={styles.dirRow}>
         <TouchableOpacity
           style={styles.dirBtn}
+          accessibilityRole="button"
+          accessibilityLabel={`Dirección de orden: ${sortDirLabel}. Toca para alternar`}
           onPress={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}
         >
-          <Ionicons name={sortDir === "asc" ? "arrow-up" : "arrow-down"} size={16} color={colors.accent} />
+          <Ionicons name={sortDir === "asc" ? "arrow-up" : "arrow-down"} size={16} color={colors.accent} accessible={false} />
           <Text style={styles.dirBtnText}>{sortDirLabel}</Text>
         </TouchableOpacity>
       </View>

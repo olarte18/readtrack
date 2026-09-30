@@ -162,11 +162,17 @@ export default function SessionSummaryScreen({ route, navigation }) {
           <Text style={styles.ratingTitle}>¿Qué te pareció?</Text>
           <View style={styles.starsRow}>
             {[1, 2, 3, 4, 5].map((star) => (
-              <TouchableOpacity key={star} onPress={() => handleRate(star)}>
+              <TouchableOpacity
+                key={star}
+                accessibilityRole="button"
+                accessibilityLabel={`Calificar con ${star} ${star === 1 ? "estrella" : "estrellas"}`}
+                onPress={() => handleRate(star)}
+              >
                 <Ionicons
                   name={star <= rating ? "star" : "star-outline"}
                   size={36}
                   color={star <= rating ? colors.star : colors.textDim}
+                  accessible={false}
                 />
               </TouchableOpacity>
             ))}
@@ -222,7 +228,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
         </View>
       )}
 
-      <TouchableOpacity style={styles.finishBtn} onPress={() => navigation.goBack()}>
+      <TouchableOpacity style={styles.finishBtn} accessibilityRole="button" accessibilityLabel="Cerrar resumen" onPress={() => navigation.goBack()}>
         <Text style={styles.finishBtnText}>Listo</Text>
       </TouchableOpacity>
 
@@ -256,7 +262,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
                     ? "El fuego está encendido, no lo dejes apagar 🔥"
                     : "Sigue así, el fuego crece cada día más 🔥"}
                 </Text>
-                <TouchableOpacity style={styles.streakBtn} onPress={closeStreak}>
+                <TouchableOpacity style={styles.streakBtn} accessibilityRole="button" accessibilityLabel="Cerrar aviso de racha" onPress={closeStreak}>
                   <Text style={styles.streakBtnText}>¡Vamos!</Text>
                 </TouchableOpacity>
               </>
@@ -274,7 +280,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
                 <Text style={styles.streakCheer}>
                   Esta sesión aún no cuenta para tu racha
                 </Text>
-                <TouchableOpacity style={styles.streakBtn} onPress={closeStreak}>
+                <TouchableOpacity style={styles.streakBtn} accessibilityRole="button" accessibilityLabel="Cerrar aviso" onPress={closeStreak}>
                   <Text style={styles.streakBtnText}>Entendido</Text>
                 </TouchableOpacity>
               </>
@@ -313,7 +319,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
             <Text style={styles.streakCheer}>
               Sigue así, estás logrando grandes cosas 🏆
             </Text>
-            <TouchableOpacity style={styles.streakBtn} onPress={() => setGoalVisible(false)}>
+            <TouchableOpacity style={styles.streakBtn} accessibilityRole="button" accessibilityLabel="Cerrar aviso de meta cumplida" onPress={() => setGoalVisible(false)}>
               <Text style={styles.streakBtnText}>¡Genial!</Text>
             </TouchableOpacity>
           </View>

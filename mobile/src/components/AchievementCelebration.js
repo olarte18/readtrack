@@ -64,7 +64,12 @@ function ConfettiPiece({ piece }) {
 
 function Confetti() {
   return (
-    <View pointerEvents="none" style={StyleSheet.absoluteFill}>
+    <View
+      pointerEvents="none"
+      style={StyleSheet.absoluteFill}
+      accessible={false}
+      importantForAccessibility="no-hide-descendants"
+    >
       {confettiSeed.map((piece, i) => (
         <ConfettiPiece key={i} piece={piece} />
       ))}
@@ -93,7 +98,7 @@ export function CelebrationModal({ items, onClose }) {
       <View style={styles.celebrateOverlay}>
         <Confetti />
         <Animated.View style={[styles.celebrateCard, { backgroundColor: colors.surface }, cardStyle]}>
-          <View style={[styles.celebrateIconWrap, { backgroundColor: colors.star + "22" }]}>
+          <View style={[styles.celebrateIconWrap, { backgroundColor: colors.star + "22" }]} accessible={false} importantForAccessibility="no-hide-descendants">
             <Ionicons name="trophy" size={40} color={colors.star} />
           </View>
           <Text style={[styles.celebrateTitle, { color: colors.text }]}>
@@ -119,7 +124,12 @@ export function CelebrationModal({ items, onClose }) {
           {items[0]?.leyenda && (
             <Text style={[styles.celebrateLeyenda, { color: colors.textMuted }]}>“{items[0].leyenda}”</Text>
           )}
-          <TouchableOpacity style={[styles.celebrateBtn, { backgroundColor: colors.accent }]} onPress={onClose}>
+          <TouchableOpacity
+            style={[styles.celebrateBtn, { backgroundColor: colors.accent }]}
+            accessibilityRole="button"
+            accessibilityLabel="Cerrar celebración"
+            onPress={onClose}
+          >
             <Text style={[styles.celebrateBtnText, { color: colors.onAccent }]}>¡Genial!</Text>
           </TouchableOpacity>
         </Animated.View>

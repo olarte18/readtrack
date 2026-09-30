@@ -176,11 +176,11 @@ export default function CalendarScreen() {
       </View>
 
       <View style={styles.monthNav}>
-        <TouchableOpacity style={styles.navBtn} onPress={goPrevMonth}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        <TouchableOpacity style={styles.navBtn} accessibilityRole="button" accessibilityLabel="Mes anterior" onPress={goPrevMonth}>
+          <Ionicons name="chevron-back" size={22} color={colors.text} accessible={false} />
         </TouchableOpacity>
         <Text style={styles.monthLabel}>{MONTH_NAMES[month - 1]} {year}</Text>
-        <TouchableOpacity style={styles.navBtn} onPress={goNextMonth} disabled={isCurrentMonth}>
+        <TouchableOpacity style={styles.navBtn} accessibilityRole="button" accessibilityLabel="Mes siguiente" onPress={goNextMonth} disabled={isCurrentMonth}>
           <Ionicons
             name="chevron-forward"
             size={22}
@@ -209,7 +209,14 @@ export default function CalendarScreen() {
                 day === null ? (
                   <View key={`blank-${i}`} style={styles.blankCell} />
                 ) : (
-                  <TouchableOpacity key={day} style={styles.dayCellWrapper} accessibilityLabel={`Día ${day}`} onPress={() => setSelectedDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}>
+                  <TouchableOpacity
+                    key={day}
+                    style={styles.dayCellWrapper}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Día ${day} de ${MONTH_NAMES[month - 1]}`}
+                    accessibilityHint={infoFor(day) ? "Toca para ver las sesiones del día" : undefined}
+                    onPress={() => setSelectedDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}
+                  >
                     <View
                       style={[
                         styles.dayCell,
@@ -265,12 +272,14 @@ export default function CalendarScreen() {
                     <TouchableOpacity
                       key={`${b.user_book_id}-${i}`}
                       style={styles.bookRow}
+                      accessibilityRole="button"
+                      accessibilityLabel={`${b.title}${b.author ? `, ${b.author}` : ""}: ${b.minutes} minutos, ${b.pages} páginas. Toca para corregir`}
                       onPress={() => openEdit(b)}
                     >
                       {b.cover ? (
-                        <Image source={{ uri: b.cover }} style={styles.bookCover} />
+                        <Image source={{ uri: b.cover }} style={styles.bookCover} accessible={false} importantForAccessibility="no-hide-descendants" />
                       ) : (
-                        <View style={[styles.bookCover, styles.noCover]}>
+                        <View style={[styles.bookCover, styles.noCover]} accessible={false} importantForAccessibility="no-hide-descendants">
                           <Ionicons name="book" size={18} color={colors.textDim} />
                         </View>
                       )}
@@ -321,6 +330,7 @@ export default function CalendarScreen() {
                           keyboardType="numeric"
                           maxLength={4}
                           selectTextOnFocus
+                          accessibilityLabel="Página"
                         />
                       </View>
                       <View style={styles.sessionField}>
@@ -332,6 +342,7 @@ export default function CalendarScreen() {
                           keyboardType="numeric"
                           maxLength={4}
                           selectTextOnFocus
+                          accessibilityLabel="Páginas leídas"
                         />
                       </View>
                       <View style={styles.sessionField}>
@@ -343,11 +354,14 @@ export default function CalendarScreen() {
                           keyboardType="numeric"
                           maxLength={4}
                           selectTextOnFocus
+                          accessibilityLabel="Minutos"
                         />
                       </View>
                     </View>
                     <TouchableOpacity
                       style={[styles.sessionSaveBtn, savingId === s.id && styles.sessionSaveBtnDisabled]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Guardar sesión"
                       onPress={() => saveSession(s)}
                       disabled={savingId !== null}
                     >
@@ -361,7 +375,7 @@ export default function CalendarScreen() {
                 ))}
               </ScrollView>
             )}
-            <TouchableOpacity style={styles.modalCloseBtn} onPress={() => setEditBook(null)}>
+            <TouchableOpacity style={styles.modalCloseBtn} accessibilityRole="button" accessibilityLabel="Cerrar" onPress={() => setEditBook(null)}>
               <Text style={styles.modalCloseBtnText}>Cerrar</Text>
             </TouchableOpacity>
           </View>

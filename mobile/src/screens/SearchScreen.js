@@ -48,10 +48,12 @@ const handleScan = async (isbn) => {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Volver"
           onPress={() => navigation.goBack()}
           hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         >
-          <Ionicons name="chevron-back" size={28} color={colors.accent} />
+          <Ionicons name="chevron-back" size={28} color={colors.accent} accessible={false} />
         </TouchableOpacity>
         <Text style={styles.title}>Buscar libros</Text>
       </View>
@@ -63,13 +65,14 @@ const handleScan = async (isbn) => {
           value={query}
           onChangeText={handleChange}
           returnKeyType="search"
+          accessibilityLabel="Buscar libros"
         />
-        <TouchableOpacity style={styles.scanBtn} onPress={() => setScannerVisible(true)}>
-  <Ionicons name="barcode-outline" size={22} color={colors.accent} />
+        <TouchableOpacity style={styles.scanBtn} accessibilityRole="button" accessibilityLabel="Escanear código de barras" onPress={() => setScannerVisible(true)}>
+  <Ionicons name="barcode-outline" size={22} color={colors.accent} accessible={false} />
 </TouchableOpacity>
         {query.length > 0 && (
-          <TouchableOpacity style={styles.clearBtn} onPress={() => { setQuery(""); setResults([]); }}>
-            <Ionicons name="close" size={18} color={colors.textMuted} />
+          <TouchableOpacity style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Limpiar búsqueda" onPress={() => { setQuery(""); setResults([]); }}>
+            <Ionicons name="close" size={18} color={colors.textMuted} accessible={false} />
           </TouchableOpacity>
         )}
       </View>
@@ -92,10 +95,11 @@ const handleScan = async (isbn) => {
       />
       <TouchableOpacity
         style={styles.manualBtn}
+        accessibilityRole="button"
         onPress={() => navigation.navigate("ManualAdd")}
         accessibilityLabel="Agregar libro manualmente"
       >
-        <Ionicons name="add-circle-outline" size={24} color={colors.accent} />
+        <Ionicons name="add-circle-outline" size={24} color={colors.accent} accessible={false} />
         <View style={styles.manualBtnCopy}>
           <Text style={styles.manualBtnHint}>¿No encuentras tu libro?</Text>
           <Text style={styles.manualBtnText}>Agregar manualmente</Text>

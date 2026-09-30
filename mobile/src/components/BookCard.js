@@ -12,23 +12,49 @@ const STATUS_LABEL = {
 export default function BookCard({ book, onPress }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
+  const statusText = book.status ? STATUS_LABEL[book.status] : null;
+  const pagesText =
+    book.status === "reading" && book.current_page && book.pages
+      ? `Página ${book.current_page} de ${book.pages}`
+      : null;
+  const label = [book.title, book.author, statusText, pagesText]
+    .filter(Boolean)
+    .join(", ");
   return (
-    <TouchableOpacity style={styles.card} onPress={onPress}>
+    <TouchableOpacity
+      style={styles.card}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      onPress={onPress}
+    >
       {book.cover ? (
-        <Image source={{ uri: book.cover }} style={styles.cover} />
+        <Image
+          source={{ uri: book.cover }}
+          style={styles.cover}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        />
       ) : (
-        <View style={styles.noCover}>
+        <View
+          style={styles.noCover}
+          accessible={false}
+          importantForAccessibility="no-hide-descendants"
+        >
           <Ionicons name="book" size={26} color={colors.textDim} />
         </View>
       )}
-      <View style={styles.info}>
+      <View
+        style={styles.info}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
         <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
         <Text style={styles.author}>{book.author}</Text>
-        {book.status && (
-          <Text style={styles.status}>{STATUS_LABEL[book.status]}</Text>
+        {statusText && (
+          <Text style={styles.status}>{statusText}</Text>
         )}
-        {book.status === "reading" && book.current_page && book.pages && (
-          <Text style={styles.pages}>Página {book.current_page} de {book.pages}</Text>
+        {pagesText && (
+          <Text style={styles.pages}>{pagesText}</Text>
         )}
       </View>
     </TouchableOpacity>

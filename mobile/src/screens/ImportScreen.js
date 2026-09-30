@@ -123,7 +123,7 @@ export default function ImportScreen({ navigation }) {
         Trae tu historial desde un respaldo de Bookmory (.bookmory o .bin) o un CSV de Goodreads u otra app
       </Text>
 
-      <TouchableOpacity style={styles.pickBtn} onPress={pickFile} disabled={picking}>
+      <TouchableOpacity style={styles.pickBtn} accessibilityRole="button" accessibilityLabel={fileName ? "Cambiar archivo" : "Seleccionar archivo"} onPress={pickFile} disabled={picking}>
         {picking ? (
           <ActivityIndicator color={colors.onAccent} />
         ) : (
@@ -204,7 +204,7 @@ export default function ImportScreen({ navigation }) {
             </View>
           )}
 
-          <TouchableOpacity style={styles.importBtn} onPress={handleImport} disabled={importing}>
+          <TouchableOpacity style={styles.importBtn} accessibilityRole="button" accessibilityLabel="Importar todos los libros" onPress={handleImport} disabled={importing}>
             {importing ? (
               <ActivityIndicator color={colors.onAccent} />
             ) : (
@@ -244,7 +244,7 @@ export default function ImportScreen({ navigation }) {
             </View>
           )}
 
-          <TouchableOpacity style={styles.importBtn} onPress={handleImport} disabled={importing}>
+          <TouchableOpacity style={styles.importBtn} accessibilityRole="button" accessibilityLabel={`Importar ${preview.total} libros`} onPress={handleImport} disabled={importing}>
             {importing ? (
               <ActivityIndicator color={colors.onAccent} />
             ) : (
@@ -281,14 +281,14 @@ export default function ImportScreen({ navigation }) {
               )}
             </>
           )}
-          <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.doneBtn} accessibilityRole="button" accessibilityLabel="Cerrar importación" onPress={() => navigation.goBack()}>
             <Text style={styles.doneBtnText}>Listo</Text>
           </TouchableOpacity>
         </View>
       )}
 
       {!preview && fileName && !result && (
-        <TouchableOpacity style={styles.resetBtn} onPress={reset}>
+        <TouchableOpacity style={styles.resetBtn} accessibilityRole="button" accessibilityLabel="Quitar archivo seleccionado" onPress={reset}>
           <Text style={styles.resetBtnText}>Quitar archivo</Text>
         </TouchableOpacity>
       )}

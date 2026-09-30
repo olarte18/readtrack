@@ -79,7 +79,7 @@ export default function ForgotPasswordScreen({ navigation }) {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-      <Image source={require("../../assets/images/logo.png")} style={styles.logo} />
+      <Image source={require("../../assets/images/logo.png")} style={styles.logo} accessible={false} importantForAccessibility="no-hide-descendants" />
       <Text style={styles.title}>ReadTrack</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
 
@@ -94,11 +94,12 @@ export default function ForgotPasswordScreen({ navigation }) {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            accessibilityLabel="Email"
           />
           {loading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />
           ) : (
-            <TouchableOpacity style={styles.btn} onPress={handleSendCode}>
+            <TouchableOpacity style={styles.btn} accessibilityRole="button" accessibilityLabel="Enviar código" onPress={handleSendCode}>
               <Text style={styles.btnText}>Enviar código</Text>
             </TouchableOpacity>
           )}
@@ -115,18 +116,19 @@ export default function ForgotPasswordScreen({ navigation }) {
             onChangeText={(t) => setCode(t.replace(/[^0-9]/g, ""))}
             keyboardType="number-pad"
             maxLength={6}
+            accessibilityLabel="Código de verificación"
           />
           {loading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />
           ) : (
-            <TouchableOpacity style={styles.btn} onPress={handleVerifyCode}>
+            <TouchableOpacity style={styles.btn} accessibilityRole="button" accessibilityLabel="Continuar" onPress={handleVerifyCode}>
               <Text style={styles.btnText}>Continuar</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => goBack("email", true)}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cambiar email" onPress={() => goBack("email", true)}>
             <Text style={styles.link}>Cambiar email</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleSendCode}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reenviar código" onPress={handleSendCode}>
             <Text style={styles.link}>Reenviar código</Text>
           </TouchableOpacity>
         </>
@@ -142,8 +144,14 @@ export default function ForgotPasswordScreen({ navigation }) {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPass}
+              accessibilityLabel="Nueva contraseña"
             />
-            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPass((s) => !s)}>
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              accessibilityRole="button"
+              accessibilityLabel={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+              onPress={() => setShowPass((s) => !s)}
+            >
               <Ionicons name={showPass ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textDim} />
             </TouchableOpacity>
           </View>
@@ -154,21 +162,22 @@ export default function ForgotPasswordScreen({ navigation }) {
             value={confirm}
             onChangeText={setConfirm}
             secureTextEntry={!showPass}
+            accessibilityLabel="Confirmar contraseña"
           />
           {loading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />
           ) : (
-            <TouchableOpacity style={styles.btn} onPress={handleReset}>
+            <TouchableOpacity style={styles.btn} accessibilityRole="button" accessibilityLabel="Cambiar contraseña" onPress={handleReset}>
               <Text style={styles.btnText}>Cambiar contraseña</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => goBack("code")}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver al código" onPress={() => goBack("code")}>
             <Text style={styles.link}>Volver al código</Text>
           </TouchableOpacity>
         </>
       )}
 
-      <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Volver al inicio de sesión" onPress={() => navigation.navigate("Login")}>
         <Text style={[styles.link, { marginTop: 20 }]}>← Volver al inicio de sesión</Text>
       </TouchableOpacity>
       </ScrollView>

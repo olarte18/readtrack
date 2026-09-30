@@ -242,17 +242,18 @@ export default function BookDetailScreen({ route, navigation }) {
       >
       <View style={styles.topBar}>
         {alreadyInLibrary ? (
-          <TouchableOpacity style={styles.topBtn} onPress={openEdit} disabled={loading}>
-            <Ionicons name="create-outline" size={16} color={colors.accent} />
+          <TouchableOpacity style={styles.topBtn} accessibilityRole="button" accessibilityLabel="Editar ficha" onPress={openEdit} disabled={loading}>
+            <Ionicons name="create-outline" size={16} color={colors.accent} accessible={false} />
             <Text style={styles.topBtnText}>Editar ficha</Text>
           </TouchableOpacity>
         ) : (
           <TouchableOpacity
             style={styles.topBtn}
+            accessibilityRole="button"
             onPress={handleAddToLibrary}
             accessibilityLabel="Agregar a mi biblioteca"
           >
-            <Ionicons name="add-circle-outline" size={16} color={colors.accent} />
+            <Ionicons name="add-circle-outline" size={16} color={colors.accent} accessible={false} />
             <Text style={styles.topBtnText}>Agregar</Text>
           </TouchableOpacity>
         )}
@@ -260,9 +261,9 @@ export default function BookDetailScreen({ route, navigation }) {
 
       <View style={styles.hero}>
         {book.cover ? (
-          <Image source={{ uri: book.cover }} style={styles.cover} />
+          <Image source={{ uri: book.cover }} style={styles.cover} accessible={false} importantForAccessibility="no-hide-descendants" />
         ) : (
-          <View style={styles.noCover}>
+          <View style={styles.noCover} accessible={false} importantForAccessibility="no-hide-descendants">
             <Ionicons name="book" size={48} color={colors.textDim} />
           </View>
         )}
@@ -351,6 +352,8 @@ export default function BookDetailScreen({ route, navigation }) {
 
             <TouchableOpacity
               style={styles.actionBtn}
+              accessibilityRole="button"
+              accessibilityLabel={actionLabel}
               onPress={handlePrimaryAction}
               disabled={loading}
             >
@@ -358,7 +361,7 @@ export default function BookDetailScreen({ route, navigation }) {
                 <ActivityIndicator color={colors.onAccent} />
               ) : (
                 <>
-                  <Ionicons name={actionIcon} size={20} color={colors.onAccent} />
+                  <Ionicons name={actionIcon} size={20} color={colors.onAccent} accessible={false} />
                   <Text style={styles.actionBtnText}>{actionLabel}</Text>
                 </>
               )}
@@ -416,13 +419,21 @@ export default function BookDetailScreen({ route, navigation }) {
               value={notePage}
               onChangeText={setNotePage}
               onFocus={onFieldFocus("notes")}
+              accessibilityLabel="Página de la nota"
             />
-            <TouchableOpacity style={styles.pageBtn} onPress={handleAddNote}>
+            <TouchableOpacity style={styles.pageBtn} accessibilityRole="button" accessibilityLabel="Agregar nota" onPress={handleAddNote}>
               <Text style={styles.pageBtnText}>Agregar</Text>
             </TouchableOpacity>
           </View>
           {notes.map((note) => (
-            <TouchableOpacity key={note.id} style={styles.noteCard} onLongPress={() => handleNoteLongPress(note)}>
+            <TouchableOpacity
+              key={note.id}
+              style={styles.noteCard}
+              accessibilityRole="button"
+              accessibilityLabel={`Nota${note.page ? ` de ${formatPoint(book, note.page)}` : ""}: ${note.content}`}
+              accessibilityHint="Mantén presionado para ver acciones"
+              onLongPress={() => handleNoteLongPress(note)}
+            >
               {note.page && <Text style={styles.notePage}>{formatPoint(book, note.page)}</Text>}
               <Text style={styles.noteContent}>{note.content}</Text>
             </TouchableOpacity>
@@ -449,8 +460,8 @@ export default function BookDetailScreen({ route, navigation }) {
 
       {alreadyInLibrary && (
         <View style={styles.section}>
-          <TouchableOpacity style={styles.deleteBtn} onPress={handleDelete}>
-            <Ionicons name="trash-outline" size={16} color={colors.danger} />
+          <TouchableOpacity style={styles.deleteBtn} accessibilityRole="button" accessibilityLabel="Quitar de biblioteca" onPress={handleDelete}>
+            <Ionicons name="trash-outline" size={16} color={colors.danger} accessible={false} />
             <Text style={styles.deleteBtnText}>Quitar de biblioteca</Text>
           </TouchableOpacity>
         </View>

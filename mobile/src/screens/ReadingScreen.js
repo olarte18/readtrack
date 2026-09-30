@@ -85,13 +85,16 @@ export default function ReadingScreen({ navigation }) {
             styles.streakChip,
             { borderColor: streakActiveToday ? colors.star + "55" : colors.border }
           ]}
+          accessibilityRole="button"
+          accessibilityLabel={`Racha actual ${streak?.current ?? 0} días, mejor racha ${streak?.best ?? 0}`}
+          accessibilityHint="Toca para ver tu calendario"
           onPress={() => navigation.navigate("Main", { screen: "Calendar" })}
           activeOpacity={0.7}
         >
-          <Ionicons name="flame" size={20} color={streakActiveToday ? colors.star : colors.textMuted} />
+          <Ionicons name="flame" size={20} color={streakActiveToday ? colors.star : colors.textMuted} accessible={false} />
           <Text style={[styles.streakValue, { color: streakActiveToday ? colors.text : colors.textMuted }]}>{streak?.current ?? 0}</Text>
-          <View style={styles.streakDivider} />
-          <Ionicons name="trophy" size={14} color={colors.textMuted} />
+          <View style={styles.streakDivider} accessible={false} />
+          <Ionicons name="trophy" size={14} color={colors.textMuted} accessible={false} />
           <Text style={styles.streakBest}>{streak?.best ?? 0}</Text>
         </TouchableOpacity>
       </View>
@@ -108,6 +111,9 @@ export default function ReadingScreen({ navigation }) {
               <View style={styles.goalCard}>
                 <Text style={styles.goalTitle}>Meta diaria</Text>
                 <TouchableOpacity
+                  accessibilityRole="button"
+                  accessibilityLabel={`Meta diaria: ${dailyPct} por ciento`}
+                  accessibilityHint="Toca para ver tu calendario"
                   onPress={() => navigation.navigate("Main", { screen: "Calendar" })}
                   activeOpacity={0.8}
                   hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
@@ -149,12 +155,15 @@ export default function ReadingScreen({ navigation }) {
               <View style={styles.card}>
                 <TouchableOpacity
                   style={styles.bookInfo}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${item.title}, ${item.author}. ${pageText}`}
+                  accessibilityHint="Toca para ver el detalle"
                   onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: fetchReading })}
                 >
                   {item.cover ? (
-                    <Image source={{ uri: item.cover }} style={styles.cover} />
+                    <Image source={{ uri: item.cover }} style={styles.cover} accessible={false} importantForAccessibility="no-hide-descendants" />
                   ) : (
-                    <View style={styles.noCover}>
+                    <View style={styles.noCover} accessible={false} importantForAccessibility="no-hide-descendants">
                       <Ionicons name="book" size={28} color={colors.textDim} />
                     </View>
                   )}
@@ -192,9 +201,11 @@ export default function ReadingScreen({ navigation }) {
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.continueBtn}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Continuar leyendo ${item.title}`}
                   onPress={() => navigation.navigate("ReadingMode", { book: item })}
                 >
-                  <Ionicons name="play" size={18} color={colors.onAccent} />
+                  <Ionicons name="play" size={18} color={colors.onAccent} accessible={false} />
                   <Text style={styles.continueBtnLabel}>Leer</Text>
                 </TouchableOpacity>
               </View>
@@ -206,16 +217,20 @@ export default function ReadingScreen({ navigation }) {
               <Text style={styles.empty}>No tienes libros en curso</Text>
               <TouchableOpacity
                 style={styles.emptyBtnPrimary}
+                accessibilityRole="button"
+                accessibilityLabel="Buscar un libro"
                 onPress={() => navigation.navigate("Search")}
               >
-                <Ionicons name="search" size={18} color={colors.onAccent} />
+                <Ionicons name="search" size={18} color={colors.onAccent} accessible={false} />
                 <Text style={styles.emptyBtnPrimaryText}>Buscar un libro</Text>
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.emptyBtnSecondary}
+                accessibilityRole="button"
+                accessibilityLabel="Agregar desde tu biblioteca"
                 onPress={() => navigation.navigate("Main", { screen: "Home" })}
               >
-                <Ionicons name="library-outline" size={18} color={colors.accent} />
+                <Ionicons name="library-outline" size={18} color={colors.accent} accessible={false} />
                 <Text style={styles.emptyBtnSecondaryText}>Agregar desde tu biblioteca</Text>
               </TouchableOpacity>
             </View>

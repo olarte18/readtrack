@@ -14,7 +14,7 @@ const FLING_VELOCITY = 60;
 // siguientes; la fila del centro es el valor actual. Hace snap fila a fila,
 // sin teclado. El highlight sigue el scroll en vivo pero el valor se notifica
 // al padre una sola vez cuando la rueda se asienta (con un haptic sutil).
-export default function ValueDial({ min, max, value, onChange, unit }) {
+export default function ValueDial({ min, max, value, onChange, unit, label = "Valor" }) {
   const { colors } = useTheme();
   const styles = createStyles(colors);
 
@@ -74,6 +74,22 @@ export default function ValueDial({ min, max, value, onChange, unit }) {
     handleSettle(e);
   };
 
+  // Accesibilidad (TalkBack/VoiceOver): el dial se controla con
+  // incremento/decremento en lugar de arrastrar la lista.
+  const handleAccessibilityAction = (e) => {
+    const delta = e.nativeEvent.actionName === "increment" ? 1 : -1;
+    const curIndex = committedIndex.current;
+    const nextIndex = Math.max(0, Math.min(curIndex + delta, dataRef.current.length - 1));
+    if (nextIndex === curIndex) return;
+    committedIndex.current = nextIndex;
+    setActive(nextIndex);
+    onChange?.(dataRef.current[nextIndex]);
+    try {
+      Haptics.selectionAsync();
+    } catch {}
+    listRef.current?.scrollToOffset({ offset: nextIndex * ROW_HEIGHT, animated: true });
+  };
+
   const renderItem = ({ item, index }) => {
     const dist = Math.abs(index - active);
     const isCenter = dist === 0;
@@ -92,6 +108,8 @@ export default function ValueDial({ min, max, value, onChange, unit }) {
       </View>
     );
   };
+
+  const activeValue = data[active] ?? value;
 
   return (
     <View style={styles.wrap}>
@@ -118,8 +136,20 @@ export default function ValueDial({ min, max, value, onChange, unit }) {
         extraData={active}
         contentContainerStyle={styles.content}
         style={styles.list}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
       />
-      <View pointerEvents="none" style={[styles.centerBand, { borderColor: colors.accent }]}>
+      <View
+        pointerEvents="none"
+        accessible
+        accessibilityRole="adjustable"
+        accessibilityLabel={label}
+        accessibilityHint="Toca dos veces y desliza hacia arriba o abajo para cambiar el valor"
+        accessibilityValue={{ min: safeMin, max: safeMax, now: activeValue, text: `${activeValue}${unit ? ` ${unit}` : ""}` }}
+        accessibilityActions={[{ name: "increment", label: "Aumentar" }, { name: "decrement", label: "Disminuir" }]}
+        onAccessibilityAction={handleAccessibilityAction}
+        style={[styles.centerBand, { borderColor: colors.accent }]}
+      >
         <View style={[styles.centerLine, { backgroundColor: colors.accent }]} />
         <View style={[styles.centerLine, styles.centerLineBottom, { backgroundColor: colors.accent }]} />
       </View>

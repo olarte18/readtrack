@@ -13,12 +13,12 @@ export default function WhatsNewScreen({ navigation }) {
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
         <View style={styles.card}>
           <View style={styles.headerRow}>
-            <Ionicons name="sparkles" size={28} color={colors.star} />
+            <Ionicons name="sparkles" size={28} color={colors.star} accessible={false} />
             <Text style={styles.cardTitle}>{RELEASE_NOTES.title}</Text>
           </View>
           {RELEASE_NOTES.items.map((item, i) => (
             <View key={i} style={styles.itemRow}>
-              <View style={styles.iconWrap}>
+              <View style={styles.iconWrap} accessible={false} importantForAccessibility="no-hide-descendants">
                 <Ionicons name={item.icon} size={18} color={colors.accent} />
               </View>
               <Text style={styles.itemText}>{item.text}</Text>
@@ -27,7 +27,7 @@ export default function WhatsNewScreen({ navigation }) {
           <Text style={styles.footer}>Esta sección desaparecerá en unos días</Text>
         </View>
 
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Listo" onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>Listo</Text>
         </TouchableOpacity>
       </ScrollView>

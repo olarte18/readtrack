@@ -103,13 +103,17 @@ export default function StreakReminderModal({ visible, onClose, userId, mode = "
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={mode === "settings" ? undefined : onClose}>
-        <TouchableOpacity style={styles.card} activeOpacity={1}>
+      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={mode === "settings" ? undefined : onClose} accessible={false}>
+        <TouchableOpacity style={styles.card} activeOpacity={1} accessible={false}>
           <View style={styles.handle} />
 
           {step === "ask" && (
             <>
-              <View style={styles.iconWrap}>
+              <View
+                style={styles.iconWrap}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <Ionicons name="flame" size={34} color={colors.star} />
               </View>
               <Text style={styles.title}>¿Recibir recordatorios de tu racha?</Text>
@@ -117,10 +121,10 @@ export default function StreakReminderModal({ visible, onClose, userId, mode = "
                 Cada día, si aún no has leído, te avisamos a la hora que elijas para que no pierdas tu racha.
               </Text>
               <View style={styles.btnRow}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={handleNoThanks}>
+                <TouchableOpacity style={styles.secondaryBtn} accessibilityRole="button" onPress={handleNoThanks}>
                   <Text style={styles.secondaryText}>No, gracias</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.primaryBtn} onPress={handleActivate}>
+                <TouchableOpacity style={styles.primaryBtn} accessibilityRole="button" onPress={handleActivate}>
                   <Text style={styles.primaryText}>Activar</Text>
                 </TouchableOpacity>
               </View>
@@ -144,19 +148,24 @@ export default function StreakReminderModal({ visible, onClose, userId, mode = "
                   }}
                 />
               ) : (
-                <TouchableOpacity style={styles.timeRow} onPress={() => setShowTimePicker(true)}>
-                  <Ionicons name="time-outline" size={20} color={colors.accent} />
+                <TouchableOpacity
+                  style={styles.timeRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Hora del recordatorio: ${formatTime(hour, minute)}. Toca para cambiar`}
+                  onPress={() => setShowTimePicker(true)}
+                >
+                  <Ionicons name="time-outline" size={20} color={colors.accent} accessible={false} />
                   <Text style={styles.timeText}>{formatTime(hour, minute)}</Text>
-                  <Ionicons name="chevron-down" size={18} color={colors.textDim} />
+                  <Ionicons name="chevron-down" size={18} color={colors.textDim} accessible={false} />
                 </TouchableOpacity>
               )}
               <View style={styles.btnRow}>
                 {showTimePicker ? (
-                  <TouchableOpacity style={styles.primaryBtn} onPress={handleSaveTime}>
+                  <TouchableOpacity style={styles.primaryBtn} accessibilityRole="button" onPress={handleSaveTime}>
                     <Text style={styles.primaryText}>Guardar</Text>
                   </TouchableOpacity>
                 ) : (
-                  <TouchableOpacity style={styles.primaryBtn} onPress={handleSaveTime}>
+                  <TouchableOpacity style={styles.primaryBtn} accessibilityRole="button" onPress={handleSaveTime}>
                     <Text style={styles.primaryText}>Activar recordatorio</Text>
                   </TouchableOpacity>
                 )}
@@ -166,7 +175,11 @@ export default function StreakReminderModal({ visible, onClose, userId, mode = "
 
           {step === "deviceSettings" && (
             <>
-              <View style={styles.iconWrap}>
+              <View
+                style={styles.iconWrap}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
                 <Ionicons name="notifications-off-outline" size={34} color={colors.textDim} />
               </View>
               <Text style={styles.title}>Notificaciones apagadas</Text>
@@ -174,10 +187,10 @@ export default function StreakReminderModal({ visible, onClose, userId, mode = "
                 Reactivalas en los ajustes del teléfono cuando quieras. Siempre podrás hacerlo desde tu Perfil.
               </Text>
               <View style={styles.btnRow}>
-                <TouchableOpacity style={styles.secondaryBtn} onPress={mode === "invite" ? handleNoThanks : onClose}>
+                <TouchableOpacity style={styles.secondaryBtn} accessibilityRole="button" onPress={mode === "invite" ? handleNoThanks : onClose}>
                   <Text style={styles.secondaryText}>Ahora no</Text>
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.primaryBtn} onPress={openSystemSettings}>
+                <TouchableOpacity style={styles.primaryBtn} accessibilityRole="button" onPress={openSystemSettings}>
                   <Text style={styles.primaryText}>Abrir ajustes</Text>
                 </TouchableOpacity>
               </View>
@@ -188,13 +201,14 @@ export default function StreakReminderModal({ visible, onClose, userId, mode = "
             <>
               <Text style={styles.title}>Notificaciones de racha</Text>
               <View style={styles.switchRow}>
-                <Ionicons name="notifications-outline" size={22} color={colors.text} />
-                <Text style={styles.switchLabel}>Recordatorio diario</Text>
+                <Ionicons name="notifications-outline" size={22} color={colors.text} accessible={false} />
+                <Text style={styles.switchLabel} accessible={false}>Recordatorio diario</Text>
                 <Switch
                   value={cfg.enabled}
                   onValueChange={handleToggle}
                   trackColor={{ true: colors.accent }}
                   thumbColor={cfg.enabled ? colors.onAccent : undefined}
+                  accessibilityLabel="Recordatorio diario"
                 />
               </View>
               <Text style={styles.switchHint}>
@@ -203,15 +217,21 @@ export default function StreakReminderModal({ visible, onClose, userId, mode = "
                   : "Te avisamos si aún no has leído. Puedes elegir la hora."}
               </Text>
               {cfg.enabled && (
-                <TouchableOpacity style={styles.timeRow} onPress={() => { setHour(cfg.hour); setMinute(cfg.minute); setStep("time"); }}>
-                  <Ionicons name="time-outline" size={20} color={colors.accent} />
+                <TouchableOpacity
+                  style={styles.timeRow}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Cambiar hora. Hora actual: ${formatTime(cfg.hour, cfg.minute)}`}
+                  onPress={() => { setHour(cfg.hour); setMinute(cfg.minute); setStep("time"); }}
+                >
+                  <Ionicons name="time-outline" size={20} color={colors.accent} accessible={false} />
                   <Text style={styles.timeText}>{formatTime(cfg.hour, cfg.minute)}</Text>
-                  <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+                  <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
                 </TouchableOpacity>
               )}
               <View style={styles.btnRow}>
                 <TouchableOpacity
                   style={styles.primaryBtn}
+                  accessibilityRole="button"
                   onPress={() => { setStep("settings"); setShowTimePicker(false); onClose(); }}
                 >
                   <Text style={styles.primaryText}>Listo</Text>

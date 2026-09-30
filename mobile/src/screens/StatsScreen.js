@@ -229,12 +229,12 @@ export default function StatsScreen({ navigation }) {
       <View style={styles.headerRow}>
         <Text style={styles.title}>Estadísticas</Text>
         <View style={styles.yearControl}>
-          <TouchableOpacity onPress={() => goYear(-1)} hitSlop={8}>
-            <Ionicons name="chevron-back" size={18} color={colors.accent} />
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Año anterior: ${year - 1}`} onPress={() => goYear(-1)} hitSlop={8}>
+            <Ionicons name="chevron-back" size={18} color={colors.accent} accessible={false} />
           </TouchableOpacity>
           <Text style={styles.yearText}>{year}</Text>
-          <TouchableOpacity onPress={() => goYear(1)} disabled={!canGoNextYear} hitSlop={8}>
-            <Ionicons name="chevron-forward" size={18} color={canGoNextYear ? colors.accent : colors.textDim} />
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Siguiente año: ${year + 1}`} onPress={() => goYear(1)} disabled={!canGoNextYear} hitSlop={8}>
+            <Ionicons name="chevron-forward" size={18} color={canGoNextYear ? colors.accent : colors.textDim} accessible={false} />
           </TouchableOpacity>
         </View>
       </View>
@@ -244,6 +244,8 @@ export default function StatsScreen({ navigation }) {
           <TouchableOpacity
             key={key}
             style={[styles.segBtn, view === key && styles.segBtnActive]}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver por ${label}`}
             onPress={() => selectView(key)}
           >
             <Text style={[styles.segText, view === key && styles.segTextActive]}>{label}</Text>
@@ -253,13 +255,15 @@ export default function StatsScreen({ navigation }) {
 
       {(view === "week" || view === "month") && (
         <View style={styles.periodRow}>
-          <TouchableOpacity onPress={() => goPeriod(-1)} hitSlop={8}>
-            <Ionicons name="chevron-back" size={20} color={colors.accent} />
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Periodo anterior" onPress={() => goPeriod(-1)} hitSlop={8}>
+            <Ionicons name="chevron-back" size={20} color={colors.accent} accessible={false} />
           </TouchableOpacity>
           <Text style={styles.periodLabel}>
             {view === "month" ? `${MONTH_NAMES[month - 1]} ${year}` : weekLabel}
           </Text>
           <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Periodo siguiente"
             onPress={() => goPeriod(1)}
             disabled={view === "month" ? atCurrentMonth : atCurrentWeek}
             hitSlop={8}
@@ -268,6 +272,7 @@ export default function StatsScreen({ navigation }) {
               name="chevron-forward"
               size={20}
               color={view === "month" ? (atCurrentMonth ? colors.textDim : colors.accent) : (atCurrentWeek ? colors.textDim : colors.accent)}
+              accessible={false}
             />
           </TouchableOpacity>
         </View>
@@ -288,6 +293,8 @@ export default function StatsScreen({ navigation }) {
                 <TouchableOpacity
                   key={key}
                   style={[styles.unitBtn, yearMetric === key && styles.unitBtnActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Medir en ${label}`}
                   onPress={() => setYearMetric(key)}
                 >
                   <Text style={[styles.unitText, yearMetric === key && styles.unitTextActive]}>{label}</Text>
@@ -326,7 +333,7 @@ export default function StatsScreen({ navigation }) {
       </View>
 
       {goal ? (
-        <TouchableOpacity style={styles.goalCard} onPress={() => navigation.navigate("GoalDetail", { type: "annual", metric: "books", year })}>
+        <TouchableOpacity style={styles.goalCard} accessibilityRole="button" accessibilityLabel={`Meta anual ${year}: ${completed} de ${goal} libros`} onPress={() => navigation.navigate("GoalDetail", { type: "annual", metric: "books", year })}>
           <ProgressRing
             percent={ringPct}
             radius={30}
@@ -360,6 +367,8 @@ export default function StatsScreen({ navigation }) {
           <TouchableOpacity
             key={item.key}
             style={styles.statCard}
+            accessibilityRole="button"
+            accessibilityLabel={`Ver libros ${item.label}`}
             onPress={() => navigation.navigate("Home", { filterStatus: item.key })}
           >
             <Ionicons name={item.icon} size={24} color={colors.textMuted} style={styles.icon} />

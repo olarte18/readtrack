@@ -593,6 +593,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
               value={endPageVal}
               onChange={(v) => setEndPage(String(v))}
               unit={modeUnit(book)}
+              label={`Página de ${modeLabel(book)}`}
             />
           ) : (
             <View style={styles.customInputBox}>
@@ -604,6 +605,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
                 maxLength={readingMode === "page" ? 4 : 3}
                 autoFocus
                 selectTextOnFocus
+                accessibilityLabel={`Página de ${modeLabel(book)} en la que quedaste`}
               />
               <Text style={styles.customUnit}>{modeUnit(book)}</Text>
             </View>
@@ -619,17 +621,20 @@ export default function ActiveSessionScreen({ route, navigation }) {
                 onValueChange={setFinishExplicit}
                 trackColor={{ true: colors.accent }}
                 thumbColor={finishExplicit ? colors.onAccent : undefined}
+                accessibilityLabel="Terminaste el libro"
               />
             </View>
           )}
           <View style={styles.modalBtnRow}>
             <TouchableOpacity
               style={[styles.modalBtn, styles.modalBtnCancel]}
+              accessibilityRole="button"
+              accessibilityLabel="Cancelar"
               onPress={() => closeFinish(true)}
             >
               <Text style={styles.modalBtnCancelText}>Cancelar</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={[styles.modalBtn, styles.finishBtn]} onPress={confirmSave} disabled={saving}>
+            <TouchableOpacity style={[styles.modalBtn, styles.finishBtn]} accessibilityRole="button" accessibilityLabel="Guardar" onPress={confirmSave} disabled={saving}>
               {saving ? (
                 <ActivityIndicator color={colors.onAccent} />
               ) : (
@@ -663,8 +668,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
         {blockNotice}
 
         {Platform.Version >= 34 && (
-          <TouchableOpacity style={styles.fsiBtn} onPress={openFullScreenIntentSettings}>
-            <Ionicons name="expand-outline" size={16} color={colors.accent} />
+          <TouchableOpacity style={styles.fsiBtn} accessibilityRole="button" onPress={openFullScreenIntentSettings}>
+            <Ionicons name="expand-outline" size={16} color={colors.accent} accessible={false} />
             <Text style={styles.fsiBtnText}>
               ¿No salta a pantalla completa? Permite "Alarmas y recordatorios"
             </Text>
@@ -676,6 +681,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
             <TouchableOpacity
               key={m}
               style={[styles.chip, minutesInput === String(m) && styles.chipActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Leer ${m} minutos`}
               onPress={() => setMinutesInput(String(m))}
             >
               <Text style={[styles.chipText, minutesInput === String(m) && styles.chipTextActive]}>
@@ -695,16 +702,17 @@ export default function ActiveSessionScreen({ route, navigation }) {
               keyboardType="numeric"
               maxLength={3}
               placeholderTextColor={colors.placeholder}
+              accessibilityLabel="Minutos personalizados"
             />
             <Text style={styles.customUnit}>min</Text>
           </View>
         </View>
 
-        <TouchableOpacity style={styles.finishBtn} onPress={startTimer}>
+        <TouchableOpacity style={styles.finishBtn} accessibilityRole="button" accessibilityLabel="Comenzar a leer" onPress={startTimer}>
           <Text style={styles.finishBtnText}>Comenzar</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
+        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Volver" onPress={() => navigation.goBack()}>
           <Text style={styles.backBtnText}>Volver</Text>
         </TouchableOpacity>
       </KeyboardAvoidingView>
@@ -724,7 +732,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
           </Text>
         </View>
 
-        <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
+        <TouchableOpacity style={styles.finishBtn} accessibilityRole="button" accessibilityLabel="Guardar sesión" onPress={handleFinish} disabled={saving}>
           {saving ? (
             <ActivityIndicator color={colors.onAccent} />
           ) : (
@@ -739,13 +747,13 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   if (simpleMode) {
     return (
-      <TouchableOpacity style={styles.simpleContainer} activeOpacity={1} onPress={exitSimpleMode}>
+      <TouchableOpacity style={styles.simpleContainer} activeOpacity={1} accessibilityRole="button" accessibilityLabel={`Modo simple. ${book.title}. ${clockText()}`} accessibilityHint="Toca la pantalla para volver" onPress={exitSimpleMode}>
         <Text style={styles.simpleClock}>{clockText()}</Text>
         <Text style={styles.simpleDate}>{now.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}</Text>
         {book.cover ? (
-          <Image source={{ uri: book.cover }} style={styles.simpleCover} resizeMode="cover" />
+          <Image source={{ uri: book.cover }} style={styles.simpleCover} resizeMode="cover" accessible={false} importantForAccessibility="no-hide-descendants" />
         ) : (
-          <View style={[styles.simpleCover, styles.simpleCoverNoImg]}>
+          <View style={[styles.simpleCover, styles.simpleCoverNoImg]} accessible={false} importantForAccessibility="no-hide-descendants">
             <Ionicons name="book" size={36} color="#444" />
           </View>
         )}
@@ -760,15 +768,15 @@ export default function ActiveSessionScreen({ route, navigation }) {
     <View style={styles.container}>
       {book.cover && (
         <>
-          <ImageBackground source={{ uri: getHiResCover(book.cover) }} style={styles.bgImage} resizeMode="cover" />
-          <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFillObject} />
-          <View style={styles.bgOverlay} />
+          <ImageBackground source={{ uri: getHiResCover(book.cover) }} style={styles.bgImage} resizeMode="cover" accessible={false} importantForAccessibility="no-hide-descendants" />
+          <BlurView intensity={40} tint={isDark ? "dark" : "light"} style={StyleSheet.absoluteFillObject} accessible={false} importantForAccessibility="no-hide-descendants" />
+          <View style={styles.bgOverlay} accessible={false} importantForAccessibility="no-hide-descendants" />
         </>
       )}
       <View style={styles.header}>
         <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
-        <TouchableOpacity style={styles.simpleBtn} onPress={enterSimpleMode}>
-          <Ionicons name="moon-outline" size={14} color={colors.accent} />
+        <TouchableOpacity style={styles.simpleBtn} accessibilityRole="button" accessibilityLabel="Activar modo simple" onPress={enterSimpleMode}>
+          <Ionicons name="moon-outline" size={14} color={colors.accent} accessible={false} />
           <Text style={styles.simpleBtnText}>Modo simple</Text>
         </TouchableOpacity>
       </View>
@@ -776,9 +784,9 @@ export default function ActiveSessionScreen({ route, navigation }) {
       <View style={styles.timerContainer}>
         <Text style={styles.timerLabel}>{isTimer ? "Tiempo restante" : "Tiempo transcurrido"}</Text>
         <Text style={styles.timer}>{formatTime(seconds)}</Text>
-        <TouchableOpacity style={styles.pauseBtn} onPress={togglePause}>
+        <TouchableOpacity style={styles.pauseBtn} accessibilityRole="button" accessibilityLabel={running ? "Pausar" : "Continuar"} onPress={togglePause}>
           <View style={styles.pauseBtnRow}>
-            <Ionicons name={running ? "pause" : "play"} size={18} color={colors.accent} />
+            <Ionicons name={running ? "pause" : "play"} size={18} color={colors.accent} accessible={false} />
             <Text style={styles.pauseBtnText}>{running ? "Pausar" : "Continuar"}</Text>
           </View>
         </TouchableOpacity>
@@ -788,13 +796,14 @@ export default function ActiveSessionScreen({ route, navigation }) {
         <>
           {blockNotice}
           <View style={styles.toggleRow}>
-            <Ionicons name="sunny-outline" size={18} color={colors.textDim} />
-            <Text style={styles.toggleLabel}>Mantener pantalla encendida</Text>
+            <Ionicons name="sunny-outline" size={18} color={colors.textDim} accessible={false} />
+            <Text style={styles.toggleLabel} accessible={false}>Mantener pantalla encendida</Text>
             <Switch
               value={keepAwake}
               onValueChange={toggleKeepAwake}
               trackColor={{ true: colors.accent }}
               thumbColor={keepAwake ? colors.onAccent : undefined}
+              accessibilityLabel="Mantener pantalla encendida"
             />
           </View>
         </>
@@ -853,7 +862,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
         </View>
       )}
 
-      <TouchableOpacity style={styles.finishBtn} onPress={handleFinish} disabled={saving}>
+      <TouchableOpacity style={styles.finishBtn} accessibilityRole="button" accessibilityLabel="Finalizar sesión" onPress={handleFinish} disabled={saving}>
         {saving ? (
           <ActivityIndicator color={colors.onAccent} />
         ) : (

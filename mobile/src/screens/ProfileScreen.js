@@ -84,7 +84,7 @@ export default function ProfileScreen({ navigation }) {
       <View style={styles.section}>
         <View style={styles.goalHeader}>
           <Text style={styles.goalTitle}>Meta {goalData?.year ?? new Date().getFullYear()}</Text>
-          <TouchableOpacity onPress={() => { setEditingGoal(true); setGoalInput(String(goalData?.value ?? "")); }}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Editar meta anual" onPress={() => { setEditingGoal(true); setGoalInput(String(goalData?.value ?? "")); }}>
             <Text style={styles.editBtn}>Editar</Text>
           </TouchableOpacity>
         </View>
@@ -98,11 +98,13 @@ export default function ProfileScreen({ navigation }) {
             {goalData.completed > 0 && (
               <TouchableOpacity
                 style={styles.goalLink}
+                accessibilityRole="button"
+                accessibilityLabel="Libros que cumplieron esta meta"
                 onPress={() => navigation.navigate("GoalDetail", { type: "annual", metric: "books" })}
               >
-                <Ionicons name="library-outline" size={16} color={colors.accent} />
+                <Ionicons name="library-outline" size={16} color={colors.accent} accessible={false} />
                 <Text style={styles.goalLinkText}>Libros que cumplieron esta meta</Text>
-                <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+                <Ionicons name="chevron-forward" size={16} color={colors.textDim} accessible={false} />
               </TouchableOpacity>
             )}
           </>
@@ -118,11 +120,12 @@ export default function ProfileScreen({ navigation }) {
               keyboardType="numeric"
               value={goalInput}
               onChangeText={setGoalInput}
+              accessibilityLabel="Meta de libros por año"
             />
-            <TouchableOpacity style={styles.goalSaveBtn} onPress={handleSaveGoal}>
+            <TouchableOpacity style={styles.goalSaveBtn} accessibilityRole="button" accessibilityLabel="Guardar meta" onPress={handleSaveGoal}>
               <Text style={styles.goalSaveBtnText}>Guardar</Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => setEditingGoal(false)}>
+            <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancelar edición de meta" onPress={() => setEditingGoal(false)}>
               <Text style={styles.cancelBtn}>Cancelar</Text>
             </TouchableOpacity>
           </View>
@@ -134,23 +137,32 @@ export default function ProfileScreen({ navigation }) {
         <View style={styles.themeRow}>
           <TouchableOpacity
             style={[styles.themeBtn, theme === "system" && styles.themeBtnActive]}
+            accessibilityRole="button"
+            accessibilityLabel={`Tema de la app: sistema${theme === "system" ? ". Seleccionado" : ""}`}
+            accessibilityState={{ selected: theme === "system" }}
             onPress={() => setTheme("system")}
           >
-            <Ionicons name="contrast" size={16} color={theme === "system" ? colors.onAccent : colors.textMuted} />
+            <Ionicons name="contrast" size={16} color={theme === "system" ? colors.onAccent : colors.textMuted} accessible={false} />
             <Text style={[styles.themeBtnText, theme === "system" && styles.themeBtnTextActive]}>Sistema</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.themeBtn, theme === "light" && styles.themeBtnActive]}
+            accessibilityRole="button"
+            accessibilityLabel={`Tema de la app: claro${theme === "light" ? ". Seleccionado" : ""}`}
+            accessibilityState={{ selected: theme === "light" }}
             onPress={() => setTheme("light")}
           >
-            <Ionicons name="sunny" size={16} color={theme === "light" ? colors.onAccent : colors.textMuted} />
+            <Ionicons name="sunny" size={16} color={theme === "light" ? colors.onAccent : colors.textMuted} accessible={false} />
             <Text style={[styles.themeBtnText, theme === "light" && styles.themeBtnTextActive]}>Claro</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.themeBtn, theme === "dark" && styles.themeBtnActive]}
+            accessibilityRole="button"
+            accessibilityLabel={`Tema de la app: oscuro${theme === "dark" ? ". Seleccionado" : ""}`}
+            accessibilityState={{ selected: theme === "dark" }}
             onPress={() => setTheme("dark")}
           >
-            <Ionicons name="moon" size={16} color={theme === "dark" ? colors.onAccent : colors.textMuted} />
+            <Ionicons name="moon" size={16} color={theme === "dark" ? colors.onAccent : colors.textMuted} accessible={false} />
             <Text style={[styles.themeBtnText, theme === "dark" && styles.themeBtnTextActive]}>Oscuro</Text>
           </TouchableOpacity>
         </View>
@@ -160,54 +172,56 @@ export default function ProfileScreen({ navigation }) {
         {whatsNewVisible && (
           <TouchableOpacity
             style={[styles.menuItem, styles.whatsNewItem]}
+            accessibilityRole="button"
+            accessibilityLabel="Novedades"
             onPress={() => navigation.navigate("WhatsNew")}
           >
-            <Ionicons name="sparkles" size={22} color={colors.star} />
+            <Ionicons name="sparkles" size={22} color={colors.star} accessible={false} />
             <Text style={styles.menuLabel}>Novedades</Text>
-            <View style={styles.newBadge}>
+            <View style={styles.newBadge} accessible={false} importantForAccessibility="no-hide-descendants">
               <Text style={styles.newBadgeText}>NUEVO</Text>
             </View>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={[styles.menuItem, whatsNewVisible && { marginTop: 8 }]} onPress={() => navigation.navigate("Import")}>
-          <Ionicons name="cloud-upload-outline" size={22} color={colors.accent} />
+        <TouchableOpacity style={[styles.menuItem, whatsNewVisible && { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Importar biblioteca" onPress={() => navigation.navigate("Import")}>
+          <Ionicons name="cloud-upload-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Importar biblioteca</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Export")}>
-          <Ionicons name="share-outline" size={22} color={colors.accent} />
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Exportar datos" onPress={() => navigation.navigate("Export")}>
+          <Ionicons name="share-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Exportar datos</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Achievements")}>
-          <Ionicons name="medal-outline" size={22} color={colors.accent} />
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Logros" onPress={() => navigation.navigate("Achievements")}>
+          <Ionicons name="medal-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Logros</Text>
           {unseenAchievements > 0 && (
-            <View style={styles.newBadge}>
+            <View style={styles.newBadge} accessible={false} importantForAccessibility="no-hide-descendants">
               <Text style={styles.newBadgeText}>NUEVO</Text>
             </View>
           )}
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Stats")}>
-          <Ionicons name="bar-chart-outline" size={22} color={colors.accent} />
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Estadísticas" onPress={() => navigation.navigate("Stats")}>
+          <Ionicons name="bar-chart-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Estadísticas</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Goals")}>
-          <Ionicons name="trophy-outline" size={22} color={colors.accent} />
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Metas" onPress={() => navigation.navigate("Goals")}>
+          <Ionicons name="trophy-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Metas</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => navigation.navigate("Notes")}>
-          <Ionicons name="document-text-outline" size={22} color={colors.accent} />
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Notas" onPress={() => navigation.navigate("Notes")}>
+          <Ionicons name="document-text-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Notas</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} onPress={() => setStreakReminderOpen(true)}>
-          <Ionicons name="notifications-outline" size={22} color={colors.accent} />
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Notificaciones de racha" onPress={() => setStreakReminderOpen(true)}>
+          <Ionicons name="notifications-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Notificaciones de racha</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} />
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
       </View>
 
@@ -244,7 +258,7 @@ export default function ProfileScreen({ navigation }) {
         mode="settings"
       />
 
-      <TouchableOpacity style={styles.logoutButton} onPress={logout}>
+      <TouchableOpacity style={styles.logoutButton} accessibilityRole="button" accessibilityLabel="Cerrar sesión" onPress={logout}>
         <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
       </TouchableOpacity>
       </ScrollView>

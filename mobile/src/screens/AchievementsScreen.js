@@ -25,7 +25,7 @@ function AchievementDetailModal({ item, onClose }) {
   return (
     <Modal transparent visible animationType="fade" onRequestClose={onClose}>
       <View style={styles.detailOverlay}>
-        <TouchableOpacity style={styles.detailBackdrop} onPress={onClose} activeOpacity={1} />
+        <TouchableOpacity style={styles.detailBackdrop} onPress={onClose} activeOpacity={1} accessible={false} />
         <View style={[styles.detailCard, { backgroundColor: colors.surface }]}>
           <View
             style={[
@@ -49,7 +49,7 @@ function AchievementDetailModal({ item, onClose }) {
           <View style={styles.detailProgressBlock}>
             <ProgressBlock item={item} variant="detail" />
           </View>
-          <TouchableOpacity style={[styles.detailBtn, { backgroundColor: colors.accent }]} onPress={onClose}>
+          <TouchableOpacity style={[styles.detailBtn, { backgroundColor: colors.accent }]} accessibilityRole="button" accessibilityLabel="Cerrar detalle del logro" onPress={onClose}>
             <Text style={[styles.detailBtnText, { color: colors.onAccent }]}>Cerrar</Text>
           </TouchableOpacity>
         </View>
@@ -171,8 +171,8 @@ export default function AchievementsScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Volver" onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.text} accessible={false} />
         </TouchableOpacity>
         <Text style={styles.title}>Logros</Text>
       </View>
@@ -196,6 +196,9 @@ export default function AchievementsScreen({ navigation }) {
                       key={`${item.code}:${item.tier}`}
                       style={styles.item}
                       activeOpacity={0.6}
+                      accessibilityRole="button"
+                      accessibilityLabel={item.unlocked ? `${item.name}. ${TIER_LABELS[item.tier] ?? item.tier}` : `${item.name}. Por desbloquear`}
+                      accessibilityHint="Toca para ver el detalle del logro"
                       onPress={() => setSelected(item)}
                     >
                       <View
@@ -204,6 +207,8 @@ export default function AchievementsScreen({ navigation }) {
                           { borderColor: item.unlocked ? tierColor : colors.textDim },
                           !item.unlocked && styles.itemCircleLocked,
                         ]}
+                        accessible={false}
+                        importantForAccessibility="no-hide-descendants"
                       >
                         <Ionicons
                           name={item.icon}

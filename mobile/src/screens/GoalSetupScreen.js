@@ -64,10 +64,10 @@ export default function GoalSetupScreen() {
         keyboardDismissMode="on-drag"
       >
       <View style={styles.header}>
-        <TouchableOpacity style={styles.laterLink} onPress={finishSetup} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+        <TouchableOpacity style={styles.laterLink} accessibilityRole="button" accessibilityLabel="Configurar metas más tarde" onPress={finishSetup} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
           <Text style={styles.laterLinkText}>Más tarde</Text>
         </TouchableOpacity>
-        <Ionicons name="trophy" size={48} color={colors.accent} />
+        <Ionicons name="trophy" size={48} color={colors.accent} accessible={false} />
         <Text style={styles.title}>¡Bienvenido!</Text>
         <Text style={styles.subtitle}>
           Configura tus metas de lectura para empezar. Puedes cambiarlas cuando quieras.
@@ -100,6 +100,8 @@ export default function GoalSetupScreen() {
                     <TouchableOpacity
                       key={m}
                       style={[styles.metricBtn, active && styles.metricBtnActive]}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Medir la meta en ${UNITS[m]}`}
                       onPress={() => {
                         setMetricByType((prev) => ({ ...prev, [goal.key]: m }));
                         setSaved((s) => ({ ...s, [goal.key]: false }));
@@ -121,7 +123,7 @@ export default function GoalSetupScreen() {
                 <Text style={styles.savedValue}>
                   Meta: {savedData.value} {UNITS[savedData.metric]}
                 </Text>
-                <TouchableOpacity onPress={() => setSaved((s) => ({ ...s, [goal.key]: false }))}>
+                <TouchableOpacity accessibilityRole="button" accessibilityLabel={`Cambiar meta ${goal.label}`} onPress={() => setSaved((s) => ({ ...s, [goal.key]: false }))}>
                   <Text style={styles.changeBtn}>Cambiar</Text>
                 </TouchableOpacity>
               </View>
@@ -135,6 +137,8 @@ export default function GoalSetupScreen() {
                       <TouchableOpacity
                         key={p}
                         style={[styles.chip, active && styles.chipActive]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Meta de ${goal.label.toLowerCase()} en ${p} ${UNITS[metric]}`}
                         onPress={() => selectGoal(goal.key, metric, p)}
                         disabled={busyType !== null}
                       >
@@ -153,16 +157,19 @@ export default function GoalSetupScreen() {
                     value={customs[goal.key] ?? ""}
                     onChangeText={(t) => setCustoms((c) => ({ ...c, [goal.key]: t.replace(/[^0-9]/g, "") }))}
                     onFocus={onFieldFocus(goal.key)}
+                    accessibilityLabel={`Tu propia meta en ${UNITS[metric]}`}
                   />
                   <TouchableOpacity
                     style={styles.customSaveBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Guardar meta de ${goal.label.toLowerCase()} en ${UNITS[metric]}`}
                     onPress={() => selectGoal(goal.key, metric, parseInt(customs[goal.key], 10))}
                     disabled={busyType !== null}
                   >
                     {busyType === goal.key ? (
                       <ActivityIndicator color={colors.onAccent} size="small" />
                     ) : (
-                      <Ionicons name="checkmark" size={18} color={colors.onAccent} />
+                      <Ionicons name="checkmark" size={18} color={colors.onAccent} accessible={false} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -174,6 +181,8 @@ export default function GoalSetupScreen() {
 
       <TouchableOpacity
         style={[styles.continueBtn, !anySaved && styles.continueBtnDisabled]}
+        accessibilityRole="button"
+        accessibilityLabel="Continuar"
         disabled={!anySaved}
         onPress={finishSetup}
       >

@@ -7,7 +7,7 @@ export default function ThemePickerScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
-      <Ionicons name="contrast" size={48} color={colors.accent} />
+      <Ionicons name="contrast" size={48} color={colors.accent} accessible={false} />
       <Text style={[styles.title, { color: colors.text }]}>
         Elige tu tema
       </Text>
@@ -17,10 +17,13 @@ export default function ThemePickerScreen() {
 
       <TouchableOpacity
         style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Tema: sistema. Usa el tema de tu teléfono"
+        accessibilityState={{ selected: theme === "system" }}
         onPress={() => setTheme("system")}
         activeOpacity={0.8}
       >
-        <View style={[styles.swatch, { backgroundColor: "#2a2a3e", borderColor: "#444466" }]}>
+        <View style={[styles.swatch, { backgroundColor: "#2a2a3e", borderColor: "#444466" }]} accessible={false} importantForAccessibility="no-hide-descendants">
           <Ionicons name="contrast" size={26} color="#cba6f7" />
         </View>
         <View style={styles.optionText}>
@@ -30,16 +33,19 @@ export default function ThemePickerScreen() {
           </Text>
         </View>
         {theme === "system"
-          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
-          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} />}
+          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} accessible={false} />
+          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} accessible={false} />}
       </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Tema: claro. Fondos claros y texto oscuro"
+        accessibilityState={{ selected: theme === "light" }}
         onPress={() => setTheme("light")}
         activeOpacity={0.8}
       >
-        <View style={[styles.swatch, { backgroundColor: "#f2f2f7", borderColor: "#e0e0e6" }]}>
+        <View style={[styles.swatch, { backgroundColor: "#f2f2f7", borderColor: "#e0e0e6" }]} accessible={false} importantForAccessibility="no-hide-descendants">
           <Ionicons name="sunny" size={26} color="#f0a500" />
         </View>
         <View style={styles.optionText}>
@@ -49,16 +55,19 @@ export default function ThemePickerScreen() {
           </Text>
         </View>
         {theme === "light"
-          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
-          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} />}
+          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} accessible={false} />
+          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} accessible={false} />}
       </TouchableOpacity>
 
       <TouchableOpacity
         style={[styles.option, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        accessibilityRole="button"
+        accessibilityLabel="Tema: oscuro. Fondos oscuros y texto claro"
+        accessibilityState={{ selected: theme === "dark" }}
         onPress={() => setTheme("dark")}
         activeOpacity={0.8}
       >
-        <View style={[styles.swatch, { backgroundColor: "#13131f", borderColor: "#2a2a3e" }]}>
+        <View style={[styles.swatch, { backgroundColor: "#13131f", borderColor: "#2a2a3e" }]} accessible={false} importantForAccessibility="no-hide-descendants">
           <Ionicons name="moon" size={26} color="#cba6f7" />
         </View>
         <View style={styles.optionText}>
@@ -68,8 +77,8 @@ export default function ThemePickerScreen() {
           </Text>
         </View>
         {theme === "dark"
-          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} />
-          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} />}
+          ? <Ionicons name="checkmark-circle" size={22} color={colors.accent} accessible={false} />
+          : <Ionicons name="chevron-forward" size={20} color={colors.textDim} accessible={false} />}
       </TouchableOpacity>
     </View>
   );

@@ -61,7 +61,7 @@ export default function RegisterScreen({ navigation }) {
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode="on-drag"
       >
-      <Image source={require("../../assets/images/logo.png")} style={styles.logo} />
+      <Image source={require("../../assets/images/logo.png")} style={styles.logo} accessible={false} importantForAccessibility="no-hide-descendants" />
       <Text style={styles.title}>ReadTrack</Text>
       <Text style={styles.subtitle}>Crear cuenta</Text>
       <Text style={styles.subtitleStep}>{subtitle}</Text>
@@ -77,11 +77,12 @@ export default function RegisterScreen({ navigation }) {
             keyboardType="email-address"
             autoCapitalize="none"
             autoCorrect={false}
+            accessibilityLabel="Email"
           />
           {loading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />
           ) : (
-            <TouchableOpacity style={styles.btn} onPress={handleSendCode}>
+            <TouchableOpacity style={styles.btn} accessibilityRole="button" accessibilityLabel="Enviar código de verificación" onPress={handleSendCode}>
               <Text style={styles.btnText}>Enviar código</Text>
             </TouchableOpacity>
           )}
@@ -96,6 +97,7 @@ export default function RegisterScreen({ navigation }) {
             onChangeText={(t) => setCode(t.replace(/[^0-9]/g, ""))}
             keyboardType="number-pad"
             maxLength={6}
+            accessibilityLabel="Código de verificación"
           />
           <TextInput
             style={styles.input}
@@ -104,6 +106,7 @@ export default function RegisterScreen({ navigation }) {
             value={username}
             onChangeText={setUsername}
             autoCapitalize="none"
+            accessibilityLabel="Nombre de usuario"
           />
           <View style={styles.passwordInputBox}>
             <TextInput
@@ -113,8 +116,14 @@ export default function RegisterScreen({ navigation }) {
               value={password}
               onChangeText={setPassword}
               secureTextEntry={!showPass}
+              accessibilityLabel="Contraseña"
             />
-            <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPass((s) => !s)}>
+            <TouchableOpacity
+              style={styles.eyeBtn}
+              accessibilityRole="button"
+              accessibilityLabel={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+              onPress={() => setShowPass((s) => !s)}
+            >
               <Ionicons name={showPass ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textDim} />
             </TouchableOpacity>
           </View>
@@ -125,24 +134,25 @@ export default function RegisterScreen({ navigation }) {
             value={confirm}
             onChangeText={setConfirm}
             secureTextEntry={!showPass}
+            accessibilityLabel="Confirmar contraseña"
           />
           {loading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />
           ) : (
-            <TouchableOpacity style={styles.btn} onPress={handleRegister}>
+            <TouchableOpacity style={styles.btn} accessibilityRole="button" accessibilityLabel="Crear cuenta" onPress={handleRegister}>
               <Text style={styles.btnText}>Crear cuenta</Text>
             </TouchableOpacity>
           )}
-          <TouchableOpacity onPress={() => setEmailSent(false)}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cambiar email" onPress={() => setEmailSent(false)}>
             <Text style={styles.link}>Cambiar email</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={handleSendCode}>
+          <TouchableOpacity accessibilityRole="button" accessibilityLabel="Reenviar código" onPress={handleSendCode}>
             <Text style={styles.link}>Reenviar código</Text>
           </TouchableOpacity>
         </>
       )}
 
-      <TouchableOpacity onPress={() => navigation.navigate("Login")}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Iniciar sesión" onPress={() => navigation.navigate("Login")}>
         <Text style={[styles.link, { marginTop: 20 }]}>¿Ya tienes cuenta? Inicia sesión</Text>
       </TouchableOpacity>
       </ScrollView>

@@ -13,22 +13,23 @@ export default function WhatsNewPopup({ visible, onClose }) {
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose}>
-        <TouchableOpacity style={styles.card} activeOpacity={1}>
-          <View style={styles.handle} />
+      <TouchableOpacity style={styles.backdrop} activeOpacity={1} onPress={onClose} accessible={false}>
+        <TouchableOpacity style={styles.card} activeOpacity={1} accessible={false}>
+          <View style={styles.handle} accessible={false} importantForAccessibility="no-hide-descendants" />
           <View style={styles.headerRow}>
-            <Ionicons name="sparkles" size={18} color={colors.star} />
+            <Ionicons name="sparkles" size={18} color={colors.star} accessible={false} />
             <Text style={styles.title}>{RELEASE_NOTES.title}</Text>
           </View>
           {RELEASE_NOTES.items.map((item, i) => (
             <View key={i} style={styles.itemRow}>
-              <Ionicons name={item.icon} size={14} color={colors.accent} style={styles.itemIcon} />
+              <Ionicons name={item.icon} size={14} color={colors.accent} style={styles.itemIcon} accessible={false} />
               <Text style={styles.itemText}>{item.text}</Text>
             </View>
           ))}
           <View style={styles.btnRow}>
             <TouchableOpacity
               style={styles.secondaryBtn}
+              accessibilityRole="button"
               onPress={() => {
                 onClose();
                 navigation.navigate("WhatsNew");
@@ -36,7 +37,7 @@ export default function WhatsNewPopup({ visible, onClose }) {
             >
               <Text style={styles.secondaryText}>Ver más</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.primaryBtn} onPress={onClose}>
+            <TouchableOpacity style={styles.primaryBtn} accessibilityRole="button" onPress={onClose}>
               <Text style={styles.primaryText}>Vale</Text>
             </TouchableOpacity>
           </View>

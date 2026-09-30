@@ -29,27 +29,32 @@ export default function LoginScreen({ navigation }) {
   return (
     <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === "ios" ? "padding" : "height"}>
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
-      <Image source={require("../../assets/images/logo.png")} style={styles.logo} />
+      <Image source={require("../../assets/images/logo.png")} style={styles.logo} accessible={false} importantForAccessibility="no-hide-descendants" />
       <Text style={styles.title}>ReadTrack</Text>
       <Text style={styles.subtitle}>Inicia sesión</Text>
-      <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.placeholder} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" />
+      <TextInput style={styles.input} placeholder="Email" placeholderTextColor={colors.placeholder} value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" accessibilityLabel="Email" />
       <View style={styles.passwordInputBox}>
-        <TextInput style={[styles.input, styles.passwordInput]} placeholder="Contraseña" placeholderTextColor={colors.placeholder} value={password} onChangeText={setPassword} secureTextEntry={!showPass} />
-        <TouchableOpacity style={styles.eyeBtn} onPress={() => setShowPass((s) => !s)}>
+        <TextInput style={[styles.input, styles.passwordInput]} placeholder="Contraseña" placeholderTextColor={colors.placeholder} value={password} onChangeText={setPassword} secureTextEntry={!showPass} accessibilityLabel="Contraseña" />
+        <TouchableOpacity
+          style={styles.eyeBtn}
+          accessibilityRole="button"
+          accessibilityLabel={showPass ? "Ocultar contraseña" : "Mostrar contraseña"}
+          onPress={() => setShowPass((s) => !s)}
+        >
           <Ionicons name={showPass ? "eye-off-outline" : "eye-outline"} size={20} color={colors.textDim} />
         </TouchableOpacity>
       </View>
       {loading ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />
       ) : (
-        <TouchableOpacity style={styles.btn} onPress={handleLogin}>
+        <TouchableOpacity style={styles.btn} accessibilityRole="button" accessibilityLabel="Entrar" onPress={handleLogin}>
           <Text style={styles.btnText}>Entrar</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity onPress={() => navigation.navigate("Register")}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ir a registro" onPress={() => navigation.navigate("Register")}>
         <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
       </TouchableOpacity>
-      <TouchableOpacity onPress={() => navigation.navigate("ForgotPassword")}>
+      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Recuperar contraseña" onPress={() => navigation.navigate("ForgotPassword")}>
         <Text style={[styles.link, { marginTop: 8 }]}>¿Olvidaste tu contraseña?</Text>
       </TouchableOpacity>
       </ScrollView>

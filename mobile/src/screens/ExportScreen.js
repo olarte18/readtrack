@@ -119,20 +119,20 @@ export default function ExportScreen({ navigation }) {
             )}
           </View>
 
-          <TouchableOpacity style={styles.shareBtn} onPress={shareBackup} disabled={sharing}>
+          <TouchableOpacity style={styles.shareBtn} accessibilityRole="button" accessibilityLabel="Compartir respaldo completo (JSON)" onPress={shareBackup} disabled={sharing}>
             {sharing ? (
               <ActivityIndicator color={colors.onAccent} />
             ) : (
-              <Ionicons name="share-outline" size={22} color={colors.onAccent} />
+              <Ionicons name="share-outline" size={22} color={colors.onAccent} accessible={false} />
             )}
             <Text style={styles.shareBtnText}>Compartir respaldo completo (JSON)</Text>
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.csvBtn} onPress={shareCsv} disabled={sharingCsv}>
+          <TouchableOpacity style={styles.csvBtn} accessibilityRole="button" accessibilityLabel="Compartir biblioteca (CSV)" onPress={shareCsv} disabled={sharingCsv}>
             {sharingCsv ? (
               <ActivityIndicator color={colors.accent} />
             ) : (
-              <Ionicons name="document-text-outline" size={20} color={colors.accent} />
+              <Ionicons name="document-text-outline" size={20} color={colors.accent} accessible={false} />
             )}
             <Text style={styles.csvBtnText}>Compartir biblioteca (CSV)</Text>
           </TouchableOpacity>
@@ -141,7 +141,7 @@ export default function ExportScreen({ navigation }) {
             notas y metas), usa el respaldo JSON.
           </Text>
 
-          <TouchableOpacity style={styles.doneBtn} onPress={() => navigation.goBack()}>
+          <TouchableOpacity style={styles.doneBtn} accessibilityRole="button" accessibilityLabel="Listo" onPress={() => navigation.goBack()}>
             <Text style={styles.doneBtnText}>Listo</Text>
           </TouchableOpacity>
         </>

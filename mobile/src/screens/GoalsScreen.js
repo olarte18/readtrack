@@ -104,11 +104,15 @@ if (type === "weekly") return data.progress.weekly;
           <View key={type.key} style={styles.goalCard} onLayout={onSectionLayout(type.key)}>
             <View style={styles.goalCardHeader}>
               <Text style={styles.goalCardTitle}>{type.label}</Text>
-              <TouchableOpacity onPress={() => {
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel={goal ? `Editar meta ${type.label}` : `Agregar meta ${type.label}`}
+                onPress={() => {
                 setEditing(type.key);
                 setEditMetric(goal?.metric ?? type.metrics[0]);
                 setEditValue(String(goal?.value ?? ""));
-              }}>
+              }}
+              >
                 <Text style={styles.editBtn}>{goal ? "Editar" : "Agregar"}</Text>
               </TouchableOpacity>
             </View>
@@ -126,12 +130,12 @@ if (type === "weekly") return data.progress.weekly;
                 <Text style={styles.goalPercent}>
                   {Math.round((progress / goal.value) * 100)}% completado
                 </Text>
-                <TouchableOpacity style={styles.detailLink} onPress={() => openGoalDetail(type.key, goal.metric)}>
-                  <Ionicons name={type.key === "daily" ? "calendar-outline" : "list-outline"} size={16} color={colors.accent} />
+                <TouchableOpacity style={styles.detailLink} accessibilityRole="button" accessibilityLabel={type.key === "daily" ? "Ver hoy en el calendario" : "Ver detalle de la meta"} onPress={() => openGoalDetail(type.key, goal.metric)}>
+                  <Ionicons name={type.key === "daily" ? "calendar-outline" : "list-outline"} size={16} color={colors.accent} accessible={false} />
                   <Text style={styles.detailLinkText}>
                     {type.key === "daily" ? "Ver hoy en el calendario" : "Ver detalle"}
                   </Text>
-                  <Ionicons name="chevron-forward" size={16} color={colors.textDim} />
+                  <Ionicons name="chevron-forward" size={16} color={colors.textDim} accessible={false} />
                 </TouchableOpacity>
               </>
             ) : (
@@ -146,6 +150,8 @@ if (type === "weekly") return data.progress.weekly;
                       <TouchableOpacity
                         key={m}
                         style={[styles.metricBtn, editMetric === m && styles.metricBtnActive]}
+                        accessibilityRole="button"
+                        accessibilityLabel={`Medir en ${METRIC_LABELS[m]}`}
                         onPress={() => setEditMetric(m)}
                       >
                         <Text style={[styles.metricBtnText, editMetric === m && styles.metricBtnTextActive]}>
@@ -164,12 +170,13 @@ if (type === "weekly") return data.progress.weekly;
                     value={editValue}
                     onChangeText={setEditValue}
                     onFocus={onFieldFocus(type.key)}
+                    accessibilityLabel={`Valor de la meta en ${METRIC_LABELS[editMetric]}`}
                   />
-                  <TouchableOpacity style={styles.saveBtn} onPress={() => handleSave(type.key)}>
+                  <TouchableOpacity style={styles.saveBtn} accessibilityRole="button" accessibilityLabel="Guardar meta" onPress={() => handleSave(type.key)}>
                     <Text style={styles.saveBtnText}>Guardar</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity onPress={() => setEditing(null)}>
-                    <Ionicons name="close" size={20} color={colors.textDim} />
+                  <TouchableOpacity accessibilityRole="button" accessibilityLabel="Cancelar edición" onPress={() => setEditing(null)}>
+                    <Ionicons name="close" size={20} color={colors.textDim} accessible={false} />
                   </TouchableOpacity>
                 </View>
               </View>

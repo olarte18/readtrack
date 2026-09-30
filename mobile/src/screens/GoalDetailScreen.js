@@ -72,7 +72,7 @@ export default function GoalDetailScreen({ route, navigation }) {
       {error ? (
         <View style={styles.card}>
           <Text style={styles.emptyText}>No se pudo cargar el detalle</Text>
-          <TouchableOpacity style={styles.retryBtn} onPress={fetchDetail}>
+          <TouchableOpacity style={styles.retryBtn} accessibilityRole="button" accessibilityLabel="Reintentar cargar detalle" onPress={fetchDetail}>
             <Text style={styles.retryBtnText}>Reintentar</Text>
           </TouchableOpacity>
         </View>
@@ -96,6 +96,9 @@ export default function GoalDetailScreen({ route, navigation }) {
             <TouchableOpacity
               key={`${b.id}-${b.db_id}`}
               style={styles.bookRow}
+              accessibilityRole="button"
+              accessibilityLabel={`${b.title}${b.author ? `, ${b.author}` : ""}. ${metric === "books" ? `Completado el ${formatDate(b.finished_at)}` : formatDuration(b.minutes)}`}
+              accessibilityHint="Toca para ver las sesiones"
               onPress={() =>
                 navigation.navigate("BookSessions", {
                   id: b.id,
@@ -108,9 +111,9 @@ export default function GoalDetailScreen({ route, navigation }) {
               }
             >
               {b.cover ? (
-                <Image source={{ uri: b.cover }} style={styles.cover} />
+                <Image source={{ uri: b.cover }} style={styles.cover} accessible={false} importantForAccessibility="no-hide-descendants" />
               ) : (
-                <View style={[styles.cover, styles.noCover]}>
+                <View style={[styles.cover, styles.noCover]} accessible={false} importantForAccessibility="no-hide-descendants">
                   <Ionicons name="book" size={20} color={colors.textDim} />
                 </View>
               )}

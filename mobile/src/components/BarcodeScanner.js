@@ -28,7 +28,12 @@ const handleScan = ({ data }) => {
         {!permission.granted ? (
           <View style={[styles.centered, { backgroundColor: colors.background }]}>
             <Text style={[styles.text, { color: colors.text }]}>Se necesita acceso a la cámara</Text>
-            <TouchableOpacity style={[styles.btn, { backgroundColor: colors.accent }]} onPress={requestPermission}>
+            <TouchableOpacity
+              style={[styles.btn, { backgroundColor: colors.accent }]}
+              accessibilityRole="button"
+              accessibilityLabel="Dar permiso de cámara"
+              onPress={requestPermission}
+            >
               <Text style={[styles.btnText, { color: colors.onAccent }]}>Dar permiso</Text>
             </TouchableOpacity>
           </View>
@@ -55,8 +60,13 @@ const handleScan = ({ data }) => {
             </View>
           </View>
         )}
-        <TouchableOpacity style={[styles.closeBtn, { backgroundColor: colors.surface }]} onPress={onClose}>
-          <Ionicons name="close" size={20} color={colors.danger} />
+        <TouchableOpacity
+          style={[styles.closeBtn, { backgroundColor: colors.surface }]}
+          accessibilityRole="button"
+          accessibilityLabel="Cancelar escaneo"
+          onPress={onClose}
+        >
+          <Ionicons name="close" size={20} color={colors.danger} accessible={false} />
           <Text style={[styles.closeBtnText, { color: colors.danger }]}>Cancelar</Text>
         </TouchableOpacity>
       </View>

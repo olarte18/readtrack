@@ -46,8 +46,8 @@ export default function NotesScreen({ navigation }) {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Volver" onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.text} accessible={false} />
         </TouchableOpacity>
         <Text style={styles.title}>Notas</Text>
       </View>
@@ -59,8 +59,15 @@ export default function NotesScreen({ navigation }) {
           keyExtractor={(item) => String(item.id)}
           contentContainerStyle={{ paddingBottom: 30 }}
           renderItem={({ item }) => (
-            <TouchableOpacity style={styles.card} activeOpacity={0.7} onLongPress={() => handleDeleteNote(item.id)}>
-              <View style={styles.bookRow}>
+            <TouchableOpacity
+              style={styles.card}
+              activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel={`Nota de ${item.book_title}${item.page ? `, página ${item.page}` : ""}: ${item.content}`}
+              accessibilityHint="Mantén presionado para eliminar"
+              onLongPress={() => handleDeleteNote(item.id)}
+            >
+              <View style={styles.bookRow} accessible={false} importantForAccessibility="no-hide-descendants">
                 {item.book_cover ? (
                   <Image source={{ uri: item.book_cover }} style={styles.cover} />
                 ) : (
@@ -74,21 +81,27 @@ export default function NotesScreen({ navigation }) {
                 </View>
               </View>
               <Text style={styles.content}>{item.content}</Text>
-              <View style={styles.metaRow}>
+              <View style={styles.metaRow} accessible={false} importantForAccessibility="no-hide-descendants">
                 {!!item.page && <Text style={styles.pageBadge}>Página {item.page}</Text>}
                 <Text style={styles.date}>{formatDate(item.created_at)}</Text>
                 <View style={styles.actions}>
-                  <TouchableOpacity hitSlop={8} onPress={() =>
-                    navigation.navigate("NoteEditor", {
-                      note: item,
-                      onGoBack: (updated) =>
-                        setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n))),
-                    })
-                  } style={styles.actionBtn}>
-                    <Ionicons name="pencil-outline" size={18} color={colors.accent} />
+                  <TouchableOpacity
+                    hitSlop={8}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Editar nota de ${item.book_title}`}
+                    onPress={() =>
+                      navigation.navigate("NoteEditor", {
+                        note: item,
+                        onGoBack: (updated) =>
+                          setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n))),
+                      })
+                    }
+                    style={styles.actionBtn}
+                  >
+                    <Ionicons name="pencil-outline" size={18} color={colors.accent} accessible={false} />
                   </TouchableOpacity>
-                  <TouchableOpacity hitSlop={8} onPress={() => handleDeleteNote(item.id)} style={styles.actionBtn}>
-                    <Ionicons name="trash-outline" size={18} color={colors.danger} />
+                  <TouchableOpacity hitSlop={8} accessibilityRole="button" accessibilityLabel={`Eliminar nota de ${item.book_title}`} onPress={() => handleDeleteNote(item.id)} style={styles.actionBtn}>
+                    <Ionicons name="trash-outline" size={18} color={colors.danger} accessible={false} />
                   </TouchableOpacity>
                 </View>
               </View>

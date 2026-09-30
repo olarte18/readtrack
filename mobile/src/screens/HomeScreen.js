@@ -193,6 +193,8 @@ export default function HomeScreen({ navigation, route }) {
         <TouchableOpacity
           key={String(opt.key)}
           style={[styles.filterBtn, active && styles.filterBtnActive]}
+          accessibilityRole="button"
+          accessibilityLabel={opt.label === "Sin calificar" ? "Filtrar por sin calificar" : `Filtrar por ${opt.label}`}
           onPress={() => setValue(opt.key)}
         >
           <Text style={[styles.filterText, active && styles.filterTextActive]}>{opt.label}</Text>
@@ -207,14 +209,20 @@ export default function HomeScreen({ navigation, route }) {
         <View style={styles.headerActions}>
           <TouchableOpacity
             style={styles.randomBtn}
+            accessibilityRole="button"
             onPress={openPicker}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             accessibilityLabel="Libro al azar de tu biblioteca"
           >
-            <Ionicons name="shuffle" size={15} color={colors.accent} />
+            <Ionicons name="shuffle" size={15} color={colors.accent} accessible={false} />
             <Text style={styles.randomBtnText}>Al azar</Text>
           </TouchableOpacity>
-          <TouchableOpacity onPress={() => navigation.navigate("Search")} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Agregar libro"
+            onPress={() => navigation.navigate("Search")}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
             <Text style={styles.addBtn}>+ Agregar</Text>
           </TouchableOpacity>
         </View>
@@ -229,6 +237,8 @@ export default function HomeScreen({ navigation, route }) {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={[styles.statusPill, filter === item.key && styles.statusPillActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Filtrar por estado: ${item.label}`}
               onPress={() => setFilter(item.key)}
             >
               <Text style={[styles.statusPillText, filter === item.key && styles.statusPillTextActive]}>
@@ -239,15 +249,30 @@ export default function HomeScreen({ navigation, route }) {
         />
       </View>
       <View style={styles.sortRow}>
-        <TouchableOpacity style={styles.sortDropdown} onPress={() => setSortOpen(true)}>
+        <TouchableOpacity
+          style={styles.sortDropdown}
+          accessibilityRole="button"
+          accessibilityLabel={`Ordenar por: ${SORT_KEYS.find((s) => s.key === sortKey)?.label}`}
+          onPress={() => setSortOpen(true)}
+        >
           <Text style={styles.sortDropdownText}>{SORT_KEYS.find((s) => s.key === sortKey)?.label}</Text>
-          <Ionicons name="chevron-down" size={16} color={colors.accent} />
+          <Ionicons name="chevron-down" size={16} color={colors.accent} accessible={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={styles.sortDirBtn} onPress={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}>
+        <TouchableOpacity
+          style={styles.sortDirBtn}
+          accessibilityRole="button"
+          accessibilityLabel={`Cambiar dirección del orden: ${sortDirLabel}`}
+          onPress={() => setSortDir(sortDir === "asc" ? "desc" : "asc")}
+        >
           <Text style={styles.sortDirText}>{sortDirLabel}</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.filtersBtn} onPress={() => setFilterOpen(true)}>
-          <Ionicons name="options-outline" size={15} color={colors.accent} />
+        <TouchableOpacity
+          style={styles.filtersBtn}
+          accessibilityRole="button"
+          accessibilityLabel="Filtrar biblioteca"
+          onPress={() => setFilterOpen(true)}
+        >
+          <Ionicons name="options-outline" size={15} color={colors.accent} accessible={false} />
           <Text style={styles.filtersBtnText}>Filtrar</Text>
           {activeFilters > 0 && (
             <View style={styles.badge}>
@@ -265,6 +290,9 @@ export default function HomeScreen({ navigation, route }) {
           renderItem={({ item }) => (
             <TouchableOpacity
               style={styles.card}
+              accessibilityRole="button"
+              accessibilityLabel={`${String(item.title)}, ${String(item.author)}, ${STATUS_LABEL[item.status] ?? ""}${item.status === "reading" ? `, página ${item.current_page ?? 0}` : ""}${item.status === "completed" && item.rating > 0 ? `, calificación ${item.rating} de 5` : ""}`}
+              accessibilityHint="Toca para ver el detalle. Mantén presionado para editar"
               onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: fetchLibrary })}
               onLongPress={() =>
                 navigation.navigate("EditBook", { book: item, dbId: item.db_id, ubId: item.id, onGoBack: fetchLibrary })
@@ -272,9 +300,9 @@ export default function HomeScreen({ navigation, route }) {
               delayLongPress={400}
             >
               {item.cover ? (
-                <Image source={{ uri: item.cover }} style={styles.cover} />
+                <Image source={{ uri: item.cover }} style={styles.cover} accessible={false} importantForAccessibility="no-hide-descendants" />
               ) : (
-                <View style={styles.noCover}>
+                <View style={styles.noCover} accessible={false} importantForAccessibility="no-hide-descendants">
                   <Ionicons name="book" size={26} color={colors.textDim} />
                 </View>
               )}
@@ -323,7 +351,7 @@ export default function HomeScreen({ navigation, route }) {
 
       <Modal visible={sortOpen} transparent animationType="slide" onRequestClose={() => setSortOpen(false)}>
         <View style={styles.modalOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSortOpen(false)} />
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setSortOpen(false)} accessible={false} />
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>Ordenar por</Text>
             <View style={styles.sortOptions}>
@@ -331,10 +359,12 @@ export default function HomeScreen({ navigation, route }) {
                 <TouchableOpacity
                   key={s.key}
                   style={[styles.sortOption, sortKey === s.key && styles.sortOptionActive]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Ordenar por ${s.label}`}
                   onPress={() => changeSortKey(s.key)}
                 >
                   <Text style={[styles.sortOptionText, sortKey === s.key && styles.sortOptionTextActive]}>{s.label}</Text>
-                  {sortKey === s.key && <Ionicons name="checkmark" size={18} color={colors.accent} />}
+                  {sortKey === s.key && <Ionicons name="checkmark" size={18} color={colors.accent} accessible={false} />}
                 </TouchableOpacity>
               ))}
             </View>
@@ -344,7 +374,7 @@ export default function HomeScreen({ navigation, route }) {
 
       <Modal visible={filterOpen} transparent animationType="slide" onRequestClose={() => setFilterOpen(false)}>
         <View style={styles.modalOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setFilterOpen(false)} />
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setFilterOpen(false)} accessible={false} />
           <View style={styles.sheet}>
             <Text style={styles.sheetTitle}>Filtrar biblioteca</Text>
             <ScrollView showsVerticalScrollIndicator={false}>
@@ -367,10 +397,10 @@ export default function HomeScreen({ navigation, route }) {
               </View>
             </ScrollView>
             <View style={styles.sheetFooter}>
-              <TouchableOpacity style={styles.clearBtn} onPress={clearFilters}>
+              <TouchableOpacity style={styles.clearBtn} accessibilityRole="button" accessibilityLabel="Limpiar filtros" onPress={clearFilters}>
                 <Text style={styles.clearBtnText}>Limpiar filtros</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.doneBtn} onPress={() => setFilterOpen(false)}>
+              <TouchableOpacity style={styles.doneBtn} accessibilityRole="button" accessibilityLabel="Cerrar filtros" onPress={() => setFilterOpen(false)}>
                 <Text style={styles.doneBtnText}>Listo</Text>
               </TouchableOpacity>
             </View>
@@ -379,15 +409,16 @@ export default function HomeScreen({ navigation, route }) {
       </Modal>
     <Modal visible={pickerOpen} transparent animationType="fade" onRequestClose={() => setPickerOpen(false)}>
         <View style={styles.pickerOverlay}>
-          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPickerOpen(false)} />
+          <TouchableOpacity style={StyleSheet.absoluteFill} activeOpacity={1} onPress={() => setPickerOpen(false)} accessible={false} />
           <View style={styles.pickerCard}>
             <TouchableOpacity
               style={styles.pickerClose}
+              accessibilityRole="button"
               onPress={() => setPickerOpen(false)}
               hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               accessibilityLabel="Cerrar"
             >
-              <Ionicons name="close" size={20} color={colors.textDim} />
+              <Ionicons name="close" size={20} color={colors.textDim} accessible={false} />
             </TouchableOpacity>
             <Text style={styles.pickerTitle}>Al azar en tu biblioteca</Text>
             <Text style={styles.pickerSubtitle}>
@@ -397,9 +428,9 @@ export default function HomeScreen({ navigation, route }) {
             {pickerBook ? (
               <>
                 {pickerBook.cover ? (
-                  <Image source={{ uri: pickerBook.cover }} style={styles.pickerCover} />
+                  <Image source={{ uri: pickerBook.cover }} style={styles.pickerCover} accessible={false} importantForAccessibility="no-hide-descendants" />
                 ) : (
-                  <View style={[styles.pickerCover, styles.pickerCoverNoImg]}>
+                  <View style={[styles.pickerCover, styles.pickerCoverNoImg]} accessible={false} importantForAccessibility="no-hide-descendants">
                     <Ionicons name="book" size={48} color={colors.textDim} />
                   </View>
                 )}
@@ -407,12 +438,14 @@ export default function HomeScreen({ navigation, route }) {
                 <Text style={styles.pickerAuthor} numberOfLines={1}>{String(pickerBook.author)}</Text>
                 <Text style={styles.pickerStatus}>{STATUS_LABEL[pickerBook.status]}</Text>
                 <View style={styles.pickerActions}>
-                  <TouchableOpacity style={styles.pickerAgainBtn} onPress={pickAnother}>
-                    <Ionicons name="shuffle" size={16} color={colors.accent} />
+                  <TouchableOpacity style={styles.pickerAgainBtn} accessibilityRole="button" accessibilityLabel="Elegir otro libro al azar" onPress={pickAnother}>
+                    <Ionicons name="shuffle" size={16} color={colors.accent} accessible={false} />
                     <Text style={styles.pickerAgainText}>Otro libro</Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.pickerDetailBtn}
+                    accessibilityRole="button"
+                    accessibilityLabel="Ver detalle del libro"
                     onPress={() => {
                       setPickerOpen(false);
                       navigation.navigate("BookDetail", { book: pickerBook, onGoBack: fetchLibrary });

@@ -40,8 +40,8 @@ export default function NoteEditorScreen({ route, navigation }) {
       behavior={Platform.OS === "ios" ? "padding" : undefined}
     >
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="chevron-back" size={22} color={colors.text} />
+        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Volver" onPress={() => navigation.goBack()}>
+          <Ionicons name="chevron-back" size={22} color={colors.text} accessible={false} />
         </TouchableOpacity>
         <Text style={styles.title}>Editar nota</Text>
       </View>
@@ -61,6 +61,7 @@ export default function NoteEditorScreen({ route, navigation }) {
           maxLength={5000}
           autoFocus
           textAlignVertical="top"
+          accessibilityLabel="Contenido de la nota"
         />
 
         <TextInput
@@ -71,10 +72,13 @@ export default function NoteEditorScreen({ route, navigation }) {
           placeholderTextColor={colors.placeholder}
           keyboardType="number-pad"
           maxLength={6}
+          accessibilityLabel="Página (opcional)"
         />
 
         <TouchableOpacity
           style={[styles.saveBtn, saving && styles.saveBtnDisabled]}
+          accessibilityRole="button"
+          accessibilityLabel="Guardar nota"
           onPress={handleSave}
           disabled={saving}
         >

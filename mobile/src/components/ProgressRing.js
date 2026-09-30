@@ -47,7 +47,12 @@ export default function ProgressRing({
         style,
       ]}
     >
-      <Svg width={radius * 2} height={radius * 2}>
+      <Svg
+        width={radius * 2}
+        height={radius * 2}
+        accessible={false}
+        importantForAccessibility="no-hide-descendants"
+      >
         <Circle
           cx={radius}
           cy={radius}

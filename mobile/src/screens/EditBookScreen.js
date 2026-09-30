@@ -279,8 +279,8 @@ export default function EditBookScreen({ route, navigation }) {
       >
       <View style={styles.header}>
         <Text style={styles.title}>{isCreate ? "Agregar libro" : "Editar ficha"}</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={22} color={colors.text} />
+        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Cerrar" onPress={() => navigation.goBack()}>
+          <Ionicons name="close" size={22} color={colors.text} accessible={false} />
         </TouchableOpacity>
       </View>
 
@@ -290,9 +290,11 @@ export default function EditBookScreen({ route, navigation }) {
             source={{ uri: previewCover }}
             style={styles.previewCover}
             onError={() => setCoverError(true)}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
           />
         ) : (
-          <View style={styles.previewNoCover}>
+          <View style={styles.previewNoCover} accessible={false} importantForAccessibility="no-hide-descendants">
             <Ionicons name="book" size={48} color={colors.textDim} />
           </View>
         )}
@@ -307,6 +309,7 @@ export default function EditBookScreen({ route, navigation }) {
           value={title}
           onChangeText={setTitle}
           onFocus={onFieldFocus("title")}
+          accessibilityLabel="Título del libro"
         />
       </View>
 
@@ -320,6 +323,7 @@ export default function EditBookScreen({ route, navigation }) {
           value={pages}
           onChangeText={setPages}
           onFocus={onFieldFocus("pages")}
+          accessibilityLabel="Páginas"
         />
       </View>
 
@@ -334,6 +338,7 @@ export default function EditBookScreen({ route, navigation }) {
             value={chapters}
             onChangeText={setChapters}
             onFocus={onFieldFocus("chapters")}
+            accessibilityLabel="Capítulos"
           />
         </View>
       )}
@@ -347,6 +352,7 @@ export default function EditBookScreen({ route, navigation }) {
           value={author}
           onChangeText={setAuthor}
           onFocus={onFieldFocus("author")}
+          accessibilityLabel="Autor"
         />
       </View>
 
@@ -361,13 +367,14 @@ export default function EditBookScreen({ route, navigation }) {
           onFocus={onFieldFocus("cover")}
           autoCapitalize="none"
           keyboardType="url"
+          accessibilityLabel="URL de la portada"
         />
-        <TouchableOpacity style={styles.coverBtn} onPress={pickCover} disabled={uploadingCover}>
+        <TouchableOpacity style={styles.coverBtn} accessibilityRole="button" accessibilityLabel="Subir portada" onPress={pickCover} disabled={uploadingCover}>
           {uploadingCover ? (
             <ActivityIndicator size="small" color={colors.onAccent} />
           ) : (
             <>
-              <Ionicons name="image" size={18} color={colors.onAccent} />
+              <Ionicons name="image" size={18} color={colors.onAccent} accessible={false} />
               <Text style={styles.coverBtnText}>
                 {isCreate && pendingCover ? "Cambiar portada" : "Subir portada"}
               </Text>
@@ -388,6 +395,7 @@ export default function EditBookScreen({ route, navigation }) {
           value={publisher}
           onChangeText={setPublisher}
           onFocus={onFieldFocus("publisher")}
+          accessibilityLabel="Editorial"
         />
       </View>
 
@@ -398,6 +406,9 @@ export default function EditBookScreen({ route, navigation }) {
             <TouchableOpacity
               key={opt.key}
               style={[styles.segBtn, bookType === opt.key && styles.segBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Tipo de libro: ${opt.label}${bookType === opt.key ? ". Seleccionado" : ""}`}
+              accessibilityState={{ selected: bookType === opt.key }}
               onPress={() => setBookType(opt.key)}
             >
               <Text style={[styles.segBtnText, bookType === opt.key && styles.segBtnTextActive]}>
@@ -418,6 +429,7 @@ export default function EditBookScreen({ route, navigation }) {
           value={year}
           onChangeText={setYear}
           onFocus={onFieldFocus("year")}
+          accessibilityLabel="Año"
         />
       </View>
 
@@ -431,6 +443,7 @@ export default function EditBookScreen({ route, navigation }) {
           onChangeText={setIsbn}
           onFocus={onFieldFocus("isbn")}
           autoCapitalize="none"
+          accessibilityLabel="ISBN"
         />
       </View>
 
@@ -443,6 +456,7 @@ export default function EditBookScreen({ route, navigation }) {
           value={genre}
           onChangeText={setGenre}
           onFocus={onFieldFocus("genre")}
+          accessibilityLabel="Género"
         />
       </View>
 
@@ -456,6 +470,7 @@ export default function EditBookScreen({ route, navigation }) {
           onChangeText={setDescription}
           onFocus={onFieldFocus("description")}
           multiline
+          accessibilityLabel="Descripción o sinopsis"
         />
       </View>
 
@@ -466,6 +481,9 @@ export default function EditBookScreen({ route, navigation }) {
             <TouchableOpacity
               key={opt.key}
               style={[styles.segBtn, readingMode === opt.key && styles.segBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Modo de progreso: ${opt.label}${readingMode === opt.key ? ". Seleccionado" : ""}`}
+              accessibilityState={{ selected: readingMode === opt.key }}
               onPress={() => setReadingMode(opt.key)}
             >
               <Text style={[styles.segBtnText, readingMode === opt.key && styles.segBtnTextActive]}>
@@ -483,6 +501,9 @@ export default function EditBookScreen({ route, navigation }) {
             <TouchableOpacity
               key={opt.key}
               style={[styles.statusBtn, status === opt.key && styles.statusBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Estado: ${opt.label}${status === opt.key ? ". Seleccionado" : ""}`}
+              accessibilityState={{ selected: status === opt.key }}
               onPress={() => setStatus(opt.key)}
             >
               <Text style={[styles.statusBtnText, status === opt.key && styles.statusBtnTextActive]}>
@@ -508,18 +529,19 @@ export default function EditBookScreen({ route, navigation }) {
               value={currentPage}
               onChangeText={setCurrentPage}
               onFocus={onFieldFocus("currentPage")}
+              accessibilityLabel={readingMode === "percentage" ? "Porcentaje actual" : readingMode === "chapter" ? "Capítulo actual" : "Página actual"}
             />
           </View>
 
           <View style={styles.section}>
             <Text style={styles.label}>Fechas</Text>
-            <TouchableOpacity style={styles.dateRow} onPress={() => setShowStartPicker(true)}>
+            <TouchableOpacity style={styles.dateRow} accessibilityRole="button" accessibilityLabel="Cambiar fecha de inicio" onPress={() => setShowStartPicker(true)}>
               <Text style={styles.dateLabel}>Inicio</Text>
               <Text style={styles.dateValue}>
                 {startedAt ? formatDateEs(startedAt) : "Sin registrar"}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.dateRow} onPress={() => setShowEndPicker(true)}>
+            <TouchableOpacity style={styles.dateRow} accessibilityRole="button" accessibilityLabel="Cambiar fecha de fin" onPress={() => setShowEndPicker(true)}>
               <Text style={styles.dateLabel}>Fin</Text>
               <Text style={styles.dateValue}>
                 {finishedAt ? formatDateEs(finishedAt) : "Sin registrar"}
@@ -531,16 +553,22 @@ export default function EditBookScreen({ route, navigation }) {
             <Text style={styles.label}>Valoración</Text>
             <View style={styles.starsRow}>
               {[1, 2, 3, 4, 5].map((star) => (
-                <TouchableOpacity key={star} onPress={() => setRating(star)}>
+                <TouchableOpacity
+                  key={star}
+                  accessibilityRole="button"
+                  accessibilityLabel={`${star} estrella${star === 1 ? "" : "s"}${rating === star ? ". Seleccionado" : ""}`}
+                  onPress={() => setRating(star)}
+                >
                   <Ionicons
                     name={star <= rating ? "star" : "star-outline"}
                     size={32}
                     color={star <= rating ? colors.star : colors.textDim}
+                    accessible={false}
                   />
                 </TouchableOpacity>
               ))}
               {rating > 0 && (
-                <TouchableOpacity style={styles.clearRating} onPress={() => setRating(0)}>
+                <TouchableOpacity style={styles.clearRating} accessibilityRole="button" accessibilityLabel="Quitar valoración" onPress={() => setRating(0)}>
                   <Text style={styles.clearRatingText}>Quitar</Text>
                 </TouchableOpacity>
               )}
@@ -570,7 +598,7 @@ export default function EditBookScreen({ route, navigation }) {
         />
       )}
 
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+      <TouchableOpacity style={styles.saveBtn} accessibilityRole="button" accessibilityLabel={isCreate ? "Agregar a mi biblioteca" : "Guardar cambios"} onPress={handleSave} disabled={saving}>
         {saving ? (
           <ActivityIndicator color={colors.onAccent} />
         ) : (

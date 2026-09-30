@@ -47,7 +47,11 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
           {value > 0 ? (formatValue ? formatValue(value) : value) : ""}
         </Text>
       ) : null}
-      <View style={[styles.track, { height: barArea, backgroundColor: colors.surfaceAlt }]}>
+      <View
+  style={[styles.track, { height: barArea, backgroundColor: colors.surfaceAlt }]}
+  accessible={false}
+  importantForAccessibility="no-hide-descendants"
+>
         <Animated.View
           style={[
             styles.bar,

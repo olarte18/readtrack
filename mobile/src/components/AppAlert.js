@@ -80,6 +80,8 @@ export function AppAlertHost() {
                     destructive && styles.btnDanger,
                     cancel ? styles.btnCancel : styles.btnPrimary,
                   ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={btn.text}
                   onPress={() => handlePress(btn)}
                 >
                   <Text

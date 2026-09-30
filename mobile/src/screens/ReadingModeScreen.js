@@ -16,26 +16,26 @@ export default function ReadingModeScreen({ route, navigation }) {
       <Text style={styles.bookTitle} numberOfLines={2}>{book.title}</Text>
       <Text style={styles.subtitle}>¿Cómo quieres leer hoy?</Text>
 
-      <TouchableOpacity style={styles.optionCard} onPress={() => selectMode("stopwatch")}>
-        <View style={styles.optionIcon}>
+      <TouchableOpacity style={styles.optionCard} accessibilityRole="button" accessibilityLabel="Leer con cronómetro" onPress={() => selectMode("stopwatch")}>
+        <View style={styles.optionIcon} accessible={false} importantForAccessibility="no-hide-descendants">
           <Ionicons name="stopwatch" size={28} color={colors.onAccent} />
         </View>
         <View style={styles.optionInfo}>
           <Text style={styles.optionTitle}>Cronómetro</Text>
           <Text style={styles.optionDesc}>Deja que fluya el tiempo y mide lo que leas sin límite.</Text>
         </View>
-        <Ionicons name="chevron-forward" size={22} color={colors.textDim} />
+        <Ionicons name="chevron-forward" size={22} color={colors.textDim} accessible={false} />
       </TouchableOpacity>
 
-      <TouchableOpacity style={styles.optionCard} onPress={() => selectMode("timer")}>
-        <View style={[styles.optionIcon, { backgroundColor: colors.accent }]}>
+      <TouchableOpacity style={styles.optionCard} accessibilityRole="button" accessibilityLabel="Leer con temporizador" onPress={() => selectMode("timer")}>
+        <View style={[styles.optionIcon, { backgroundColor: colors.accent }]} accessible={false} importantForAccessibility="no-hide-descendants">
           <Ionicons name="timer" size={28} color={colors.onAccent} />
         </View>
         <View style={styles.optionInfo}>
           <Text style={styles.optionTitle}>Temporizador</Text>
           <Text style={styles.optionDesc}>Elige cuánto quieres leer y recibe una alarma al terminar.</Text>
         </View>
-        <Ionicons name="chevron-forward" size={22} color={colors.textDim} />
+        <Ionicons name="chevron-forward" size={22} color={colors.textDim} accessible={false} />
       </TouchableOpacity>
     </View>
   );

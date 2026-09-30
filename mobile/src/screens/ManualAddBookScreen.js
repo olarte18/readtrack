@@ -86,8 +86,8 @@ export default function ManualAddBookScreen({ navigation }) {
       >
       <View style={styles.header}>
         <Text style={styles.title}>Agregar manualmente</Text>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={22} color={colors.text} />
+        <TouchableOpacity style={styles.backBtn} accessibilityRole="button" accessibilityLabel="Cerrar" onPress={() => navigation.goBack()}>
+          <Ionicons name="close" size={22} color={colors.text} accessible={false} />
         </TouchableOpacity>
       </View>
 
@@ -100,6 +100,7 @@ export default function ManualAddBookScreen({ navigation }) {
           value={title}
           onChangeText={setTitle}
           onFocus={onFieldFocus("title")}
+          accessibilityLabel="Título"
         />
       </View>
 
@@ -113,6 +114,7 @@ export default function ManualAddBookScreen({ navigation }) {
           value={pages}
           onChangeText={setPages}
           onFocus={onFieldFocus("pages")}
+          accessibilityLabel="Páginas"
         />
       </View>
 
@@ -125,6 +127,7 @@ export default function ManualAddBookScreen({ navigation }) {
           value={author}
           onChangeText={setAuthor}
           onFocus={onFieldFocus("author")}
+          accessibilityLabel="Autor"
         />
       </View>
 
@@ -139,6 +142,7 @@ export default function ManualAddBookScreen({ navigation }) {
           onFocus={onFieldFocus("cover")}
           autoCapitalize="none"
           keyboardType="url"
+          accessibilityLabel="URL de la portada"
         />
       </View>
 
@@ -151,6 +155,7 @@ export default function ManualAddBookScreen({ navigation }) {
           value={publisher}
           onChangeText={setPublisher}
           onFocus={onFieldFocus("publisher")}
+          accessibilityLabel="Editorial"
         />
       </View>
 
@@ -161,6 +166,8 @@ export default function ManualAddBookScreen({ navigation }) {
             <TouchableOpacity
               key={opt.key}
               style={[styles.segBtn, bookType === opt.key && styles.segBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Tipo de libro: ${opt.label}`}
               onPress={() => setBookType(opt.key)}
             >
               <Text style={[styles.segBtnText, bookType === opt.key && styles.segBtnTextActive]}>
@@ -181,6 +188,7 @@ export default function ManualAddBookScreen({ navigation }) {
           value={year}
           onChangeText={setYear}
           onFocus={onFieldFocus("year")}
+          accessibilityLabel="Año"
         />
       </View>
 
@@ -194,6 +202,7 @@ export default function ManualAddBookScreen({ navigation }) {
           onChangeText={setIsbn}
           onFocus={onFieldFocus("isbn")}
           autoCapitalize="none"
+          accessibilityLabel="ISBN"
         />
       </View>
 
@@ -206,6 +215,7 @@ export default function ManualAddBookScreen({ navigation }) {
           value={genre}
           onChangeText={setGenre}
           onFocus={onFieldFocus("genre")}
+          accessibilityLabel="Género"
         />
       </View>
 
@@ -219,6 +229,7 @@ export default function ManualAddBookScreen({ navigation }) {
           onChangeText={setDescription}
           onFocus={onFieldFocus("description")}
           multiline
+          accessibilityLabel="Descripción"
         />
       </View>
 
@@ -229,6 +240,8 @@ export default function ManualAddBookScreen({ navigation }) {
             <TouchableOpacity
               key={opt.key}
               style={[styles.statusBtn, status === opt.key && styles.statusBtnActive]}
+              accessibilityRole="button"
+              accessibilityLabel={`Estado: ${opt.label}`}
               onPress={() => setStatus(opt.key)}
             >
               <Text style={[styles.statusBtnText, status === opt.key && styles.statusBtnTextActive]}>
@@ -239,7 +252,7 @@ export default function ManualAddBookScreen({ navigation }) {
         </View>
       </View>
 
-      <TouchableOpacity style={styles.saveBtn} onPress={handleSave} disabled={saving}>
+      <TouchableOpacity style={styles.saveBtn} accessibilityRole="button" accessibilityLabel="Guardar libro" onPress={handleSave} disabled={saving}>
         {saving ? (
           <ActivityIndicator color={colors.onAccent} />
         ) : (
