@@ -229,7 +229,9 @@ export default function CalendarScreen() {
                         <Text
                           style={[
                             styles.dayText,
-                            infoFor(day) && infoFor(day).counts !== false && styles.dayTextActive,
+                            dayStyleFor(day) === styles.dayCellSecret
+                              ? styles.dayTextSecretDark
+                              : infoFor(day) && infoFor(day).counts !== false && styles.dayTextActive,
                           ]}
                         >
                           {day}
@@ -443,7 +445,8 @@ const createStyles = (colors) =>
   dayCellSelected: { borderWidth: 2, borderColor: colors.text },
   dayText: { fontSize: 13, color: colors.textDim },
   dayTextActive: { color: "#fff", fontWeight: "bold" },
-  dayTextComplete: { color: "#fff", fontWeight: "bold" },
+  dayTextComplete: { color: "#13131f", fontWeight: "bold" },
+  dayTextSecretDark: { color: "#13131f", fontWeight: "bold" },
   legendRow: { flexDirection: "row", alignItems: "center", flexWrap: "wrap", gap: 6, rowGap: 6, marginTop: 12 },
   legendSwatch: { width: 10, height: 10, borderRadius: 3 },
   legendText: { fontSize: 11, color: colors.textDim, marginRight: 10 },

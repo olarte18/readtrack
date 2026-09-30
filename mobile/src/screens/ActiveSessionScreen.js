@@ -1001,5 +1001,5 @@ const createStyles = (colors, isDark) =>
     simpleCoverNoImg: { backgroundColor: "#16161f", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#2a2a3e" },
     simpleBookTitle: { color: "#fff", fontSize: 15, fontWeight: "bold", width: "70%", textAlign: "center", marginBottom: 10 },
     simpleTimer: { color: "#999", fontSize: 14, marginBottom: 10 },
-    simpleHint: { color: "#555", fontSize: 12, position: "absolute", bottom: 40 },
+    simpleHint: { color: "#777", fontSize: 12, position: "absolute", bottom: 40 },
   });
