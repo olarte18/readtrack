@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { View, Text, Image, TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
@@ -11,7 +12,7 @@ const STATUS_LABEL = {
 
 export default function BookCard({ book, onPress }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const statusText = book.status ? STATUS_LABEL[book.status] : null;
   const pagesText =
     book.status === "reading" && book.current_page && book.pages

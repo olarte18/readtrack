@@ -1,10 +1,10 @@
-import { useEffect, useRef } from "react";
+import { useMemo, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, Animated, Easing } from "react-native";
 
 export default function ActivityChart({ data = [], colors, showValues = true, height = 150, formatValue, maxValue }) {
   const scaleMax = maxValue && maxValue > 0 ? maxValue : Math.max(1, ...data.map((d) => d.value));
   const barArea = height - 30;
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
     <View style={[styles.row, { height }]}>

@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useMemo, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
@@ -79,7 +79,7 @@ function Confetti() {
 
 export function CelebrationModal({ items, onClose }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const scale = useSharedValue(0.6);
   const opacity = useSharedValue(0);
 

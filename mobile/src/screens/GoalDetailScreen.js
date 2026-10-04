@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
-import { getGoalDetail } from "../services/api";
-
+import { getGoalDetail, logUnexpectedError } from "../services/api";
 const TITLES = {
   "annual:books": "Libros completados este año",
   "monthly:books": "Libros completados este mes",
@@ -30,7 +29,7 @@ function formatDate(str) {
 
 export default function GoalDetailScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { type = "annual", metric = "books", year } = route.params ?? {};
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -43,7 +42,7 @@ export default function GoalDetailScreen({ route, navigation }) {
       const res = await getGoalDetail(type, metric, year);
       setData(res);
     } catch (e) {
-      console.error(e);
+      logUnexpectedError(e);
       setError(true);
     } finally {
       setLoading(false);

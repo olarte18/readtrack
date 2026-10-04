@@ -1,10 +1,10 @@
-import { useEffect, useState, useCallback } from "react";
+import { useMemo, useEffect, useState, useCallback } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
-import { getLibrary, getReadingSpeed, getStreak, getGoals } from "../services/api";
+import { getLibrary, getReadingSpeed, getStreak, getGoals, logUnexpectedError } from "../services/api";
 import { getPending } from "../services/offline";
 import { streakWithLocal, goalsWithLocal } from "../utils/offlineCompute";
 import { reconcileStreakReminder } from "../services/streakReminder";
@@ -23,7 +23,7 @@ const formatRemaining = (minutes) => {
 export default function ReadingScreen({ navigation }) {
   const { colors } = useTheme();
   const { user } = useAuth();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [books, setBooks] = useState([]);
   const [speeds, setSpeeds] = useState({});
   const [streak, setStreak] = useState(null);
@@ -47,7 +47,7 @@ export default function ReadingScreen({ navigation }) {
       );
       setSpeeds(Object.fromEntries(entries));
     } catch (e) {
-      console.error(e);
+      logUnexpectedError(e);
     } finally {
       setLoading(false);
     }
@@ -64,8 +64,8 @@ export default function ReadingScreen({ navigation }) {
             reconcileStreakReminder(user.id, { hasSessionToday: !!live?.hasSessionToday, streak: live?.current ?? 0 }).catch(() => {});
           }
         })
-        .catch(console.error);
-      getGoals().then(async (g) => setGoals(g?.fromCache ? goalsWithLocal(g, await getPending()) : g)).catch(console.error);
+        .catch(logUnexpectedError);
+      getGoals().then(async (g) => setGoals(g?.fromCache ? goalsWithLocal(g, await getPending()) : g)).catch(logUnexpectedError);
     }, [user])
   );
 

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TextInput, StyleSheet, TouchableOpacity, KeyboardAvoidingView, Platform, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
@@ -10,7 +10,7 @@ import { updateNote } from "../services/api";
 // refresque su lista al volver.
 export default function NoteEditorScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { note, onGoBack } = route.params;
   const [content, setContent] = useState(note?.content ?? "");
   const [page, setPage] = useState(note?.page != null ? String(note.page) : "");

@@ -1,9 +1,9 @@
-import { useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { View, Text, FlatList, StyleSheet, Image, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
-import { getAllNotes, deleteNote } from "../services/api";
+import { getAllNotes, deleteNote, logUnexpectedError } from "../services/api";
 import { AppAlert } from "../components/AppAlert";
 
 const formatDate = (iso) => {
@@ -14,7 +14,7 @@ const formatDate = (iso) => {
 
 export default function NotesScreen({ navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -24,7 +24,7 @@ export default function NotesScreen({ navigation }) {
       setLoading(true);
       getAllNotes()
         .then((rows) => { if (!cancelled) setNotes(rows); })
-        .catch(console.error)
+        .catch(logUnexpectedError)
         .finally(() => { if (!cancelled) setLoading(false); });
       return () => { cancelled = true; };
     }, [])
@@ -110,7 +110,7 @@ export default function NotesScreen({ navigation }) {
           ListEmptyComponent={
             <Text style={styles.empty}>Aún no tienes notas{"\n"}Escríbelas desde la página de un libro</Text>
           }
-          onRefresh={() => getAllNotes().then(setNotes).catch(console.error)}
+          onRefresh={() => getAllNotes().then(setNotes).catch(logUnexpectedError)}
           refreshing={loading && notes.length > 0}
         />
       )}

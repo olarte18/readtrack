@@ -1,9 +1,8 @@
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
-import { getReadingSessions } from "../services/api";
-
+import { getReadingSessions, logUnexpectedError } from "../services/api";
 function formatDuration(minutes) {
   const m = Math.round(minutes);
   const h = Math.floor(m / 60);
@@ -45,7 +44,7 @@ function sessionProgressLabel(s, readingMode) {
 
 export default function BookSessionsScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { id: userBookId, title, author, cover, readingMode = "page", onGoBack } = route.params;
   const [sessions, setSessions] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,7 +57,7 @@ export default function BookSessionsScreen({ route, navigation }) {
       const list = await getReadingSessions(userBookId);
       setSessions(list);
     } catch (e) {
-      console.error(e);
+      logUnexpectedError(e);
       setSessions([]);
     } finally {
       setLoading(false);

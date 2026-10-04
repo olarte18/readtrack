@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { Modal, View, Text, StyleSheet, TouchableOpacity, Switch, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -22,7 +22,7 @@ const formatTime = (hour, minute) => {
 // Modo "settings": apartado en Perfil, siempre disponible.
 export default function StreakReminderModal({ visible, onClose, userId, mode = "invite", onActivated }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [step, setStep] = useState("ask");
   const [cfg, setCfg] = useState({ ...DEFAULT_CONFIG });

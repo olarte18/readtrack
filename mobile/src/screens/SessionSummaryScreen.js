@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useMemo, useEffect, useRef, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, Modal, Animated } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
@@ -38,7 +38,7 @@ const goalDescription = (goal) => {
 
 export default function SessionSummaryScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { book, readSeconds, endPage, speed, streakInfo, streakAlmost, completed, goalJustCompleted = [], delta, offline } = route.params;
   const [rating, setRating] = useState(0);
 

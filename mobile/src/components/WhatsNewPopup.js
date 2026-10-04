@@ -1,3 +1,4 @@
+import { useMemo } from "react";
 import { Modal, View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from "@react-navigation/native";
@@ -8,7 +9,7 @@ import { RELEASE_NOTES } from "../data/whatsNew";
 // Aparece una sola vez por versión; la sección del Perfil dura 7 días.
 export default function WhatsNewPopup({ visible, onClose }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const navigation = useNavigation();
 
   return (

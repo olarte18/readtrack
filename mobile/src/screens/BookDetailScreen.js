@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
-import { updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, reReadBook, getReadingHistory } from "../services/api";
+import { updateBook, checkBook, deleteBook, getNotes, addNote, deleteNote, reReadBook, getReadingHistory, logUnexpectedError } from "../services/api";
 import { getBookDescription } from "../services/openLibrary";
 import { formatPoint } from "../utils/progress";
 import { formatDateEs } from "../utils/dates";
@@ -33,7 +33,7 @@ function formatMinutes(seconds) {
 
 export default function BookDetailScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { book, onGoBack } = route.params;
   const isInLibrary = !!book.status;
 
@@ -61,7 +61,7 @@ export default function BookDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     if (!description && (book.workKey || book.description)) {
-      getBookDescription(book.workKey).then(setDescription).catch(console.error);
+      getBookDescription(book.workKey).then(setDescription).catch(logUnexpectedError);
     }
   }, []);
 
@@ -78,8 +78,8 @@ export default function BookDetailScreen({ route, navigation }) {
 
   useEffect(() => {
     if (alreadyInLibrary && bookDbId) {
-      getNotes(bookDbId).then(setNotes).catch(console.error);
-      getReadingHistory(entryId).then(setHistory).catch(console.error);
+      getNotes(bookDbId).then(setNotes).catch(logUnexpectedError);
+      getReadingHistory(entryId).then(setHistory).catch(logUnexpectedError);
     }
   }, [alreadyInLibrary, bookDbId, entryId]);
 

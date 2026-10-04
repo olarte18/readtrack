@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform, Image, ImageBackground, KeyboardAvoidingView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
@@ -10,7 +10,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { getHiResCover } from "../utils/covers";
 import { AppAlert } from "../components/AppAlert";
 import ValueDial from "../components/ValueDial";
-import { updateBook, addReadingSession, getReadingSpeed, isNetworkError, QUICK_FAIL_MS, OFFLINE_GRACE_MS } from "../services/api";
+import { updateBook, addReadingSession, getReadingSpeed, isNetworkError, QUICK_FAIL_MS, OFFLINE_GRACE_MS, logUnexpectedError } from "../services/api";
 import { enqueue, uuidv4 } from "../services/offline";
 import { markOffline } from "../services/connectivity";
 import { modeLabel, modeUnit, formatPoint, deltaLabel, completionBound, isCompleted, progressFraction, pagesEquivalent, pagesLeftEquivalent } from "../utils/progress";
@@ -33,7 +33,7 @@ const QUICK_MINUTES = [10, 15, 20, 30, 45, 60];
 
 export default function ActiveSessionScreen({ route, navigation }) {
   const { colors, isDark } = useTheme();
-  const styles = createStyles(colors, isDark);
+  const styles = useMemo(() => createStyles(colors, isDark), [colors, isDark]);
   const { book, mode = "stopwatch" } = route.params;
   const isTimer = mode === "timer";
   const readingMode = book.reading_mode ?? "page";
@@ -146,7 +146,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   useEffect(() => {
     getReadingSpeed(book.id).then((data) => {
       if (data.avg_pages_per_hour > 0) setAvgSpeed(data.avg_pages_per_hour);
-    }).catch(console.error);
+    }).catch(logUnexpectedError);
   }, []);
 
   useEffect(() => {

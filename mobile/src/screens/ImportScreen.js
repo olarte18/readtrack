@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { AppAlert } from "../components/AppAlert";
@@ -21,7 +21,7 @@ const looksLikeBookmory = (name) =>
 
 export default function ImportScreen({ navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [fileName, setFileName] = useState(null);
   const [mode, setMode] = useState(null); // 'csv' | 'bookmory'
   const [csv, setCsv] = useState(null);

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { View, Text, TextInput, Image, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useDebouncedCallback } from "use-debounce";
@@ -34,7 +34,7 @@ const STATUS_OPTIONS = [
 
 export default function EditBookScreen({ route, navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { book, dbId, mode } = route.params;
   const isCreate = mode === "create";
   const ubId = route.params?.ubId ?? book.id;

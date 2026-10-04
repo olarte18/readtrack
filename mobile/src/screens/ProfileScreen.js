@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from "react";
+import { useMemo, useState, useEffect, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, TextInput, KeyboardAvoidingView, Platform } from "react-native";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { AppAlert } from "../components/AppAlert";
-import { getGoals, getAchievements, saveGoal } from "../services/api";
+import { getGoals, getAchievements, saveGoal, logUnexpectedError } from "../services/api";
 import { isWhatsNewVisible } from "../utils/whatsNew";
 import StreakReminderModal from "../components/StreakReminderModal";
 import { Ionicons } from "@expo/vector-icons";
@@ -13,7 +13,7 @@ import * as Updates from "expo-updates";
 export default function ProfileScreen({ navigation }) {
   const { user, logout } = useAuth();
   const { colors, theme, setTheme } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [goalData, setGoalData] = useState(null);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
@@ -52,7 +52,7 @@ export default function ProfileScreen({ navigation }) {
       const value = Number(annual?.value) || 0;
       const completed = Number.isInteger(res.progress?.annual) ? res.progress.annual : 0;
       setGoalData({ value, completed, year: res.year });
-    }).catch(console.error);
+    }).catch(logUnexpectedError);
   }, []);
 
   const handleSaveGoal = async () => {

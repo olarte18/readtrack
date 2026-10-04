@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import * as Sharing from "expo-sharing";
@@ -9,7 +9,7 @@ import { exportBackup, exportLibraryCsv } from "../services/api";
 
 export default function ExportScreen({ navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [loading, setLoading] = useState(true);
   const [sharing, setSharing] = useState(false);
   const [sharingCsv, setSharingCsv] = useState(false);

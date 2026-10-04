@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
-import { getStats, getStatsActivity } from "../services/api";
+import { getStats, getStatsActivity, logUnexpectedError } from "../services/api";
 import { getPending } from "../services/offline";
 import { activityWithLocal } from "../utils/offlineCompute";
 import { todayString } from "../utils/dates";
@@ -47,7 +47,7 @@ const formatMinutes = (minutes) => String(Math.round(Number(minutes) || 0));
 
 export default function StatsScreen({ navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const now = useMemo(() => {
     const t = todayString().split("-");
     return { year: Number(t[0]), month: Number(t[1]), iso: todayString() };
@@ -68,7 +68,7 @@ export default function StatsScreen({ navigation }) {
       const res = await getStats(year);
       setStats(res);
     } catch (e) {
-      console.error(e);
+      logUnexpectedError(e);
     }
   }, [year]);
 
@@ -85,7 +85,7 @@ export default function StatsScreen({ navigation }) {
     let cancelled = false;
     getStats(year)
       .then((res) => { if (!cancelled) setStats(res); })
-      .catch((e) => console.error(e));
+      .catch(logUnexpectedError);
     return () => { cancelled = true; };
   }, [year]);
 
@@ -98,7 +98,7 @@ export default function StatsScreen({ navigation }) {
     else params.date = weekDate;
     getStatsActivity(params)
       .then(async (res) => { if (!cancelled) setActivity(res?.fromCache ? activityWithLocal(res, await getPending()) : res); })
-      .catch((e) => console.error(e))
+      .catch(logUnexpectedError)
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
   }, [view, year, month, weekDate]);
@@ -108,7 +108,7 @@ export default function StatsScreen({ navigation }) {
     try {
       await Promise.all([fetchStats(), fetchActivity()]);
     } catch (e) {
-      console.error(e);
+      logUnexpectedError(e);
     } finally {
       setRefreshing(false);
     }

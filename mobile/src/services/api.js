@@ -55,6 +55,12 @@ const isNetworkError = (err) =>
 
 export { isNetworkError };
 
+// Cortes de red y aborts del AbortController son flujo esperado (offline,
+// timeout, cold start de Render): no se loguean como error. El resto sí.
+export function logUnexpectedError(err) {
+  if (!isNetworkError(err)) console.error(err);
+}
+
 const cacheKey = async (path) => {
   const userId = await getUserId();
   return userId ? `cache:${userId}:${path}` : null;

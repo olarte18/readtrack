@@ -16,7 +16,7 @@ const FLING_VELOCITY = 60;
 // al padre una sola vez cuando la rueda se asienta (con un haptic sutil).
 export default function ValueDial({ min, max, value, onChange, unit, label = "Valor" }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const safeMin = min;
   const safeMax = Math.max(safeMin, max);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useMemo, useState, useEffect, useCallback, useRef } from "react";
 import { Modal, View, Text, StyleSheet, TouchableOpacity } from "react-native";
 import { useTheme } from "../contexts/ThemeContext";
 
@@ -22,7 +22,7 @@ export const AppAlert = {
 
 export function AppAlertHost() {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [, force] = useState(0);
   const configRef = useRef(null);
 

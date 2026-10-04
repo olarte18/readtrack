@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useMemo, useState, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
-import { getGoals, saveGoal } from "../services/api";
+import { getGoals, saveGoal, logUnexpectedError } from "../services/api";
 import { getPending } from "../services/offline";
 import { goalsWithLocal } from "../utils/offlineCompute";
 import { useKeyboardFormScroll } from "../hooks/useKeyboardFormScroll";
@@ -19,7 +19,7 @@ const METRIC_LABELS = { books: "libros", hours: "horas", minutes: "minutos" };
 
 export default function GoalsScreen({ navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState(null);
@@ -34,7 +34,7 @@ export default function GoalsScreen({ navigation }) {
       const res = await getGoals();
       setData(res?.fromCache ? goalsWithLocal(res, await getPending()) : res);
     } catch (e) {
-      console.error(e);
+      logUnexpectedError(e);
     } finally {
       setLoading(false);
     }

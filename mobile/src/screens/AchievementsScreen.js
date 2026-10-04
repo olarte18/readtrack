@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from "react";
+import { useMemo, useState, useRef, useCallback } from "react";
 import { View, Text, ScrollView, StyleSheet, ActivityIndicator, TouchableOpacity, Modal } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -18,7 +18,7 @@ const TIER_LABELS = {
 
 function AchievementDetailModal({ item, onClose }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   if (!item) return null;
   const tierColor = item.tier && TIER_COLORS[item.tier] ? TIER_COLORS[item.tier] : colors.accent;
 
@@ -60,7 +60,7 @@ function AchievementDetailModal({ item, onClose }) {
 
 function ProgressBlock({ item, variant = "grid" }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const isDetail = variant === "detail";
   const trackStyle = isDetail ? styles.detailProgressTrack : styles.progressTrack;
   const fillStyle = isDetail ? styles.detailProgressFill : styles.progressFill;
@@ -94,7 +94,7 @@ function ProgressBlock({ item, variant = "grid" }) {
 
 export default function AchievementsScreen({ navigation }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);

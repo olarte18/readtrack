@@ -1,10 +1,10 @@
-import { useState, useCallback } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Image, TextInput, Modal, RefreshControl, KeyboardAvoidingView, Platform } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
-import { getCalendar, getReadingSessions, updateReadingSession } from "../services/api";
+import { getCalendar, getReadingSessions, updateReadingSession, logUnexpectedError } from "../services/api";
 import { getPending } from "../services/offline";
 import { calendarWithLocal } from "../utils/offlineCompute";
 import { todayString } from "../utils/dates";
@@ -18,7 +18,7 @@ const SECRET_MINUTES = 180;
 
 export default function CalendarScreen() {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const now = new Date();
   const [year, setYear] = useState(now.getFullYear());
   const [month, setMonth] = useState(now.getMonth() + 1);
@@ -39,7 +39,7 @@ export default function CalendarScreen() {
       setSelectedDate(year === Number(t[0]) && month === Number(t[1]) ? todayString() : null);
       getCalendar(year, month)
         .then(async (res) => { if (!cancelled) setData(res?.fromCache ? calendarWithLocal(res, await getPending()) : res); })
-        .catch((e) => console.error(e))
+        .catch(logUnexpectedError)
         .finally(() => { if (!cancelled) setLoading(false); });
       return () => { cancelled = true; };
     }, [year, month])
@@ -50,7 +50,7 @@ export default function CalendarScreen() {
       const res = await getCalendar(year, month);
       setData(res?.fromCache ? calendarWithLocal(res, await getPending()) : res);
     } catch (e) {
-      console.error(e);
+      logUnexpectedError(e);
     }
   };
 

@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback, useMemo } from "react";
 
-import { getLibrary, getLibraryCached } from "../services/api";
+import { getLibrary, getLibraryCached, isNetworkError } from "../services/api";
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, ScrollView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -41,7 +41,7 @@ const STATUS_LABEL = {
 
 export default function HomeScreen({ navigation, route }) {
   const { colors } = useTheme();
-  const styles = createStyles(colors);
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
   const { filterStatus } = route?.params ?? {};
@@ -68,7 +68,7 @@ export default function HomeScreen({ navigation, route }) {
       const data = await getLibrary();
       setBooks(data);
     } catch (error) {
-      console.error("Error cargando biblioteca:", error);
+      if (!isNetworkError(error)) console.error("Error cargando biblioteca:", error);
     } finally {
       setLoading(false);
     }
