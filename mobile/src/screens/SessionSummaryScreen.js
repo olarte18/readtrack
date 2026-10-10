@@ -72,9 +72,9 @@ export default function SessionSummaryScreen({ route, navigation }) {
           Animated.timing(flameScale, { toValue: 1.12, duration: 650, useNativeDriver: true }),
           Animated.timing(flameScale, { toValue: 1, duration: 650, useNativeDriver: true }),
         ])
-      ),
+), 
     ]).start();
-  }, [streakInfo]);
+  }, [streakInfo]); // eslint-disable-line react-hooks/exhaustive-deps -- loop de animación, no re-disparar
 
   useEffect(() => {
     if (!goalVisible) return;
@@ -90,7 +90,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
         ])
       ),
     ]).start();
-  }, [goalVisible]);
+  }, [goalVisible]); // eslint-disable-line react-hooks/exhaustive-deps -- loop de animación, no re-disparar
 
   const closeStreak = () => {
     setStreakVisible(false);
@@ -137,7 +137,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
           <>
             <Ionicons name="trophy" size={64} color={colors.star} />
             <Text style={styles.title}>¡Felicidades!</Text>
-            <Text style={styles.completedText}>Terminaste "{book.title}"</Text>
+            <Text style={styles.completedText}>Terminaste “{book.title}”</Text>
           </>
         ) : (
           <>

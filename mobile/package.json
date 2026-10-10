@@ -8,7 +8,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "a11y": "node scripts/check-a11y.js",
-    "contrast": "node scripts/check-contrast.js"
+    "contrast": "node scripts/check-contrast.js",
+    "lint": "eslint src --max-warnings 0",
+    "test": "jest --runInBand"
   },
   "dependencies": {
     "@react-native-async-storage/async-storage": "2.2.0",
@@ -44,6 +46,13 @@
   },
   "private": true,
   "devDependencies": {
-    "babel-preset-expo": "~54.0.12"
+    "babel-preset-expo": "~54.0.12",
+    "eslint": "^9.39.5",
+    "eslint-config-expo": "~10.0.0",
+    "jest": "~29.7.0",
+    "jest-expo": "~54.0.18"
+  },
+  "jest": {
+    "preset": "jest-expo"
   }
 }

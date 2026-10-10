@@ -86,7 +86,7 @@ export default function ExportScreen({ navigation }) {
       <Text style={styles.title}>Exportar datos</Text>
       <Text style={styles.subtitle}>
         Genera un respaldo completo de tu biblioteca: libros (incluidos archivados), sesiones de lectura, notas,
-        ciclos y metas. Podrás restaurarlo en otro teléfono desde "Importar biblioteca". También puedes descargar
+        ciclos y metas. Podrás restaurarlo en otro teléfono desde “Importar biblioteca”. También puedes descargar
         la biblioteca en CSV estilo Goodreads para llevarla a otra app.
       </Text>
 

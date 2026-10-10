@@ -76,7 +76,6 @@ export default function HomeScreen({ navigation, route }) {
 
   useEffect(() => {
     fetchLibrary();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refresca al volver al tab: refleja cambios de estado, imports y sesiones

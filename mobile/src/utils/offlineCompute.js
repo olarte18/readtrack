@@ -6,7 +6,6 @@ import { todayString, addDays, diffDays } from "./dates";
 // corrimientos. Port de api/src/utils/streaks.js usando todayString() local.
 export function computeStreaks(dates) {
   const set = new Set(dates);
-  const DAY_MS = 86400000;
 
   let current = 0;
   let cursor = todayString();
@@ -28,7 +27,6 @@ export function computeStreaks(dates) {
   return { current, best };
 }
 
-const DAY_MS = 86400000;
 const epochDay = (ms) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/Bogota", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(ms));
 

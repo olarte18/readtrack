@@ -47,7 +47,7 @@ function ConfettiPiece({ piece }) {
       )
     );
     rotate.value = withDelay(piece.delay, withRepeat(withTiming(360, { duration: piece.duration }), -1, false));
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- setup único del confeti
   const style = useAnimatedStyle(() => ({
     transform: [{ translateY: translateY.value }, { rotate: `${rotate.value}deg` }],
   }));
@@ -86,7 +86,7 @@ export function CelebrationModal({ items, onClose }) {
   useEffect(() => {
     scale.value = withSpring(1, { damping: 9, stiffness: 140 });
     opacity.value = withSpring(1);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- animación única de entrada
 
   const cardStyle = useAnimatedStyle(() => ({
     opacity: opacity.value,

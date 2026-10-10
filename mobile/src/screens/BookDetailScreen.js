@@ -63,7 +63,7 @@ export default function BookDetailScreen({ route, navigation }) {
     if (!description && (book.workKey || book.description)) {
       getBookDescription(book.workKey).then(setDescription).catch(logUnexpectedError);
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- descarga única al abrir la pantalla
 
   useEffect(() => {
     if (!isInLibrary && book.id) {
@@ -74,7 +74,7 @@ export default function BookDetailScreen({ route, navigation }) {
         }
       });
     }
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- chequeo único al abrir la pantalla
 
   useEffect(() => {
     if (alreadyInLibrary && bookDbId) {

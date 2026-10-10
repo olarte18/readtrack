@@ -45,7 +45,7 @@ function sessionProgressLabel(s, readingMode) {
 export default function BookSessionsScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { id: userBookId, title, author, cover, readingMode = "page", onGoBack } = route.params;
+  const { id: userBookId, title, author, cover, readingMode = "page" } = route.params;
   const [sessions, setSessions] = useState(null);
   const [loading, setLoading] = useState(true);
   const [sortKey, setSortKey] = useState("date");

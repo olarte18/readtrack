@@ -147,7 +147,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
     getReadingSpeed(book.id).then((data) => {
       if (data.avg_pages_per_hour > 0) setAvgSpeed(data.avg_pages_per_hour);
     }).catch(logUnexpectedError);
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps -- book.id es constante en esta pantalla
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
@@ -176,7 +176,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
       appState.current = nextState;
     });
     return () => subscription.remove();
-  }, [running, isTimer]);
+  }, [running, isTimer]); // eslint-disable-line react-hooks/exhaustive-deps -- hasNative se re-lee al togglear la sesión
 
   useEffect(() => {
     if (running) {
@@ -671,7 +671,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
           <TouchableOpacity style={styles.fsiBtn} accessibilityRole="button" onPress={openFullScreenIntentSettings}>
             <Ionicons name="expand-outline" size={16} color={colors.accent} accessible={false} />
             <Text style={styles.fsiBtnText}>
-              ¿No salta a pantalla completa? Permite "Alarmas y recordatorios"
+              ¿No salta a pantalla completa? Permite “Alarmas y recordatorios”
             </Text>
           </TouchableOpacity>
         )}

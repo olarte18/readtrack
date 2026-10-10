@@ -7,10 +7,8 @@ import { useTheme } from "../contexts/ThemeContext";
 // nativo en toda la app (misma firma: title, message, buttons).
 
 let listener = null;
-let current = null;
 
 function setConfig(cfg) {
-  current = cfg;
   if (listener) listener(cfg);
 }
 
