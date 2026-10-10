@@ -5,15 +5,7 @@ import { useTheme } from "../contexts/ThemeContext";
 import { AppAlert } from "../components/AppAlert";
 import { updateBook } from "../services/api";
 import { formatPoint, deltaLabel, progressFraction, completionBound, pagesLeftEquivalent } from "../utils/progress";
-
-const formatTime = (s) => {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  return h > 0
-    ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-    : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-};
+import { formatClock } from "../utils/dates";
 
 const formatMinutes = (min) => {
   if (min >= 60) return `${(min / 60).toFixed(1)}h`;
@@ -196,7 +188,7 @@ export default function SessionSummaryScreen({ route, navigation }) {
           <Ionicons name="time" size={20} color={colors.accent} />
           <View style={styles.rowInfo}>
             <Text style={styles.rowLabel}>Leíste</Text>
-            <Text style={styles.rowValue}>{deltaLabel(book, delta)} · {formatTime(readSeconds)}</Text>
+            <Text style={styles.rowValue}>{deltaLabel(book, delta)} · {formatClock(readSeconds)}</Text>
           </View>
         </View>
         <View style={styles.divider} />

@@ -29,4 +29,15 @@ export const formatDateEs = (iso) => {
   return new Intl.DateTimeFormat("es-CO", { day: "numeric", month: "short", year: "numeric" }).format(new Date(y, m - 1, d));
 };
 
+// Formatea una duración en segundos como reloj: H:MM:SS si hay horas, si no MM:SS.
+export const formatClock = (totalSeconds) => {
+  const s = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  return h > 0
+    ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
+    : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
+};
+
 export const nowIso = () => new Date().toISOString();

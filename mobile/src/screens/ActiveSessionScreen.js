@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef } from "react";
+import { useMemo, useState, useEffect, useRef, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, AppState, ActivityIndicator, Modal, Switch, NativeModules, Platform, Image, ImageBackground, KeyboardAvoidingView } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAudioPlayer, setAudioModeAsync } from "expo-audio";
@@ -10,10 +10,14 @@ import { useTheme } from "../contexts/ThemeContext";
 import { getHiResCover } from "../utils/covers";
 import { AppAlert } from "../components/AppAlert";
 import ValueDial from "../components/ValueDial";
+import SessionTimer from "../components/SessionTimer";
+import SessionStats from "../components/SessionStats";
+import SimpleClock from "../components/SimpleClock";
 import { updateBook, addReadingSession, getReadingSpeed, isNetworkError, QUICK_FAIL_MS, OFFLINE_GRACE_MS, logUnexpectedError } from "../services/api";
 import { enqueue, uuidv4 } from "../services/offline";
 import { markOffline } from "../services/connectivity";
-import { modeLabel, modeUnit, formatPoint, deltaLabel, completionBound, isCompleted, progressFraction, pagesEquivalent, pagesLeftEquivalent } from "../utils/progress";
+import { modeLabel, modeUnit, formatPoint, deltaLabel, completionBound, isCompleted, progressFraction, pagesEquivalent } from "../utils/progress";
+import { sessionSeconds, computeSessionStats } from "../utils/sessionStats";
 import {
   cancelAlarm,
   cancelAlarmSession,
@@ -39,7 +43,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const readingMode = book.reading_mode ?? "page";
   const bound = completionBound(book);
 
-  const [seconds, setSeconds] = useState(0);
+  const [anchor, setAnchor] = useState(() => ({ base: 0, at: Date.now() }));
   const [running, setRunning] = useState(true);
   const [endPage, setEndPage] = useState(String(book.current_page ?? 0));
   const [duration, setDuration] = useState(null);
@@ -52,8 +56,9 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const [finishExplicit, setFinishExplicit] = useState(false);
   const [keepAwake, setKeepAwakeState] = useState(false);
   const [simpleMode, setSimpleMode] = useState(false);
-  const [now, setNow] = useState(() => new Date());
   const savingRef = useRef(false);
+  const anchorRef = useRef(anchor);
+  const runningRef = useRef(true);
 
   const AlarmNative = Platform.OS === "android" ? NativeModules.ReadTrackAlarm : null;
   const hasNative = !!AlarmNative;
@@ -62,8 +67,6 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const dialMax = bound != null ? Math.max(bound, startPage) : null;
   const startTime = useRef(Date.now());
   const appState = useRef(AppState.currentState);
-  const backgroundTime = useRef(null);
-  const intervalRef = useRef(null);
   const alarmFiredRef = useRef(false);
   const alarmIdRef = useRef(null);
   const permissionWarnedRef = useRef(false);
@@ -72,6 +75,35 @@ export default function ActiveSessionScreen({ route, navigation }) {
   const wasRunningBefore = useRef(false);
 
   const alarm = useAudioPlayer(require("../../assets/alarm.wav"));
+
+  // Helpers del "ancla": el reloj es una proyección `{ base, at }` desde una
+  // marca de tiempo, no un contador que acumula drift.
+  const currentSeconds = () => sessionSeconds(isTimer, anchorRef.current, runningRef.current);
+  const applyAnchor = (base, at = Date.now()) => {
+    const a = { base: Math.max(0, Math.round(Number(base) || 0)), at };
+    anchorRef.current = a;
+    setAnchor(a);
+  };
+  const applyRunning = (next) => {
+    let a;
+    if (next) {
+      a = { base: anchorRef.current?.base ?? 0, at: Date.now() };
+    } else {
+      a = { base: sessionSeconds(isTimer, anchorRef.current, runningRef.current), at: Date.now() };
+    }
+    anchorRef.current = a;
+    setAnchor(a);
+    runningRef.current = next;
+    setRunning(next);
+  };
+  // Reconcilia con el servicio nativo (fuente de verdad en segundo plano).
+  const syncFrom = (secs, paused) => {
+    const a = { base: Math.max(0, Math.round(Number(secs) || 0)), at: Date.now() };
+    anchorRef.current = a;
+    setAnchor(a);
+    runningRef.current = !paused;
+    setRunning(!paused);
+  };
 
   useEffect(() => {
     setAudioModeAsync({ playsInSilentMode: true });
@@ -96,8 +128,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
     // en el estado "¡Tiempo cumplido!" para guardar.
     if (route.params?.fromAlarm) {
       setDuration(Number(route.params.alarmSeconds) || 0);
-      setSeconds(0);
-      setRunning(false);
+      applyAnchor(0);
+      applyRunning(false);
       setTimeUp(true);
       // La sesión ya terminó: el inicio real fue lo que duró el temporizador
       // atrás desde ahora (no el momento en que se reabrió la app).
@@ -115,14 +147,13 @@ export default function ActiveSessionScreen({ route, navigation }) {
             setDuration(Math.max(0, Math.round(Number(st.durationMs) / 1000)));
             setTimerStarted(true);
             if (st.fired) {
-              setSeconds(0);
-              setRunning(false);
+              applyAnchor(0);
+              applyRunning(false);
               setTimeUp(true);
               return;
             }
           }
-          setSeconds(Math.max(0, Math.round(Number(st.seconds) || 0)));
-          setRunning(!st.paused);
+          syncFrom(st.seconds, st.paused);
           startTime.current = Date.now() - (Number(st.seconds) || 0) * 1000;
         })
         .catch(() => {});
@@ -151,9 +182,6 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
-      if (appState.current === "active" && nextState.match(/inactive|background/)) {
-        backgroundTime.current = Date.now();
-      }
       if (appState.current.match(/inactive|background/) && nextState === "active") {
         if (hasNative) {
           // El servicio de primer plano es la fuente de verdad mientras la app
@@ -161,95 +189,73 @@ export default function ActiveSessionScreen({ route, navigation }) {
           getAlarmSessionState()
             .then((s) => {
               if (s?.active) {
-                setRunning(!s.paused);
-                setSeconds(Math.max(0, Math.round(Number(s.seconds))));
+                syncFrom(s.seconds, s.paused);
                 if (isTimer && s.fired) setTimeUp(true);
               }
             })
             .catch(() => {});
-        } else if (backgroundTime.current && running) {
-          const elapsed = Math.floor((Date.now() - backgroundTime.current) / 1000);
-          setSeconds((s) => (isTimer ? Math.max(0, s - elapsed) : s + elapsed));
         }
+        // Sin nativo (iOS/web) no hace falta reconcilia manual: el ancla ya se
+        // proyecta con `Date.now()`, así que al volver el tiempo es correcto.
         if (isTimer && alarmFiredRef.current) setTimeUp(true);
       }
       appState.current = nextState;
     });
     return () => subscription.remove();
-  }, [running, isTimer]); // eslint-disable-line react-hooks/exhaustive-deps -- hasNative se re-lee al togglear la sesión
+  }, [isTimer, hasNative]); // syncFrom usa refs y setters estables
 
-  useEffect(() => {
-    if (running) {
-      intervalRef.current = setInterval(
-        () => setSeconds((s) => (isTimer ? (s > 0 ? s - 1 : 0) : s + 1)),
-        1000
-      );
-    } else {
-      clearInterval(intervalRef.current);
-    }
-    return () => clearInterval(intervalRef.current);
-  }, [running, isTimer]);
-
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 1000);
-    return () => clearInterval(id);
-  }, []);
-
-  useEffect(() => {
-    if (!isTimer || !timerStarted || seconds > 0 || alarmFiredRef.current) return;
-    alarmFiredRef.current = true;
-    setRunning(false);
-    if (appState.current !== "active") return;
-    (async () => {
-      // Si la alarma nativa ya sonó (app estaba en segundo plano y volvió),
-      // no repetir el timbre aquí: solo reanudar el flujo de guardado.
-      const st = hasNative ? await getAlarmSessionState().catch(() => null) : null;
-      if (st?.fired) {
-        cancelAlarmSession();
-        setTimeUp(true);
-        return;
-      }
-      cancelSessionAlarm();
-      try {
-        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch {}
-      alarm.loop = true;
-      alarm.play();
-      AppAlert.alert(
-        "Tiempo cumplido",
-        `¡Terminaste tu sesión de ${Math.round(duration / 60)} minutos!`,
-        [
-          {
-            text: "Detener alarma",
-            onPress: () => {
-              alarm.pause();
-              alarm.seekTo(0);
-              cancelSessionAlarm();
-              setTimeUp(true);
-            },
-          },
-        ]
-      );
-    })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [seconds, isTimer, timerStarted, duration]);
-
-  const cancelSessionAlarm = () => {
+  const cancelSessionAlarm = useCallback(() => {
     if (hasNative) {
       cancelAlarmSession();
-    } else {
-      cancelTimerAlarm();
+    } else if (alarmIdRef.current !== null) {
+      cancelAlarm(alarmIdRef.current);
+      alarmIdRef.current = null;
     }
-  };
+  }, [hasNative]);
 
-  const formatTime = (s) => {
-    const h = Math.floor(s / 3600);
-    const m = Math.floor((s % 3600) / 60);
-    const sec = s % 60;
-    return h > 0
-      ? `${h}:${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`
-      : `${String(m).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
-  };
+  const handleTimerFire = useCallback(async () => {
+    if (alarmFiredRef.current) return;
+    alarmFiredRef.current = true;
+    applyAnchor(0);
+    applyRunning(false);
+    if (appState.current !== "active") return;
+    // Si la alarma nativa ya sonó (app estaba en segundo plano y volvió), no
+    // repetir el timbre aquí: solo reanudar el flujo de guardado.
+    const st = hasNative ? await getAlarmSessionState().catch(() => null) : null;
+    if (st?.fired) {
+      cancelAlarmSession();
+      setTimeUp(true);
+      return;
+    }
+    cancelSessionAlarm();
+    try {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {}
+    alarm.loop = true;
+    alarm.play();
+    AppAlert.alert(
+      "Tiempo cumplido",
+      `¡Terminaste tu sesión de ${Math.round(duration / 60)} minutos!`,
+      [
+        {
+          text: "Detener alarma",
+          onPress: () => {
+            alarm.pause();
+            alarm.seekTo(0);
+            cancelSessionAlarm();
+            setTimeUp(true);
+          },
+        },
+      ]
+    );
+  }, [hasNative, duration, alarm, cancelSessionAlarm]); // eslint-disable-line react-hooks/exhaustive-deps -- applyAnchor/applyRunning usan refs
+
+  useEffect(() => {
+    if (!isTimer || !timerStarted || !running) return;
+    const remaining = sessionSeconds(true, anchor, true);
+    const id = setTimeout(handleTimerFire, Math.max(0, remaining) * 1000 + 100);
+    return () => clearTimeout(id);
+  }, [isTimer, timerStarted, running, anchor, handleTimerFire]);
 
   const stopAlarm = () => {
     alarm.pause();
@@ -313,9 +319,9 @@ export default function ActiveSessionScreen({ route, navigation }) {
     alarmFiredRef.current = false;
     startTime.current = Date.now();
     setDuration(min * 60);
-    setSeconds(min * 60);
+    applyAnchor(min * 60);
+    applyRunning(true);
     setTimerStarted(true);
-    setRunning(true);
     requestTimerPermission();
     try {
       Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -328,19 +334,13 @@ export default function ActiveSessionScreen({ route, navigation }) {
   };
 
   const pauseClock = () => {
-    if (running) {
-      if (isTimer) {
-        if (hasNative) {
-          setAlarmSessionPaused(true);
-        } else {
-          cancelTimerAlarm();
-        }
-        setRunning(false);
-      } else {
-        setRunning(false);
-        if (hasNative) setAlarmSessionPaused(true);
-      }
+    if (!running) return;
+    if (hasNative) {
+      setAlarmSessionPaused(true);
+    } else if (isTimer) {
+      cancelTimerAlarm();
     }
+    applyRunning(false);
   };
 
   const resumeClock = () => {
@@ -349,13 +349,12 @@ export default function ActiveSessionScreen({ route, navigation }) {
       if (hasNative) {
         setAlarmSessionPaused(false);
       } else {
-        scheduleTimerAlarm(seconds * 1000);
+        scheduleTimerAlarm(currentSeconds() * 1000);
       }
-      setRunning(true);
-    } else {
-      setRunning(true);
-      if (hasNative) setAlarmSessionPaused(false);
+    } else if (hasNative) {
+      setAlarmSessionPaused(false);
     }
+    applyRunning(true);
   };
 
   const togglePause = () => {
@@ -404,44 +403,21 @@ export default function ActiveSessionScreen({ route, navigation }) {
     }
   };
 
-  const clockText = () => {
-    const h = now.getHours();
-    const m = now.getMinutes();
-    return `${h}:${String(m).padStart(2, "0")}`;
-  };
-
   const endPageVal = parseInt(endPage || "0", 10);
   const canAutoComplete = bound != null && endPageVal >= bound;
   const showFinishBook = book.status !== "completed" && !canAutoComplete && endPageVal >= startPage;
   const modeDelta = Math.max(0, endPageVal - startPage);
-  const equivalentPages = pagesEquivalent(book, endPage, startPage);
-  const hoursElapsed = (isTimer ? (duration ?? 0) - seconds : seconds) / 3600;
-  const estimatedEqPages = avgSpeed && hoursElapsed > 0 ? Math.round(avgSpeed * hoursElapsed) : null;
-  const currentSpeedH = hoursElapsed > 0 && equivalentPages > 0 ? equivalentPages / hoursElapsed : 0;
-  const effectiveSpeed = currentSpeedH > 0 ? (avgSpeed ? (currentSpeedH + avgSpeed) / 2 : currentSpeedH) : (avgSpeed ?? 0);
-  const pagesPerHour = effectiveSpeed;
-  const remainingEqPages = pagesLeftEquivalent(book, endPage);
-  const minutesLeft = pagesPerHour > 0 && remainingEqPages !== null ? remainingEqPages / (pagesPerHour / 60) : null;
-
-  const readLabel =
-    readingMode === "page" ? "Páginas leídas" : readingMode === "percentage" ? "Avance" : "Capítulos";
-  const readValue =
-    estimatedEqPages == null
-      ? "—"
-      : readingMode === "page"
-        ? String(estimatedEqPages)
-        : readingMode === "percentage"
-          ? book.pages ? `${Math.round((estimatedEqPages / book.pages) * 100)}%` : "—"
-          : book.pages && book.chapters ? String(Math.round((estimatedEqPages / book.pages) * book.chapters)) : "—";
 
   const saveSession = async ({ page, pages }) => {
     if (savingRef.current) return; // toques repetidos se ignoran al instante
     savingRef.current = true;
     setSaving(true);
-    setRunning(false);
+    const sec = currentSeconds();
+    const readSeconds = isTimer ? (duration ?? 0) - sec : sec;
+    const { pagesPerHour } = computeSessionStats({ book, endPage: page, startPage, avgSpeed, isTimer, duration, seconds: sec });
+    applyRunning(false);
     stopAlarm();
     cancelSessionAlarm();
-    const readSeconds = isTimer ? (duration ?? 0) - seconds : seconds;
     try {
       const completed = finishExplicit || isCompleted(book, page);
       const startedAt = new Date(startTime.current).toISOString();
@@ -747,9 +723,8 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
   if (simpleMode) {
     return (
-      <TouchableOpacity style={styles.simpleContainer} activeOpacity={1} accessibilityRole="button" accessibilityLabel={`Modo simple. ${book.title}. ${clockText()}`} accessibilityHint="Toca la pantalla para volver" onPress={exitSimpleMode}>
-        <Text style={styles.simpleClock}>{clockText()}</Text>
-        <Text style={styles.simpleDate}>{now.toLocaleDateString("es-CO", { weekday: "long", day: "numeric", month: "long" })}</Text>
+      <TouchableOpacity style={styles.simpleContainer} activeOpacity={1} accessibilityRole="button" accessibilityLabel={`Modo simple. ${book.title}`} accessibilityHint="Toca la pantalla para volver" onPress={exitSimpleMode}>
+        <SimpleClock />
         {book.cover ? (
           <Image source={{ uri: book.cover }} style={styles.simpleCover} resizeMode="cover" accessible={false} importantForAccessibility="no-hide-descendants" />
         ) : (
@@ -758,7 +733,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
           </View>
         )}
         <Text style={styles.simpleBookTitle} numberOfLines={1}>{book.title}</Text>
-        <Text style={styles.simpleTimer}>{isTimer ? "Tiempo restante" : "Tiempo transcurrido"} · {formatTime(seconds)}</Text>
+        <Text style={styles.simpleTimer}>{isTimer ? "Tiempo restante" : "Tiempo transcurrido"} · <SessionTimer isTimer={isTimer} anchor={anchor} running={running} label={null} /></Text>
         <Text style={styles.simpleHint}>Toca la pantalla para volver</Text>
       </TouchableOpacity>
     );
@@ -783,7 +758,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
 
       <View style={styles.timerContainer}>
         <Text style={styles.timerLabel}>{isTimer ? "Tiempo restante" : "Tiempo transcurrido"}</Text>
-        <Text style={styles.timer}>{formatTime(seconds)}</Text>
+        <SessionTimer isTimer={isTimer} anchor={anchor} running={running} style={styles.timer} />
         <TouchableOpacity style={styles.pauseBtn} accessibilityRole="button" accessibilityLabel={running ? "Pausar" : "Continuar"} onPress={togglePause}>
           <View style={styles.pauseBtnRow}>
             <Ionicons name={running ? "pause" : "play"} size={18} color={colors.accent} accessible={false} />
@@ -822,28 +797,16 @@ export default function ActiveSessionScreen({ route, navigation }) {
         </View>
       </View>
 
-      <View style={styles.statsContainer}>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>{readValue}</Text>
-          <Text style={styles.statLabel}>{readLabel}</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {pagesPerHour > 0 ? pagesPerHour.toFixed(0) : "—"}
-          </Text>
-          <Text style={styles.statLabel}>Págs/h</Text>
-        </View>
-        <View style={styles.statItem}>
-          <Text style={styles.statValue}>
-            {minutesLeft !== null && minutesLeft > 0
-              ? minutesLeft > 60
-                ? `${(minutesLeft / 60).toFixed(1)}h`
-                : `${Math.round(minutesLeft)}min`
-              : "—"}
-          </Text>
-          <Text style={styles.statLabel}>Para terminar</Text>
-        </View>
-      </View>
+      <SessionStats
+        book={book}
+        endPage={endPage}
+        startPage={startPage}
+        avgSpeed={avgSpeed}
+        isTimer={isTimer}
+        duration={duration}
+        anchor={anchor}
+        running={running}
+      />
 
       {progressFraction(book, endPage) != null && (
         <View style={styles.progressSection}>
@@ -940,10 +903,6 @@ const createStyles = (colors, isDark) =>
     pageBox: { backgroundColor: colors.surface, borderRadius: 12, padding: 12, alignItems: "center", minWidth: 96 },
     pageBoxLabel: { color: colors.textDim, fontSize: 11, marginBottom: 6 },
     pageBoxValue: { color: colors.text, fontSize: 26, fontWeight: "bold" },
-    statsContainer: { flexDirection: "row", justifyContent: "space-around", backgroundColor: colors.surface, borderRadius: 12, padding: 12, marginBottom: 18 },
-    statItem: { alignItems: "center" },
-    statValue: { fontSize: 22, fontWeight: "bold", color: colors.accent },
-    statLabel: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
     progressSection: { marginBottom: 18 },
     progressLabel: { color: colors.textMuted, fontSize: 13, marginBottom: 8, textAlign: "center" },
     progressContainer: { height: 8, backgroundColor: colors.surfaceAlt, borderRadius: 4, overflow: "hidden" },
@@ -995,8 +954,6 @@ const createStyles = (colors, isDark) =>
       justifyContent: "center",
       paddingHorizontal: 32,
     },
-    simpleClock: { fontSize: 92, fontWeight: "200", color: "#fff", fontVariant: ["tabular-nums"], letterSpacing: 2 },
-    simpleDate: { fontSize: 14, color: "#777", marginTop: 4, textTransform: "capitalize", marginBottom: 36 },
     simpleCover: { width: 130, height: 195, borderRadius: 12, marginBottom: 22 },
     simpleCoverNoImg: { backgroundColor: "#16161f", alignItems: "center", justifyContent: "center", borderWidth: 1, borderColor: "#2a2a3e" },
     simpleBookTitle: { color: "#fff", fontSize: 15, fontWeight: "bold", width: "70%", textAlign: "center", marginBottom: 10 },
