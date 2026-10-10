@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>ReadTrack — Registra y mejora tus lecturas</title>
+  <meta name="description" content="ReadTrack es la app para registrar tus lecturas, seguir tus rachas, fijar metas y ver tus estadísticas. Disponible en Google Play." />
+  <link rel="icon" href="/assets/favicon.png" />
+  <meta property="og:title" content="ReadTrack" />
+  <meta property="og:description" content="Registra tus lecturas, sigue tus rachas y cumple tus metas." />
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content="https://readtrack.online/" />
+  <meta property="og:image" content="https://readtrack.online/assets/icon-512.png" />
+  <link rel="stylesheet" href="/styles.css" />
+</head>
+<body>
+  <header class="site">
+    <div class="wrap">
+      <a class="brand" href="/">
+        <img src="/assets/readtrack-logo.svg" alt="" width="40" height="40" />
+        <span>ReadTrack</span>
+      </a>
+      <nav class="site" aria-label="Principal">
+        <a href="/soporte">Soporte</a>
+        <a href="/privacidad">Privacidad</a>
+        <a href="/terminos">Términos</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <section class="hero">
+        <img class="logo" src="/assets/readtrack-logo.svg" alt="Logotipo de ReadTrack" width="104" height="104" />
+        <h1>Lee más, con constancia</h1>
+        <p class="lead">
+          ReadTrack es la app para registrar tus lecturas, seguir tus rachas,
+          fijar metas diarias, semanales o mensuales y ver tus estadísticas con el tiempo.
+        </p>
+        <a class="btn" href="https://play.google.com/store/apps/details?id=com.alejandro.readtrack">
+          Descargar en Google Play
+        </a>
+      </section>
+
+      <section aria-labelledby="features-title">
+        <h2 id="features-title" style="text-align:center">Todo para tu hábito de lectura</h2>
+        <div class="features">
+          <div class="card">
+            <h3>Biblioteca y progreso</h3>
+            <p>Organiza tus libros, marca tus avances y retoma justo donde quedaste.</p>
+          </div>
+          <div class="card">
+            <h3>Rachas y metas</h3>
+            <p>Mantén la motivación con rachas y metas que se adaptan a tu ritmo.</p>
+          </div>
+          <div class="card">
+            <h3>Estadísticas y calendario</h3>
+            <p>Visualiza minutos, páginas y días leídos en un calendario claro.</p>
+          </div>
+          <div class="card">
+            <h3>Notas y logros</h3>
+            <p>Guarda notas por libro y desbloquea logros mientras avanzas.</p>
+          </div>
+        </div>
+      </section>
+    </div>
+  </main>
+
+  <footer class="site">
+    <div class="wrap">
+      <span>© <span id="year">2026</span> ReadTrack</span>
+      <nav aria-label="Pie de página">
+        <a href="/soporte">Soporte</a>
+        <a href="/privacidad">Política de privacidad</a>
+        <a href="/terminos">Términos y condiciones</a>
+      </nav>
+    </div>
+  </footer>
+
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>

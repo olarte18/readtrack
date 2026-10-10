@@ -1,0 +1,6 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg" role="img">
+  <title>ReadTrack logo</title>
+  <rect x="0" y="0" width="200" height="200" rx="45" fill="#CECBF6"/>
+  <path d="M47 32 L153 32 L153 152 L100 121 L47 152 Z" fill="#26215C"/>
+  <path d="M75 87 L91 103 L128 62" fill="none" stroke="#CECBF6" stroke-width="11" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
