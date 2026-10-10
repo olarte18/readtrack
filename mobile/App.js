@@ -35,13 +35,14 @@ import StreakShopScreen from "./src/screens/StreakShopScreen";
 import WhatsNewScreen from "./src/screens/WhatsNewScreen";
 import AlarmDeepLinkScreen from "./src/screens/AlarmDeepLinkScreen";
 import WhatsNewPopup from "./src/components/WhatsNewPopup";
-import { AppAlertHost } from "./src/components/AppAlert";
+import { AppAlert, AppAlertHost } from "./src/components/AppAlert";
 import { CelebrationModal } from "./src/components/AchievementCelebration";
 import { onAchievements } from "./src/services/achievementsBus";
 import GoalSetupScreen from "./src/screens/GoalSetupScreen";
 import { shouldShowWhatsNewPopup } from "./src/utils/whatsNew";
 import { warmup, getStreak } from "./src/services/api";
-import { initOfflineSync } from "./src/services/offlineSync";
+import { initOfflineSync, subscribeOfflineFailures, retryFailed } from "./src/services/offlineSync";
+import { discardFailed } from "./src/services/offline";
 import { getConnectivity, subscribe } from "./src/services/connectivity";
 import { configureNotifications, bindNotificationTap } from "./src/services/notifications";
 import StreakReminderModal from "./src/components/StreakReminderModal";
@@ -263,7 +264,21 @@ export default function App() {
       if (next === "active") warmup();
     });
     const unsubscribeSync = initOfflineSync();
-    return () => { sub.remove(); unsubscribeSync(); };
+    // Aviso si alguna sesión encolada agotó los intentos: se conserva en la zona
+    // muerta y se ofrece reintentarla o descartarla (no se pierde en silencio).
+    const unsubscribeFailures = subscribeOfflineFailures(({ failed }) => {
+      AppAlert.alert(
+        "Sesiones sin guardar",
+        failed === 1
+          ? "No se pudo guardar 1 sesión de lectura. ¿Quieres reintentarla?"
+          : `No se pudieron guardar ${failed} sesiones de lectura. ¿Quieres reintentarlas?`,
+        [
+          { text: "Descartar", style: "cancel", onPress: discardFailed },
+          { text: "Reintentar", onPress: retryFailed },
+        ]
+      );
+    });
+    return () => { sub.remove(); unsubscribeSync(); unsubscribeFailures(); };
   }, []);
 
   return (
