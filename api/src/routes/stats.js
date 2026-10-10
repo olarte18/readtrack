@@ -9,6 +9,7 @@ const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
 const { getQualifyingDates, appToday } = require("../utils/streakDays");
 const { bucketReadingDays, dayMs } = require("../utils/sessionDays");
+const { reconcileProtectors, getProtectedDates, getProtectorSummary, rolloverSlots } = require("../utils/streakProtectors");
 
 router.use(authMiddleware);
 router.use(globalUserLimiter);
@@ -22,7 +23,14 @@ router.get("/streak", async (req, res) => {
   if (cached) return res.json(cached);
 
   const buckets = await bucketReadingDays(req.userId);
-  const dates = await getQualifyingDates(req.userId, buckets);
+  // Cierra los meses cumplidos antes de conciliar: la evaluación del bono por
+  // mes perfecto debe ver el inventario previo a cualquier consumo de hoy.
+  await rolloverSlots(req.userId);
+  // Cubre huecos aislados antes de calcular la racha: los días protegidos suman.
+  await reconcileProtectors(req.userId, buckets);
+  const realDates = await getQualifyingDates(req.userId, buckets);
+  const protectedDates = await getProtectedDates(req.userId);
+  const dates = [...new Set([...realDates, ...protectedDates])];
   const streak = computeStreaks(dates);
   const today = await appToday();
   const todayCounts = dates.includes(today);
@@ -33,7 +41,8 @@ router.get("/streak", async (req, res) => {
   // hoy.
   const hasSessionToday = buckets.some((b) => b.date === today);
 
-  const payload = { ...streak, hasSessionToday, todayCounts };
+  const protectors = await getProtectorSummary(req.userId);
+  const payload = { ...streak, hasSessionToday, todayCounts, protectors };
   cache.set(cacheKey, payload, 60000);
   res.json(payload);
 });

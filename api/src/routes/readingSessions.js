@@ -11,6 +11,8 @@ const { getQualifyingDates, getDayProgress, appToday } = require("../utils/strea
 const { getGoalCompletion } = require("../utils/goalProgress");
 const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
 const { bucketReadingDays } = require("../utils/sessionDays");
+const { rolloverSlots, reconcileProtectors } = require("../utils/streakProtectors");
+const { awardPointsForSession, getSessionPoints } = require("../utils/streakPoints");
 const { SQL } = require("../utils/dates");
 
 router.use(authMiddleware);
@@ -97,7 +99,9 @@ router.post("/", async (req, res) => {
     if (existing.length > 0) {
       let ach = null;
       try { ach = await recheckAchievements(req.userId); } catch {}
-      return res.status(200).json(await withFreshAchievements(await sessionPayload(req, existing[0], req.body), ach));
+      const payload = await sessionPayload(req, existing[0], req.body);
+      const pointsEarned = await getSessionPoints(req.userId, existing[0].id);
+      return res.status(200).json(await withFreshAchievements({ ...payload, pointsEarned }, ach));
     }
   }
 
@@ -114,11 +118,19 @@ router.post("/", async (req, res) => {
   cache.delPrefix(`goals:${req.userId}`);
   cache.delPrefix(`calendar:${req.userId}`);
   cache.delPrefix(`stats:${req.userId}`);
+
+  const session = rows[0];
+  // Ranuras primero (rollover de meses cerrados), luego cubrir huecos aislados
+  // con protectores: así el feedback de racha ya incluye los días protegidos.
+  await rolloverSlots(req.userId);
+  await reconcileProtectors(req.userId);
+  const pointsEarned = await awardPointsForSession(req.userId, session);
+
   let ach = null;
   try { ach = await recheckAchievements(req.userId); } catch {}
 
-  const session = rows[0];
-  res.status(201).json(await withFreshAchievements(await sessionPayload(req, session, req.body), ach));
+  const payload = await sessionPayload(req, session, req.body);
+  res.status(201).json(await withFreshAchievements({ ...payload, pointsEarned }, ach));
 });
 
 router.patch("/:id", async (req, res) => {

@@ -13,6 +13,7 @@ const calendarRouter = require("./routes/calendar");
 const importsRouter = require("./routes/imports");
 const exportRouter = require("./routes/export");
 const achievementsRouter = require("./routes/achievements");
+const streakShopRouter = require("./routes/streakShop");
 const errorHandler = require("./middleware/errorHandler");
 const { booksLimiter } = require("./middleware/rateLimit");
 const pool = require("./db/connection");
@@ -46,6 +47,7 @@ app.use("/calendar", calendarRouter);
 app.use("/import", importsRouter);
 app.use("/export", exportRouter);
 app.use("/achievements", achievementsRouter);
+app.use("/streak", streakShopRouter);
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");

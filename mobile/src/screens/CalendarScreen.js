@@ -156,6 +156,7 @@ export default function CalendarScreen() {
   };
 
   const hasSecret = (data?.days ?? []).some((d) => d.minutes >= SECRET_MINUTES);
+  const hasProtected = (data?.days ?? []).some((d) => d.protected);
 
   return (
     <View style={styles.container}>
@@ -213,7 +214,7 @@ export default function CalendarScreen() {
                     key={day}
                     style={styles.dayCellWrapper}
                     accessibilityRole="button"
-                    accessibilityLabel={`Día ${day} de ${MONTH_NAMES[month - 1]}`}
+                    accessibilityLabel={`Día ${day} de ${MONTH_NAMES[month - 1]}${infoFor(day)?.protected ? ", protegido por un protector" : ""}`}
                     accessibilityHint={infoFor(day) ? "Toca para ver las sesiones del día" : undefined}
                     onPress={() => setSelectedDate(`${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`)}
                   >
@@ -239,6 +240,16 @@ export default function CalendarScreen() {
                       ) : (
                         <Text style={styles.dayTextComplete}>{day}</Text>
                       )}
+                      {infoFor(day)?.protected && (
+                        <Ionicons
+                          name="shield-checkmark"
+                          size={11}
+                          color={colors.accent}
+                          style={styles.dayShield}
+                          accessible={false}
+                          importantForAccessibility="no-hide-descendants"
+                        />
+                      )}
                     </View>
                   </TouchableOpacity>
                 )
@@ -256,6 +267,12 @@ export default function CalendarScreen() {
               <View style={styles.secretLegend}>
                 <View style={[styles.legendSwatch, { backgroundColor: colors.calendarSecret }]} />
                 <Text style={styles.legendText}>Días con 3+ horas</Text>
+              </View>
+            )}
+            {hasProtected && (
+              <View style={styles.secretLegend}>
+                <Ionicons name="shield-checkmark" size={12} color={colors.accent} accessible={false} />
+                <Text style={styles.legendText}>Día protegido</Text>
               </View>
             )}
           </View>
@@ -443,6 +460,7 @@ const createStyles = (colors) =>
   dayCellSecret: { backgroundColor: colors.calendarSecret },
   dayCellToday: { borderWidth: 2, borderColor: colors.star },
   dayCellSelected: { borderWidth: 2, borderColor: colors.text },
+  dayShield: { position: "absolute", top: 2, right: 3 },
   dayText: { fontSize: 13, color: colors.textDim },
   dayTextActive: { color: "#fff", fontWeight: "bold" },
   dayTextComplete: { color: "#13131f", fontWeight: "bold" },

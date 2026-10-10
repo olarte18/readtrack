@@ -441,6 +441,10 @@ export const getStatsActivity = async ({ view, year, month, date }) => {
 
 export const getStreak = async () => getWithCache("/stats/streak");
 
+export const getStreakShop = async () => getWithCache("/streak");
+
+export const buyStreakProtector = async () => request("/streak/buy", { method: "POST" });
+
 export const getAllNotes = async () => request("/notes");
 
 export const addReadingSession = async (user_book_id, page, duration_seconds, pages_read, book_completed, start_page, clientId, started_at) =>

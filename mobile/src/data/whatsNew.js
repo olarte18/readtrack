@@ -3,6 +3,7 @@
 export const RELEASE_NOTES = {
   title: "¡Novedades de ReadTrack!",
   items: [
+    { icon: "shield-checkmark", text: "Protectores de racha: gana puntos leyendo y canjéalos por protectores que evitan que se corte tu racha" },
     { icon: "medal", text: "Logros: gana insignias por tus rachas, libros terminados, páginas leídas y más" },
     { icon: "sparkles", text: "Tus logros ahora se celebran al instante, justo cuando los desbloqueas" },
   ],

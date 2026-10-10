@@ -148,7 +148,18 @@ describe("GET /stats/streak", () => {
     expect(res.body).toMatchObject({ current: 3, best: 3, hasSessionToday: true });
   });
 
-  test("hueco ayer rompe la racha actual pero no el récord", async () => {
+  test("un hueco de dos días rompe la racha actual pero no el récord", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+    await insertSessionOnDay(user.id, book.id, 0, 1800);
+    await insertSessionOnDay(user.id, book.id, 3, 1800);
+    await insertSessionOnDay(user.id, book.id, 4, 1800);
+
+    const res = await request(app).get("/stats/streak").set(authHeader(token));
+    expect(res.body).toMatchObject({ current: 1, best: 2, hasSessionToday: true });
+  });
+
+  test("un hueco de un día lo cubre el protector de regalo", async () => {
     const { token, user } = await registerUser();
     const book = await addBook(token);
     await insertSessionOnDay(user.id, book.id, 0, 1800);
@@ -156,7 +167,9 @@ describe("GET /stats/streak", () => {
     await insertSessionOnDay(user.id, book.id, 3, 1800);
 
     const res = await request(app).get("/stats/streak").set(authHeader(token));
-    expect(res.body).toMatchObject({ current: 1, best: 2, hasSessionToday: true });
+    // El día intermedio (ayer) queda protegido: 0,1(protegido),2,3 -> racha 4.
+    expect(res.body).toMatchObject({ current: 4, best: 4, hasSessionToday: true });
+    expect(res.body.protectors).toMatchObject({ available: 0, slots: 2 });
   });
 
   test("sin sesión hoy, la racha no se rompe hasta terminar el día", async () => {

@@ -371,3 +371,43 @@ WHERE (a.code, a.tier) NOT IN (
     ('abandono','special')
   ) AS catalog(code, tier)
 );
+
+-- Protectores de racha (streak freeze)
+-- Ledger de puntos: saldo = SUM(delta). 'earn' por sesión que califica (único por
+-- session_id => idempotente ante reintentos), 'spend' al comprar. Las monedas
+-- persisten: nunca se reinician por mes.
+CREATE TABLE IF NOT EXISTS streak_point_events (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  delta      INTEGER NOT NULL,
+  reason     VARCHAR(20) NOT NULL,
+  session_id INTEGER REFERENCES reading_sessions(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT NOW()
+);
+CREATE UNIQUE INDEX IF NOT EXISTS streak_point_events_earn_uidx
+  ON streak_point_events (user_id, session_id) WHERE session_id IS NOT NULL;
+
+-- Protectores: se arrastran entre meses (no caducan). source='gift' es el regalo
+-- único de bienvenida; 'buy' los comprados. used_at/protected_date marcan el día
+-- (Bogotá) que cubrió. available = used_at IS NULL.
+CREATE TABLE IF NOT EXISTS streak_protectors (
+  id             SERIAL PRIMARY KEY,
+  user_id        INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  source         VARCHAR(10) NOT NULL DEFAULT 'buy',
+  cost           INTEGER NOT NULL DEFAULT 0,
+  bought_at      TIMESTAMP DEFAULT NOW(),
+  used_at        TIMESTAMP,
+  protected_date DATE
+);
+CREATE UNIQUE INDEX IF NOT EXISTS streak_protectors_gift_uidx
+  ON streak_protectors (user_id) WHERE source = 'gift';
+CREATE UNIQUE INDEX IF NOT EXISTS streak_protectors_user_date_uidx
+  ON streak_protectors (user_id, protected_date) WHERE protected_date IS NOT NULL;
+
+-- Ranuras: capacidad de inventario y tope de compra (base 2, máx 4). Suben +1 al
+-- cerrar un mes con 0 usados e inventario lleno; usar un protector las vuelve a 2.
+CREATE TABLE IF NOT EXISTS streak_protector_state (
+  user_id         INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
+  slots           INTEGER NOT NULL DEFAULT 2,
+  last_eval_month DATE
+);

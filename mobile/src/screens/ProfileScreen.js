@@ -203,6 +203,11 @@ export default function ProfileScreen({ navigation }) {
           )}
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
+        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Protectores de racha" onPress={() => navigation.navigate("StreakShop")}>
+          <Ionicons name="shield-checkmark-outline" size={22} color={colors.accent} accessible={false} />
+          <Text style={styles.menuLabel}>Protectores de racha</Text>
+          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
+        </TouchableOpacity>
         <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Estadísticas" onPress={() => navigation.navigate("Stats")}>
           <Ionicons name="bar-chart-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Estadísticas</Text>

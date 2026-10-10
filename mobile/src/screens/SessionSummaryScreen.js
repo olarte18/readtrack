@@ -31,7 +31,7 @@ const goalDescription = (goal) => {
 export default function SessionSummaryScreen({ route, navigation }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const { book, readSeconds, endPage, speed, streakInfo, streakAlmost, completed, goalJustCompleted = [], delta, offline } = route.params;
+  const { book, readSeconds, endPage, speed, streakInfo, streakAlmost, completed, goalJustCompleted = [], delta, offline, pointsEarned = 0 } = route.params;
   const [rating, setRating] = useState(0);
 
   const handleRate = async (stars) => {
@@ -199,6 +199,18 @@ export default function SessionSummaryScreen({ route, navigation }) {
             <Text style={styles.rowValue}>{speed > 0 ? `${speed.toFixed(0)} págs/h` : "—"}</Text>
           </View>
         </View>
+        {pointsEarned > 0 && (
+          <>
+            <View style={styles.divider} />
+            <View style={styles.row}>
+              <Ionicons name="sparkles" size={20} color={colors.star} />
+              <View style={styles.rowInfo}>
+                <Text style={styles.rowLabel}>Puntos ganados</Text>
+                <Text style={[styles.rowValue, { color: colors.star }]}>+{pointsEarned} Puntos</Text>
+              </View>
+            </View>
+          </>
+        )}
       </View>
 
       {!completed && remainingValue !== null && (

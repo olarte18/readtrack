@@ -75,28 +75,52 @@ export default function ReadingScreen({ navigation }) {
   // El fuego se enciende solo si HOY califica para la racha (todayCounts).
   // hasSessionToday queda como respaldo para clientes con el server viejo.
   const streakActiveToday = streak?.todayCounts === true || streak?.hasSessionToday === true;
+  const protectorsAvailable = streak?.protectors?.available ?? 0;
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <Text style={styles.title}>Leyendo</Text>
-        <TouchableOpacity
-          style={[
-            styles.streakChip,
-            { borderColor: streakActiveToday ? colors.star + "55" : colors.border }
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={`Racha actual ${streak?.current ?? 0} días, mejor racha ${streak?.best ?? 0}`}
-          accessibilityHint="Toca para ver tu calendario"
-          onPress={() => navigation.navigate("Main", { screen: "Calendar" })}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="flame" size={20} color={streakActiveToday ? colors.star : colors.textMuted} accessible={false} />
-          <Text style={[styles.streakValue, { color: streakActiveToday ? colors.text : colors.textMuted }]}>{streak?.current ?? 0}</Text>
-          <View style={styles.streakDivider} accessible={false} />
-          <Ionicons name="trophy" size={14} color={colors.textMuted} accessible={false} />
-          <Text style={styles.streakBest}>{streak?.best ?? 0}</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={[
+              styles.shopChip,
+              { borderColor: protectorsAvailable > 0 ? colors.accent + "55" : colors.border },
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Protectores de racha: ${protectorsAvailable} disponibles`}
+            accessibilityHint="Toca para abrir la tienda de protectores"
+            onPress={() => navigation.navigate("StreakShop")}
+            activeOpacity={0.7}
+          >
+            <Ionicons
+              name="shield-checkmark"
+              size={20}
+              color={protectorsAvailable > 0 ? colors.accent : colors.textMuted}
+              accessible={false}
+            />
+            <Text style={[styles.shopValue, { color: protectorsAvailable > 0 ? colors.text : colors.textMuted }]}>
+              {protectorsAvailable}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[
+              styles.streakChip,
+              { borderColor: streakActiveToday ? colors.star + "55" : colors.border }
+            ]}
+            accessibilityRole="button"
+            accessibilityLabel={`Racha actual ${streak?.current ?? 0} días, mejor racha ${streak?.best ?? 0}`}
+            accessibilityHint="Toca para ver tu calendario"
+            onPress={() => navigation.navigate("Main", { screen: "Calendar" })}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="flame" size={20} color={streakActiveToday ? colors.star : colors.textMuted} accessible={false} />
+            <Text style={[styles.streakValue, { color: streakActiveToday ? colors.text : colors.textMuted }]}>{streak?.current ?? 0}</Text>
+            <View style={styles.streakDivider} accessible={false} />
+            <Ionicons name="trophy" size={14} color={colors.textMuted} accessible={false} />
+            <Text style={styles.streakBest}>{streak?.best ?? 0}</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {loading ? (
@@ -254,6 +278,19 @@ const createStyles = (colors) =>
       paddingTop: 50,
     },
     title: { fontSize: 24, fontWeight: "bold", color: colors.text },
+    headerActions: { flexDirection: "row", alignItems: "center", gap: 8 },
+    shopChip: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 4,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    shopValue: { fontSize: 15, fontWeight: "bold" },
     streakChip: {
       flexDirection: "row",
       alignItems: "center",

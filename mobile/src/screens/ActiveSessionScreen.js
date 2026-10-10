@@ -445,6 +445,7 @@ export default function ActiveSessionScreen({ route, navigation }) {
               : { days: streakState.days ?? 1 },
           streakAlmost: offline || streakState?.kind !== "almost" ? null : streakState,
           goalJustCompleted: offline ? [] : saved?.goalJustCompleted ?? [],
+          pointsEarned: offline ? 0 : saved?.pointsEarned ?? 0,
           offline,
         });
       };

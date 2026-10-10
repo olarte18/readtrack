@@ -31,6 +31,7 @@ import ExportScreen from "./src/screens/ExportScreen";
 import NotesScreen from "./src/screens/NotesScreen";
 import NoteEditorScreen from "./src/screens/NoteEditorScreen";
 import AchievementsScreen from "./src/screens/AchievementsScreen";
+import StreakShopScreen from "./src/screens/StreakShopScreen";
 import WhatsNewScreen from "./src/screens/WhatsNewScreen";
 import AlarmDeepLinkScreen from "./src/screens/AlarmDeepLinkScreen";
 import WhatsNewPopup from "./src/components/WhatsNewPopup";
@@ -118,6 +119,7 @@ function AppStack() {
       <Stack.Screen name="Notes" component={NotesScreen} />
       <Stack.Screen name="NoteEditor" component={NoteEditorScreen} />
       <Stack.Screen name="Achievements" component={AchievementsScreen} />
+      <Stack.Screen name="StreakShop" component={StreakShopScreen} />
       <Stack.Screen name="WhatsNew" component={WhatsNewScreen} />
       <Stack.Screen name="AlarmLink" component={AlarmDeepLinkScreen} />
     </Stack.Navigator>

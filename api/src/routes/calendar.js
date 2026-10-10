@@ -7,6 +7,7 @@ const cache = require("../utils/cache");
 const { computeStreaks } = require("../utils/streaks");
 const { getQualifyingDates, appToday } = require("../utils/streakDays");
 const { bucketReadingDays } = require("../utils/sessionDays");
+const { reconcileProtectors, getProtectedDates, rolloverSlots } = require("../utils/streakProtectors");
 const { appYear } = require("../utils/dates");
 
 router.use(authMiddleware);
@@ -26,8 +27,11 @@ router.get("/:year/:month", async (req, res) => {
   if (cached) return res.json(cached);
 
   const buckets = await bucketReadingDays(req.userId);
+  await rolloverSlots(req.userId);
+  await reconcileProtectors(req.userId, buckets);
   const sessionDates = await getQualifyingDates(req.userId, buckets);
-  const streakDates = new Set(sessionDates);
+  const protectedDates = new Set(await getProtectedDates(req.userId));
+  const streakDates = new Set([...sessionDates, ...protectedDates]);
   const today = await appToday();
   const todayCounts = streakDates.has(today);
 
@@ -64,6 +68,7 @@ router.get("/:year/:month", async (req, res) => {
         pages: 0,
         books: [],
         counts: streakDates.has(b.date), // día que suma a la racha (regla mínima)
+        protected: protectedDates.has(b.date), // cubierto por un protector
       };
       dayMap.set(b.date, day);
     }
@@ -91,6 +96,15 @@ router.get("/:year/:month", async (req, res) => {
     acc.pages += pages;
   }
 
+  // Días del mes cubiertos por un protector y sin actividad: igual aparecen en
+  // el calendario (con el escudo y contando para la racha).
+  for (const d of protectedDates) {
+    if (!d.startsWith(start)) continue;
+    const existing = dayMap.get(d);
+    if (existing) existing.protected = true;
+    else dayMap.set(d, { date: d, minutes: 0, pages: 0, books: [], counts: true, protected: true });
+  }
+
   const payload = {
     year,
     month,
@@ -98,7 +112,7 @@ router.get("/:year/:month", async (req, res) => {
     daily_goal_minutes: null,
     hasSessionToday,
     todayCounts,
-    streak: computeStreaks(sessionDates),
+    streak: computeStreaks([...streakDates]),
   };
 
   const { rows: dailyGoalRows } = await pool.query(
