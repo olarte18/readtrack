@@ -50,6 +50,13 @@ export async function enqueue(item) {
   await AsyncStorage.setItem(key, JSON.stringify(queue));
 }
 
+// Conserva la clave de idempotencia creada por el intento online si la sesión
+// pasa a la cola tras agotarse la ventana de espera.
+export async function enqueueSession(clientId, payload) {
+  if (!clientId) throw new Error("clientId es obligatorio para encolar una sesión");
+  return enqueue({ type: "save-session", clientId, payload });
+}
+
 async function removeItem(id) {
   const key = await queueKey();
   if (!key) return;

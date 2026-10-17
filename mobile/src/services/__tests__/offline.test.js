@@ -7,6 +7,7 @@ import {
   discardFailed,
   requeueFailed,
   clearPendingQueue,
+  enqueueSession,
 } from "../offline";
 
 jest.mock("@react-native-async-storage/async-storage", () =>
@@ -34,6 +35,17 @@ describe("offline queue", () => {
     expect(queue).toHaveLength(1);
     expect(queue[0].clientId).toBeTruthy();
     expect(queue[0].attempts).toBe(0);
+  });
+
+  it("conserva el clientId de los intentos online al encolar la sesión", async () => {
+    const clientId = "00000000-0000-4000-8000-000000000001";
+    const payload = { session: { user_book_id: 12, page: 8 } };
+
+    await enqueueSession(clientId, payload);
+
+    expect(await getPending()).toMatchObject([
+      { type: "save-session", clientId, payload },
+    ]);
   });
 
   it("flush exitoso borra el item", async () => {

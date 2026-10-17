@@ -14,7 +14,7 @@ import SessionTimer from "../components/SessionTimer";
 import SessionStats from "../components/SessionStats";
 import SimpleClock from "../components/SimpleClock";
 import { updateBook, addReadingSession, getReadingSpeed, isNetworkError, QUICK_FAIL_MS, OFFLINE_GRACE_MS, logUnexpectedError } from "../services/api";
-import { enqueue, uuidv4 } from "../services/offline";
+import { enqueueSession, uuidv4 } from "../services/offline";
 import { markOffline } from "../services/connectivity";
 import { modeLabel, modeUnit, formatPoint, deltaLabel, completionBound, isCompleted, progressFraction, pagesEquivalent } from "../utils/progress";
 import { sessionSeconds, computeSessionStats } from "../utils/sessionStats";
@@ -472,21 +472,18 @@ export default function ActiveSessionScreen({ route, navigation }) {
           if (offlineNow || deadlineHit) {
             if (deadlineHit) markOffline(); // agotamos la espera: indicador sincero
             // Sin red garantizada: encolar y no perder la sesión. Se sincroniza al reconectar.
-            await enqueue({
-              type: "save-session",
-              payload: {
-                update: updates,
-                finishedAt,
-                session: {
-                  user_book_id: book.id,
-                  page,
-                  start_page: startPage,
-                  duration_seconds: readSeconds,
-                  pages_read: pages,
-                  book_completed: completed,
-                  reading_mode: book.reading_mode ?? "page",
-                  started_at: startedAt,
-                },
+            await enqueueSession(clientId, {
+              update: updates,
+              finishedAt,
+              session: {
+                user_book_id: book.id,
+                page,
+                start_page: startPage,
+                duration_seconds: readSeconds,
+                pages_read: pages,
+                book_completed: completed,
+                reading_mode: book.reading_mode ?? "page",
+                started_at: startedAt,
               },
             });
             navigateSummary({ offline: true });
