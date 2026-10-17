@@ -1,10 +1,11 @@
 import { useMemo, useEffect, useRef, useState } from "react";
-import { View, Text, StyleSheet, Animated, Easing, ScrollView, useWindowDimensions } from "react-native";
+import { View, Text, StyleSheet, Animated, Easing, ScrollView, useWindowDimensions, AccessibilityInfo } from "react-native";
 
 export default function ActivityChart({ data = [], colors, showValues = true, height = 150, formatValue, maxValue }) {
   const scaleMax = maxValue && maxValue > 0 ? maxValue : Math.max(1, ...data.map((d) => d.value));
   const { fontScale } = useWindowDimensions();
   const [viewportWidth, setViewportWidth] = useState(0);
+  const [reduceMotionEnabled, setReduceMotionEnabled] = useState(null);
   const fontSize = 11;
   const textBand = Math.max(30, (fontSize * 2 + 8) * fontScale);
   const chartHeight = height + textBand - 30;
@@ -21,6 +22,27 @@ export default function ActivityChart({ data = [], colors, showValues = true, he
   const contentWidth = minColumnWidth * data.length;
   const shouldScroll = fontScale > 1 && viewportWidth > 0 && contentWidth > viewportWidth;
   const styles = useMemo(() => createStyles(colors), [colors]);
+  useEffect(() => {
+    let active = true;
+    let receivedChange = false;
+    const subscription = AccessibilityInfo.addEventListener("reduceMotionChanged", (enabled) => {
+      receivedChange = true;
+      setReduceMotionEnabled(enabled);
+    });
+
+    AccessibilityInfo.isReduceMotionEnabled()
+      .then((enabled) => {
+        if (active && !receivedChange) setReduceMotionEnabled(enabled);
+      })
+      .catch(() => {
+        if (active && !receivedChange) setReduceMotionEnabled(false);
+      });
+
+    return () => {
+      active = false;
+      subscription.remove();
+    };
+  }, []);
   const onLayout = (event) => {
     const width = event.nativeEvent.layout.width;
     setViewportWidth((current) => (Math.abs(current - width) > 0.5 ? width : current));
@@ -37,6 +59,7 @@ export default function ActivityChart({ data = [], colors, showValues = true, he
       formatValue={formatValue}
       delay={i * 35}
       columnWidth={shouldScroll ? minColumnWidth : undefined}
+      reduceMotionEnabled={reduceMotionEnabled}
     />
   ));
   const chart = (
@@ -63,13 +86,16 @@ export default function ActivityChart({ data = [], colors, showValues = true, he
   );
 }
 
-function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValue, delay, columnWidth }) {
+function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValue, delay, columnWidth, reduceMotionEnabled }) {
   const value = Number(d.value) || 0;
   const barHeight = Math.max(Math.min(value / maxValue, 1) * (barArea - 6), value > 0 ? 4 : 2);
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    progress.setValue(0);
+    if (reduceMotionEnabled == null) return;
+    progress.setValue(reduceMotionEnabled ? 1 : 0);
+    if (reduceMotionEnabled) return;
+
     const animation = Animated.timing(progress, {
       toValue: 1,
       duration: 420,
@@ -79,7 +105,7 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
     });
     animation.start();
     return () => animation.stop();
-  }, [barHeight, delay, progress]);
+  }, [barHeight, delay, progress, reduceMotionEnabled]);
 
   return (
     <View style={[styles.col, columnWidth ? { flex: 0, width: columnWidth } : null]}>

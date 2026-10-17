@@ -97,6 +97,7 @@ export default function AchievementsScreen({ navigation }) {
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
   const [error, setError] = useState(false);
   const [celebration, setCelebration] = useState([]);
   const [selected, setSelected] = useState(null);
@@ -105,7 +106,7 @@ export default function AchievementsScreen({ navigation }) {
   useFocusEffect(
     useCallback(() => {
       let cancelled = false;
-      setLoading(true);
+      if (!hasLoadedRef.current) setLoading(true);
       setError(false);
 
       getAchievements()
@@ -113,6 +114,7 @@ export default function AchievementsScreen({ navigation }) {
           if (cancelled) return;
           const rows = data.groups ?? [];
           setGroups(rows);
+          hasLoadedRef.current = true;
           const unlocked = rows.flatMap((g) => g.items.filter((i) => i.unlocked));
 
           const known = (await readSnapshot()) ?? {};
@@ -154,7 +156,10 @@ export default function AchievementsScreen({ navigation }) {
           if (!cancelled) setError(true);
         })
         .finally(() => {
-          if (!cancelled) setLoading(false);
+          if (!cancelled) {
+            hasLoadedRef.current = true;
+            setLoading(false);
+          }
         });
 
       return () => {
@@ -177,9 +182,9 @@ export default function AchievementsScreen({ navigation }) {
         <Text style={styles.title}>Logros</Text>
       </View>
 
-      {loading ? (
+      {loading && !hasLoadedRef.current ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
-      ) : error ? (
+      ) : error && groups.length === 0 ? (
         <Text style={styles.error}>No se pudieron cargar los logros</Text>
       ) : groups.length === 0 ? (
         <Text style={styles.empty}>Tus logros aparecerán aquí a medida que leas</Text>

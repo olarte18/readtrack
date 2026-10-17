@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { View, Text, TextInput, FlatList, StyleSheet, TouchableOpacity, ActivityIndicator, KeyboardAvoidingView, Platform } from "react-native";
 import { useDebouncedCallback } from "use-debounce";
 import { searchBooks } from "../services/api";
@@ -7,6 +7,8 @@ import BookCard from "../components/BookCard";
 import BarcodeScanner from "../components/BarcodeScanner";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
+
+const keyExtractor = (item) => item.id;
 
 export default function SearchScreen({ navigation }) {
   const { colors } = useTheme();
@@ -22,6 +24,11 @@ const [scannerVisible, setScannerVisible] = useState(false);
     setResults(books);
     setLoading(false);
   }, 500);
+
+  const renderBook = useCallback(
+    ({ item }) => <BookCard book={item} onPress={() => navigation.navigate("BookDetail", { book: item })} />,
+    [navigation]
+  );
 
   const handleChange = (text) => {
     setQuery(text);
@@ -80,14 +87,9 @@ const handleScan = async (isbn) => {
       {loading && <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />}
       <FlatList
         data={results}
-        keyExtractor={(item) => item.id}
+        keyExtractor={keyExtractor}
         keyboardShouldPersistTaps="handled"
-        renderItem={({ item }) => (
-          <BookCard
-            book={item}
-            onPress={() => navigation.navigate("BookDetail", { book: item })}
-          />
-        )}
+        renderItem={renderBook}
         ListEmptyComponent={
           !loading && query ? <Text style={styles.empty}>Sin resultados</Text> : null
         }

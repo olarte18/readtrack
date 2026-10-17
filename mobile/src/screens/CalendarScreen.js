@@ -112,6 +112,8 @@ export default function CalendarScreen() {
   };
 
   const goPrevMonth = () => {
+    setData(null);
+    setLoading(true);
     if (month === 1) { setYear(year - 1); setMonth(12); }
     else setMonth(month - 1);
   };
@@ -119,6 +121,8 @@ export default function CalendarScreen() {
   const goNextMonth = () => {
     const isCurrent = year === now.getFullYear() && month === now.getMonth() + 1;
     if (isCurrent) return;
+    setData(null);
+    setLoading(true);
     if (month === 12) { setYear(year + 1); setMonth(1); }
     else setMonth(month + 1);
   };
@@ -190,7 +194,7 @@ export default function CalendarScreen() {
         </TouchableOpacity>
       </View>
 
-      {loading ? (
+      {loading && !data ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
       ) : (
         <ScrollView

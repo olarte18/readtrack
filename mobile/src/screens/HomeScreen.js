@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback, useMemo } from "react";
+import { memo, useRef, useState, useCallback, useMemo } from "react";
 
 import { getLibrary, getLibraryCached, isNetworkError } from "../services/api";
 import { View, Text, FlatList, Image, StyleSheet, TouchableOpacity, ActivityIndicator, Modal, ScrollView } from "react-native";
@@ -39,11 +39,67 @@ const STATUS_LABEL = {
   abandoned: "Abandonado",
 };
 
+const statusKeyExtractor = (item) => item.key;
+const bookKeyExtractor = (item) => String(item.id);
+
+const HomeBookRow = memo(function HomeBookRow({ item, colors, styles, navigation, onRefresh }) {
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      accessibilityRole="button"
+      accessibilityLabel={`${String(item.title)}, ${String(item.author)}, ${STATUS_LABEL[item.status] ?? ""}${item.status === "reading" ? `, página ${item.current_page ?? 0}` : ""}${item.status === "completed" && item.rating > 0 ? `, calificación ${item.rating} de 5` : ""}`}
+      accessibilityHint="Toca para ver el detalle. Mantén presionado para editar"
+      onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: onRefresh })}
+      onLongPress={() => navigation.navigate("EditBook", { book: item, dbId: item.db_id, ubId: item.id, onGoBack: onRefresh })}
+      delayLongPress={400}
+    >
+      {item.cover ? (
+        <Image source={{ uri: item.cover }} style={styles.cover} accessible={false} importantForAccessibility="no-hide-descendants" />
+      ) : (
+        <View style={styles.noCover} accessible={false} importantForAccessibility="no-hide-descendants">
+          <Ionicons name="book" size={26} color={colors.textDim} />
+        </View>
+      )}
+      <View style={styles.info}>
+        <Text style={styles.bookTitle} numberOfLines={2}>{String(item.title)}</Text>
+        <Text style={styles.author} numberOfLines={1}>{String(item.author)}</Text>
+        <View style={styles.statusRow}>
+          {item.status === "completed" && <Text style={styles.statusBadge}>Completado</Text>}
+          {item.status === "reading" && <Text style={styles.statusBadge}>Leyendo</Text>}
+          {item.status === "pending" && <Text style={styles.statusBadge}>Pendiente</Text>}
+          {item.status === "abandoned" && <Text style={styles.statusBadge}>Abandonado</Text>}
+          {item.status === "wishlist" && <Text style={styles.statusBadge}>Deseos</Text>}
+          {item.status === "paused" && <Text style={styles.statusBadge}>Pausado</Text>}
+        </View>
+        {item.status === "reading" && !!item.pages && (
+          <View style={styles.progressContainer}>
+            <View style={[styles.progressBar, { width: `${Math.min((item.current_page / item.pages) * 100, 100)}%` }]} />
+          </View>
+        )}
+        {item.status === "reading" && (
+          <Text style={styles.pageText}>
+            Página {item.current_page ?? 0}{item.pages ? ` de ${item.pages}` : ""}
+          </Text>
+        )}
+        {item.status === "completed" && item.rating > 0 && (
+          <View style={styles.ratingRow}>
+            {Array.from({ length: item.rating }).map((_, i) => (
+              <Ionicons key={i} name="star" size={12} color={colors.star} />
+            ))}
+          </View>
+        )}
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function HomeScreen({ navigation, route }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [books, setBooks] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedRef = useRef(false);
   const { filterStatus } = route?.params ?? {};
   const [filter, setFilter] = useState(filterStatus ?? "all");
   const [sortKey, setSortKey] = useState("date");
@@ -57,32 +113,49 @@ export default function HomeScreen({ navigation, route }) {
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerBook, setPickerBook] = useState(null);
 
-  const fetchLibrary = async () => {
-    setLoading(true);
-    const cached = await getLibraryCached();
-    if (cached) {
-      setBooks(cached);
-      setLoading(false);
-    }
+  const fetchLibrary = useCallback(async () => {
+    const alreadyLoaded = hasLoadedRef.current;
+    if (alreadyLoaded) setRefreshing(true);
+    else setLoading(true);
     try {
+      const cached = await getLibraryCached();
+      if (cached) {
+        setBooks(cached);
+        if (!hasLoadedRef.current) {
+          hasLoadedRef.current = true;
+          setLoading(false);
+          setRefreshing(true);
+        }
+      }
       const data = await getLibrary();
       setBooks(data);
     } catch (error) {
       if (!isNetworkError(error)) console.error("Error cargando biblioteca:", error);
     } finally {
+      hasLoadedRef.current = true;
       setLoading(false);
+      setRefreshing(false);
     }
-  };
-
-  useEffect(() => {
-    fetchLibrary();
   }, []);
 
-  // Refresca al volver al tab: refleja cambios de estado, imports y sesiones
+  const renderBookItem = useCallback(
+    ({ item }) => (
+      <HomeBookRow
+        item={item}
+        colors={colors}
+        styles={styles}
+        navigation={navigation}
+        onRefresh={fetchLibrary}
+      />
+    ),
+    [colors, styles, navigation, fetchLibrary]
+  );
+
+  // Esta carga también cubre la primera entrada; no se duplica con un useEffect.
   useFocusEffect(
     useCallback(() => {
       fetchLibrary();
-    }, [])
+    }, [fetchLibrary])
   );
 
   const filteredBooks = useMemo(() => {
@@ -230,7 +303,7 @@ export default function HomeScreen({ navigation, route }) {
         <FlatList
           horizontal
           data={STATUSES}
-          keyExtractor={(f) => f.key}
+          keyExtractor={statusKeyExtractor}
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.statusBarRow}
           renderItem={({ item }) => (
@@ -280,62 +353,13 @@ export default function HomeScreen({ navigation, route }) {
           )}
         </TouchableOpacity>
       </View>
-      {loading ? (
+      {loading && !hasLoadedRef.current ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 60 }} />
       ) : (
         <FlatList
           data={sortedBooks}
-          keyExtractor={(item) => String(item.id)}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              accessibilityRole="button"
-              accessibilityLabel={`${String(item.title)}, ${String(item.author)}, ${STATUS_LABEL[item.status] ?? ""}${item.status === "reading" ? `, página ${item.current_page ?? 0}` : ""}${item.status === "completed" && item.rating > 0 ? `, calificación ${item.rating} de 5` : ""}`}
-              accessibilityHint="Toca para ver el detalle. Mantén presionado para editar"
-              onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: fetchLibrary })}
-              onLongPress={() =>
-                navigation.navigate("EditBook", { book: item, dbId: item.db_id, ubId: item.id, onGoBack: fetchLibrary })
-              }
-              delayLongPress={400}
-            >
-              {item.cover ? (
-                <Image source={{ uri: item.cover }} style={styles.cover} accessible={false} importantForAccessibility="no-hide-descendants" />
-              ) : (
-                <View style={styles.noCover} accessible={false} importantForAccessibility="no-hide-descendants">
-                  <Ionicons name="book" size={26} color={colors.textDim} />
-                </View>
-              )}
-              <View style={styles.info}>
-                <Text style={styles.bookTitle} numberOfLines={2}>{String(item.title)}</Text>
-                <Text style={styles.author} numberOfLines={1}>{String(item.author)}</Text>
-                <View style={styles.statusRow}>
-                  {item.status === "completed" && <Text style={styles.statusBadge}>Completado</Text>}
-                  {item.status === "reading" && <Text style={styles.statusBadge}>Leyendo</Text>}
-                  {item.status === "pending" && <Text style={styles.statusBadge}>Pendiente</Text>}
-                  {item.status === "abandoned" && <Text style={styles.statusBadge}>Abandonado</Text>}
-                  {item.status === "wishlist" && <Text style={styles.statusBadge}>Deseos</Text>}
-                  {item.status === "paused" && <Text style={styles.statusBadge}>Pausado</Text>}
-                </View>
-                {item.status === "reading" && !!item.pages && (
-                  <View style={styles.progressContainer}>
-                    <View style={[styles.progressBar, { width: `${Math.min((item.current_page / item.pages) * 100, 100)}%` }]} />
-                  </View>
-                )}
-                {item.status === "reading" && (
-                  <Text style={styles.pageText}>
-                    Página {item.current_page ?? 0}{item.pages ? ` de ${item.pages}` : ""}
-                  </Text>
-                )}
-                {item.status === "completed" && item.rating > 0 && (
-                  <View style={styles.ratingRow}>
-                    {Array.from({ length: item.rating }).map((_, i) => (
-                      <Ionicons key={i} name="star" size={12} color={colors.star} />
-                    ))}
-                  </View>
-                )}
-              </View>
-            </TouchableOpacity>
-          )}
+          keyExtractor={bookKeyExtractor}
+          renderItem={renderBookItem}
           ListEmptyComponent={
             <Text style={styles.empty}>
               {books.length === 0
@@ -344,7 +368,7 @@ export default function HomeScreen({ navigation, route }) {
             </Text>
           }
           onRefresh={fetchLibrary}
-          refreshing={loading}
+          refreshing={refreshing}
         />
       )}
 

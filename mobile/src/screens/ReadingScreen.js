@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { memo, useMemo, useState, useCallback, useRef } from "react";
 import { View, Text, FlatList, StyleSheet, TouchableOpacity, Image, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -20,6 +20,78 @@ const formatRemaining = (minutes) => {
   return `~${Math.max(m, 1)} min`;
 };
 
+const bookKeyExtractor = (item) => String(item.id);
+
+const ReadingBookRow = memo(function ReadingBookRow({ item, perHour, colors, styles, navigation, onRefresh }) {
+  const pagesLeft = pagesLeftEquivalent(item, item.current_page);
+  const remaining = pagesLeft != null && perHour > 0 ? formatRemaining(pagesLeft / (perHour / 60)) : null;
+  const frac = progressFraction(item);
+  const progressPct = frac != null ? Math.round(frac * 100) : null;
+  const pageText = (() => {
+    const mode = item.reading_mode ?? "page";
+    const point = formatPoint(item, item.current_page ?? 0);
+    if (mode === "percentage") return progressPct != null ? `${item.current_page ?? 0}% del libro` : point;
+    if (mode === "chapter") return item.chapters ? `${point} de ${item.chapters}` : point;
+    return item.pages ? `${point} de ${item.pages}${progressPct != null ? ` · ${progressPct}%` : ""}` : point;
+  })();
+
+  return (
+    <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.bookInfo}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.title}, ${item.author}. ${pageText}`}
+        accessibilityHint="Toca para ver el detalle"
+        onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: onRefresh })}
+      >
+        {item.cover ? (
+          <Image source={{ uri: item.cover }} style={styles.cover} accessible={false} importantForAccessibility="no-hide-descendants" />
+        ) : (
+          <View style={styles.noCover} accessible={false} importantForAccessibility="no-hide-descendants">
+            <Ionicons name="book" size={28} color={colors.textDim} />
+          </View>
+        )}
+        <View style={styles.info}>
+          <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
+          <Text style={styles.author} numberOfLines={1}>{item.author}</Text>
+          {!!progressPct && (
+            <>
+              <View style={styles.progressContainer}>
+                <View style={[styles.progressBar, { width: `${progressPct}%` }]} />
+              </View>
+              <Text style={styles.pageText}>{pageText}</Text>
+            </>
+          )}
+          <View style={styles.metaRow}>
+            {remaining ? (
+              <View style={styles.remainingBadge}>
+                <Ionicons name="time-outline" size={13} color={colors.accent} />
+                <Text style={styles.remainingText}>{remaining}</Text>
+              </View>
+            ) : null}
+            {item.rating > 0 && (
+              <View style={styles.ratingRow}>
+                {Array.from({ length: item.rating }).map((_, i) => (
+                  <Ionicons key={i} name="star" size={11} color={colors.star} />
+                ))}
+              </View>
+            )}
+          </View>
+        </View>
+      </TouchableOpacity>
+      <TouchableOpacity
+        style={styles.continueBtn}
+        accessibilityRole="button"
+        accessibilityLabel={`Continuar leyendo ${item.title}`}
+        onPress={() => navigation.navigate("ReadingMode", { book: item })}
+      >
+        <Ionicons name="play" size={18} color={colors.onAccent} accessible={false} />
+        <Text style={styles.continueBtnLabel}>Leer</Text>
+      </TouchableOpacity>
+    </View>
+  );
+});
+
 export default function ReadingScreen({ navigation }) {
   const { colors } = useTheme();
   const { user } = useAuth();
@@ -29,9 +101,12 @@ export default function ReadingScreen({ navigation }) {
   const [streak, setStreak] = useState(null);
   const [goals, setGoals] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedRef = useRef(false);
 
-  const fetchReading = async () => {
-    setLoading(true);
+  const fetchReading = useCallback(async () => {
+    if (hasLoadedRef.current) setRefreshing(true);
+    else setLoading(true);
     try {
       const all = await getLibrary();
       const reading = all.filter((b) => b.status === "reading");
@@ -49,9 +124,25 @@ export default function ReadingScreen({ navigation }) {
     } catch (e) {
       logUnexpectedError(e);
     } finally {
+      hasLoadedRef.current = true;
       setLoading(false);
+      setRefreshing(false);
     }
-  };
+  }, []);
+
+  const renderBookItem = useCallback(
+    ({ item }) => (
+      <ReadingBookRow
+        item={item}
+        perHour={speeds[item.id]}
+        colors={colors}
+        styles={styles}
+        navigation={navigation}
+        onRefresh={fetchReading}
+      />
+    ),
+    [speeds, colors, styles, navigation, fetchReading]
+  );
 
   useFocusEffect(
     useCallback(() => {
@@ -66,7 +157,7 @@ export default function ReadingScreen({ navigation }) {
         })
         .catch(logUnexpectedError);
       getGoals().then(async (g) => setGoals(g?.fromCache ? goalsWithLocal(g, await getPending()) : g)).catch(logUnexpectedError);
-    }, [user])
+    }, [fetchReading, user])
   );
 
   const dailyGoal = goals?.goals?.find((g) => g.type === "daily");
@@ -123,12 +214,12 @@ export default function ReadingScreen({ navigation }) {
         </View>
       </View>
 
-      {loading ? (
+      {loading && !hasLoadedRef.current ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={books}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={bookKeyExtractor}
           contentContainerStyle={{ paddingBottom: 30 }}
           ListFooterComponent={
             dailyPct != null ? (
@@ -160,81 +251,7 @@ export default function ReadingScreen({ navigation }) {
               </View>
             ) : null
           }
-          renderItem={({ item }) => {
-            const perHour = speeds[item.id];
-            const pagesLeft = pagesLeftEquivalent(item, item.current_page);
-            const remaining =
-              pagesLeft != null && perHour > 0 ? formatRemaining(pagesLeft / (perHour / 60)) : null;
-            const frac = progressFraction(item);
-            const progressPct = frac != null ? Math.round(frac * 100) : null;
-            const pageText = (() => {
-              const mode = item.reading_mode ?? "page";
-              const point = formatPoint(item, item.current_page ?? 0);
-              if (mode === "percentage") return progressPct != null ? `${item.current_page ?? 0}% del libro` : point;
-              if (mode === "chapter") return item.chapters ? `${point} de ${item.chapters}` : point;
-              return item.pages ? `${point} de ${item.pages}${progressPct != null ? ` · ${progressPct}%` : ""}` : point;
-            })();
-
-            return (
-              <View style={styles.card}>
-                <TouchableOpacity
-                  style={styles.bookInfo}
-                  accessibilityRole="button"
-                  accessibilityLabel={`${item.title}, ${item.author}. ${pageText}`}
-                  accessibilityHint="Toca para ver el detalle"
-                  onPress={() => navigation.navigate("BookDetail", { book: item, onGoBack: fetchReading })}
-                >
-                  {item.cover ? (
-                    <Image source={{ uri: item.cover }} style={styles.cover} accessible={false} importantForAccessibility="no-hide-descendants" />
-                  ) : (
-                    <View style={styles.noCover} accessible={false} importantForAccessibility="no-hide-descendants">
-                      <Ionicons name="book" size={28} color={colors.textDim} />
-                    </View>
-                  )}
-                  <View style={styles.info}>
-                    <Text style={styles.bookTitle} numberOfLines={2}>{item.title}</Text>
-                    <Text style={styles.author} numberOfLines={1}>{item.author}</Text>
-
-                    {!!progressPct && (
-                      <>
-                        <View style={styles.progressContainer}>
-                          <View style={[styles.progressBar, { width: `${progressPct}%` }]} />
-                        </View>
-                        <Text style={styles.pageText}>
-                          {pageText}
-                        </Text>
-                      </>
-                    )}
-
-                    <View style={styles.metaRow}>
-                      {remaining ? (
-                        <View style={styles.remainingBadge}>
-                          <Ionicons name="time-outline" size={13} color={colors.accent} />
-                          <Text style={styles.remainingText}>{remaining}</Text>
-                        </View>
-                      ) : null}
-                      {item.rating > 0 && (
-                        <View style={styles.ratingRow}>
-                          {Array.from({ length: item.rating }).map((_, i) => (
-                            <Ionicons key={i} name="star" size={11} color={colors.star} />
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.continueBtn}
-                  accessibilityRole="button"
-                  accessibilityLabel={`Continuar leyendo ${item.title}`}
-                  onPress={() => navigation.navigate("ReadingMode", { book: item })}
-                >
-                  <Ionicons name="play" size={18} color={colors.onAccent} accessible={false} />
-                  <Text style={styles.continueBtnLabel}>Leer</Text>
-                </TouchableOpacity>
-              </View>
-            );
-          }}
+          renderItem={renderBookItem}
           ListEmptyComponent={
             <View style={styles.emptyWrap}>
               <Ionicons name="book-outline" size={34} color={colors.textDim} />
@@ -260,7 +277,7 @@ export default function ReadingScreen({ navigation }) {
             </View>
           }
           onRefresh={fetchReading}
-          refreshing={loading}
+          refreshing={refreshing}
         />
       )}
     </View>

@@ -71,9 +71,9 @@ export default function StreakShopScreen({ navigation }) {
         <Text style={styles.title}>Protectores de racha</Text>
       </View>
 
-      {loading ? (
+      {loading && !state ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
-      ) : error || !state ? (
+      ) : error && !state ? (
         <Text style={styles.error}>No se pudo cargar la tienda</Text>
       ) : (
         <ScrollView contentContainerStyle={styles.content}>

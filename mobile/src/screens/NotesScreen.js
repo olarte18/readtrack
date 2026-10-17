@@ -1,4 +1,4 @@
-import { useMemo, useState, useCallback } from "react";
+import { memo, useMemo, useState, useCallback, useRef } from "react";
 import { View, Text, FlatList, StyleSheet, Image, ActivityIndicator, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
@@ -12,25 +12,95 @@ const formatDate = (iso) => {
   return d.toLocaleDateString("es-CO", { day: "numeric", month: "short", year: "numeric" });
 };
 
+const noteKeyExtractor = (item) => String(item.id);
+
+const NoteRow = memo(function NoteRow({ item, colors, styles, navigation, onDelete, onUpdate }) {
+  return (
+    <TouchableOpacity
+      style={styles.card}
+      activeOpacity={0.7}
+      accessibilityRole="button"
+      accessibilityLabel={`Nota de ${item.book_title}${item.page ? `, página ${item.page}` : ""}: ${item.content}`}
+      accessibilityHint="Mantén presionado para eliminar"
+      onLongPress={() => onDelete(item.id)}
+    >
+      <View style={styles.bookRow} accessible={false} importantForAccessibility="no-hide-descendants">
+        {item.book_cover ? (
+          <Image source={{ uri: item.book_cover }} style={styles.cover} />
+        ) : (
+          <View style={[styles.cover, styles.noCover]}>
+            <Ionicons name="book" size={16} color={colors.textDim} />
+          </View>
+        )}
+        <View style={styles.bookInfo}>
+          <Text style={styles.bookTitle} numberOfLines={1}>{item.book_title}</Text>
+          <Text style={styles.bookAuthor} numberOfLines={1}>{item.book_author}</Text>
+        </View>
+      </View>
+      <Text style={styles.content}>{item.content}</Text>
+      <View style={styles.metaRow} accessible={false} importantForAccessibility="no-hide-descendants">
+        {!!item.page && <Text style={styles.pageBadge}>Página {item.page}</Text>}
+        <Text style={styles.date}>{formatDate(item.created_at)}</Text>
+        <View style={styles.actions}>
+          <TouchableOpacity
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Editar nota de ${item.book_title}`}
+            onPress={() => navigation.navigate("NoteEditor", { note: item, onGoBack: onUpdate })}
+            style={styles.actionBtn}
+          >
+            <Ionicons name="pencil-outline" size={18} color={colors.accent} accessible={false} />
+          </TouchableOpacity>
+          <TouchableOpacity
+            hitSlop={8}
+            accessibilityRole="button"
+            accessibilityLabel={`Eliminar nota de ${item.book_title}`}
+            onPress={() => onDelete(item.id)}
+            style={styles.actionBtn}
+          >
+            <Ionicons name="trash-outline" size={18} color={colors.danger} accessible={false} />
+          </TouchableOpacity>
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+});
+
 export default function NotesScreen({ navigation }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [notes, setNotes] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const hasLoadedRef = useRef(false);
+
+  const fetchNotes = useCallback(async (isActive = () => true) => {
+    if (hasLoadedRef.current) setRefreshing(true);
+    else setLoading(true);
+    try {
+      const rows = await getAllNotes();
+      if (isActive()) setNotes(rows);
+    } catch (error) {
+      if (isActive()) logUnexpectedError(error);
+    } finally {
+      if (isActive()) {
+        hasLoadedRef.current = true;
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
+  const refreshNotes = useCallback(() => fetchNotes(), [fetchNotes]);
 
   useFocusEffect(
     useCallback(() => {
-      let cancelled = false;
-      setLoading(true);
-      getAllNotes()
-        .then((rows) => { if (!cancelled) setNotes(rows); })
-        .catch(logUnexpectedError)
-        .finally(() => { if (!cancelled) setLoading(false); });
-      return () => { cancelled = true; };
-    }, [])
+      let active = true;
+      fetchNotes(() => active);
+      return () => { active = false; };
+    }, [fetchNotes])
   );
 
-  const handleDeleteNote = (id) => {
+  const handleDeleteNote = useCallback((id) => {
     AppAlert.alert("Eliminar nota", "¿Eliminar esta nota?", [
       { text: "Cancelar", style: "cancel" },
       {
@@ -41,7 +111,25 @@ export default function NotesScreen({ navigation }) {
         },
       },
     ]);
-  };
+  }, []);
+
+  const updateNote = useCallback((updated) => {
+    setNotes((prev) => prev.map((note) => (note.id === updated.id ? updated : note)));
+  }, []);
+
+  const renderNoteItem = useCallback(
+    ({ item }) => (
+      <NoteRow
+        item={item}
+        colors={colors}
+        styles={styles}
+        navigation={navigation}
+        onDelete={handleDeleteNote}
+        onUpdate={updateNote}
+      />
+    ),
+    [colors, styles, navigation, handleDeleteNote, updateNote]
+  );
 
   return (
     <View style={styles.container}>
@@ -51,67 +139,19 @@ export default function NotesScreen({ navigation }) {
         </TouchableOpacity>
         <Text style={styles.title}>Notas</Text>
       </View>
-      {loading ? (
+      {loading && !hasLoadedRef.current ? (
         <ActivityIndicator color={colors.accent} style={{ marginTop: 40 }} />
       ) : (
         <FlatList
           data={notes}
-          keyExtractor={(item) => String(item.id)}
+          keyExtractor={noteKeyExtractor}
           contentContainerStyle={{ paddingBottom: 30 }}
-          renderItem={({ item }) => (
-            <TouchableOpacity
-              style={styles.card}
-              activeOpacity={0.7}
-              accessibilityRole="button"
-              accessibilityLabel={`Nota de ${item.book_title}${item.page ? `, página ${item.page}` : ""}: ${item.content}`}
-              accessibilityHint="Mantén presionado para eliminar"
-              onLongPress={() => handleDeleteNote(item.id)}
-            >
-              <View style={styles.bookRow} accessible={false} importantForAccessibility="no-hide-descendants">
-                {item.book_cover ? (
-                  <Image source={{ uri: item.book_cover }} style={styles.cover} />
-                ) : (
-                  <View style={[styles.cover, styles.noCover]}>
-                    <Ionicons name="book" size={16} color={colors.textDim} />
-                  </View>
-                )}
-                <View style={styles.bookInfo}>
-                  <Text style={styles.bookTitle} numberOfLines={1}>{item.book_title}</Text>
-                  <Text style={styles.bookAuthor} numberOfLines={1}>{item.book_author}</Text>
-                </View>
-              </View>
-              <Text style={styles.content}>{item.content}</Text>
-              <View style={styles.metaRow} accessible={false} importantForAccessibility="no-hide-descendants">
-                {!!item.page && <Text style={styles.pageBadge}>Página {item.page}</Text>}
-                <Text style={styles.date}>{formatDate(item.created_at)}</Text>
-                <View style={styles.actions}>
-                  <TouchableOpacity
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Editar nota de ${item.book_title}`}
-                    onPress={() =>
-                      navigation.navigate("NoteEditor", {
-                        note: item,
-                        onGoBack: (updated) =>
-                          setNotes((prev) => prev.map((n) => (n.id === updated.id ? updated : n))),
-                      })
-                    }
-                    style={styles.actionBtn}
-                  >
-                    <Ionicons name="pencil-outline" size={18} color={colors.accent} accessible={false} />
-                  </TouchableOpacity>
-                  <TouchableOpacity hitSlop={8} accessibilityRole="button" accessibilityLabel={`Eliminar nota de ${item.book_title}`} onPress={() => handleDeleteNote(item.id)} style={styles.actionBtn}>
-                    <Ionicons name="trash-outline" size={18} color={colors.danger} accessible={false} />
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </TouchableOpacity>
-          )}
+          renderItem={renderNoteItem}
           ListEmptyComponent={
             <Text style={styles.empty}>Aún no tienes notas{"\n"}Escríbelas desde la página de un libro</Text>
           }
-          onRefresh={() => getAllNotes().then(setNotes).catch(logUnexpectedError)}
-          refreshing={loading && notes.length > 0}
+          onRefresh={refreshNotes}
+          refreshing={refreshing}
         />
       )}
     </View>
