@@ -31,13 +31,16 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
   const progress = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    Animated.timing(progress, {
-      toValue: barHeight,
+    progress.setValue(0);
+    const animation = Animated.timing(progress, {
+      toValue: 1,
       duration: 420,
       delay,
       easing: Easing.out(Easing.cubic),
-      useNativeDriver: false,
-    }).start();
+      useNativeDriver: true,
+    });
+    animation.start();
+    return () => animation.stop();
   }, [barHeight, delay, progress]);
 
   return (
@@ -55,7 +58,12 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
         <Animated.View
           style={[
             styles.bar,
-            { backgroundColor: d.met ? colors.calendarComplete : colors.accent, height: progress },
+            {
+              backgroundColor: d.met ? colors.calendarComplete : colors.accent,
+              height: barHeight,
+              transformOrigin: "bottom",
+              transform: [{ scaleY: progress }],
+            },
           ]}
         />
       </View>
