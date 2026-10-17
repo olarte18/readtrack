@@ -73,11 +73,8 @@ async function ensureChannel() {
   }
 }
 
-function streakBody(streak) {
-  if (streak && streak > 0) {
-    return `Hoy aún no lees. 15 minutos mantienen tu racha de ${streak} ${streak === 1 ? "día" : "días"}.`;
-  }
-  return "¡Da el primer paso! 15 minutos hoy arrancan tu racha.";
+function streakBody() {
+  return "Hoy es un buen día para leer. 15 minutos cuentan para tu racha.";
 }
 
 /**
@@ -94,11 +91,11 @@ function targetSlots(now, hour, minute, { skipToday = false } = {}) {
   return slots;
 }
 
-async function scheduleOneShot(target, streak) {
+async function scheduleOneShot(target) {
   return Notifications.scheduleNotificationAsync({
     content: {
       title: "Tu racha de lectura",
-      body: streakBody(streak),
+      body: streakBody(),
       data: { kind: "streak-reminder", url: "readtrack://reading" },
     },
     trigger: {
@@ -118,6 +115,19 @@ async function cancelPending(id) {
   }
 }
 
+async function cancelManagedPending() {
+  try {
+    const pending = await Notifications.getAllScheduledNotificationsAsync();
+    for (const notification of pending) {
+      if (notification.content?.data?.kind === "streak-reminder") {
+        await cancelPending(notification.identifier);
+      }
+    }
+  } catch (e) {
+    logError("consultar notificaciones programadas", e);
+  }
+}
+
 /**
  * Mantiene una ventana móvil de recordatorios (hoy + LOOKAHEAD_DAYS) a la hora
  * configurada, para que el recordatorio del día exista aunque no se abra la
@@ -132,45 +142,26 @@ export async function reconcileStreakReminder(userId, { hasSessionToday, streak 
 
   const now = new Date();
   const targets = targetSlots(now, cfg.hour, cfg.minute, { skipToday: !!hasSessionToday });
-  const wanted = new Map(targets.map((t) => [t.getTime(), t]));
-
-  let changed = false;
+  const stored = Array.isArray(cfg.notifIds) ? cfg.notifIds : [];
+  const idsToCancel = new Set(stored.map((entry) => entry && entry.id).filter(Boolean));
   if (cfg.notifId != null) {
-    await cancelPending(cfg.notifId);
+    idsToCancel.add(cfg.notifId);
     delete cfg.notifId;
     delete cfg.scheduledFor;
-    changed = true;
   }
+  await cancelManagedPending();
+  for (const id of idsToCancel) await cancelPending(id);
 
-  const stored = Array.isArray(cfg.notifIds) ? cfg.notifIds : [];
   const nextIds = [];
-
-  for (const entry of stored) {
-    const kept = entry && wanted.has(entry.date);
-    if (kept) {
-      nextIds.push({ date: entry.date, id: entry.id });
-      wanted.delete(entry.date);
-    } else {
-      changed = true;
-      await cancelPending(entry && entry.id);
-    }
-  }
-
-  for (const [date, slot] of wanted) {
-    const id = await scheduleOneShot(slot, streak);
+  for (const slot of targets) {
+    const date = slot.getTime();
+    const id = await scheduleOneShot(slot);
     if (id != null) {
       nextIds.push({ date, id });
-      changed = true;
     }
   }
 
-  const same =
-    nextIds.length === stored.length &&
-    nextIds.every((e, i) => e.date === stored[i].date && e.id === stored[i].id);
-
-  if (changed || !same) {
-    await saveConfig(userId, { ...cfg, notifIds: nextIds });
-  }
+  await saveConfig(userId, { ...cfg, notifIds: nextIds });
   return { ...cfg, notifIds: nextIds };
 }
 
@@ -195,6 +186,7 @@ export async function disableStreakReminder(userId) {
   const ids = Array.isArray(cfg.notifIds) ? cfg.notifIds : [];
   for (const entry of ids) await cancelPending(entry && entry.id);
   if (cfg.notifId != null) await cancelPending(cfg.notifId);
+  await cancelManagedPending();
   const next = { ...DEFAULT_CONFIG };
   await saveConfig(userId, next);
   return next;
