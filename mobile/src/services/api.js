@@ -365,6 +365,11 @@ export const searchBooks = async (q) => {
   return res.books ?? [];
 };
 
+export const getDiscoveryBooks = async (genre) => {
+  const res = await getWithCache(`/books/discover?genre=${encodeURIComponent(genre)}`);
+  return res.books ?? [];
+};
+
 export const addBook = async (book, status = "pending") =>
   request("/user-books", {
     method: "POST",
@@ -430,6 +435,8 @@ export const uploadBookCover = async (bookId, base64) => {
 };
 
 export const getStats = async (year) => getWithCache(year ? `/stats?year=${year}` : "/stats");
+
+export const getReadingBreakdown = async () => getWithCache("/stats/breakdown");
 
 export const getStatsActivity = async ({ view, year, month, date }) => {
   const params = [`view=${view}`];

@@ -4,6 +4,7 @@ const pool = require("../db/connection");
 const httpError = require("../utils/httpError");
 const { validate } = require("../utils/validators");
 const cache = require("../utils/cache");
+const { translateTitle } = require("../utils/translate");
 const authMiddleware = require("../middleware/auth");
 const { makeLimiter } = require("../middleware/rateLimit");
 const { uploadCover, isConfigured } = require("../utils/coverStorage");
@@ -19,6 +20,16 @@ const coverUploadLimiter = makeLimiter({
 
 const GOOGLE_API = "https://www.googleapis.com/books/v1";
 const OPENLIBRARY_API = "https://openlibrary.org";
+const DISCOVERY_GENRES = {
+  fantasy: { label: "Fantasía", subject: "fantasy" },
+  fiction: { label: "Ficción", subject: "fiction" },
+  mystery: { label: "Misterio", subject: "mystery" },
+  romance: { label: "Romance", subject: "romance" },
+  science_fiction: { label: "Ciencia ficción", subject: "science_fiction" },
+  horror: { label: "Terror", subject: "horror" },
+  history: { label: "Historia", subject: "history" },
+  biography: { label: "Biografía", subject: "biography" },
+};
 
 const normKey = (s) =>
   String(s ?? "")
@@ -278,6 +289,112 @@ router.get("/search", async (req, res) => {
   // intento del usuario debe volver a consultar las fuentes.
   if (books.length > 0) cache.set(cacheKey, result, 600000);
   res.json(result);
+});
+
+const DISCOVERY_LIMIT = 20;
+const OL_FIELDS_SPA =
+  "key,title,author_name,first_publish_year,cover_i,edition_count,editions,editions.title,editions.language,editions.cover_i";
+const OL_FIELDS_ALL = "key,title,author_name,first_publish_year,cover_i,edition_count";
+
+const coverUrl = (id) => (id ? `https://covers.openlibrary.org/b/id/${id}-M.jpg` : null);
+
+// La edición en español viene en el subobjeto editions (con language:spa en la query
+// el servidor filtra por español). Devuelve la primera con título y portada.
+function spanishEdition(doc) {
+  const docs = doc?.editions?.docs;
+  if (!Array.isArray(docs)) return null;
+  return docs.find((ed) => Array.isArray(ed?.language) && ed.language.includes("spa") && ed?.title) ?? null;
+}
+
+// GET /books/discover?genre=fantasy — selección general ordenada por ediciones
+// registradas en Open Library (señal pública de popularidad, no de ReadTrack).
+// Prioriza obras con edición en español (título/portada reales); a las que no la
+// tienen les traduce el título al español como respaldo.
+router.get("/discover", authMiddleware, async (req, res) => {
+  const genre = DISCOVERY_GENRES[String(req.query.genre ?? "")];
+  if (!genre) throw httpError(400, "Género no válido");
+
+  const cacheKey = `books:discover:${req.query.genre}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  const subject = encodeURIComponent(`subject:${genre.subject}`);
+  const spaUrl = `${OPENLIBRARY_API}/search.json?q=${subject}%20language%3Aspa&sort=editions&limit=25&fields=${OL_FIELDS_SPA}`;
+  const allUrl = `${OPENLIBRARY_API}/search.json?q=${subject}&sort=editions&limit=25&fields=${OL_FIELDS_ALL}`;
+
+  let spaOk = false;
+  let allOk = false;
+  let spaDocs = [];
+  let allDocs = [];
+  try {
+    const [spaRes, allRes] = await Promise.all([fetch(spaUrl), fetch(allUrl)]);
+    spaOk = spaRes.ok;
+    allOk = allRes.ok;
+    if (spaOk) spaDocs = (await spaRes.json())?.docs ?? [];
+    if (allOk) allDocs = (await allRes.json())?.docs ?? [];
+  } catch {
+    throw httpError(502, "No se pudo consultar el catálogo de libros");
+  }
+  if (!spaOk && !allOk) throw httpError(502, "No se pudo consultar el catálogo de libros");
+
+  const byEditions = (docs) => [...docs].sort((a, b) => (b.edition_count ?? 0) - (a.edition_count ?? 0));
+  const seen = new Set();
+  const books = [];
+
+  for (const doc of byEditions(spaDocs)) {
+    if (books.length >= DISCOVERY_LIMIT) break;
+    if (!doc?.key || !doc?.title || seen.has(doc.key)) continue;
+    seen.add(doc.key);
+    const ed = spanishEdition(doc);
+    const title = ed?.title ?? doc.title;
+    books.push({
+      id: doc.key.split("/").pop(),
+      workKey: doc.key,
+      title, // edición en español: título real, es lo que se guarda
+      display_title: title,
+      original_title: doc.title,
+      translated: false,
+      author: doc.author_name?.[0] ?? "Autor desconocido",
+      year: doc.first_publish_year ?? null,
+      pages: null,
+      cover: coverUrl(ed?.cover_i) ?? coverUrl(doc.cover_i),
+      isbn: null,
+      description: null,
+      genre: genre.label,
+      edition_count: Number(doc.edition_count) || 0,
+      source: "openlibrary",
+    });
+  }
+
+  // Relleno: obras sin edición en español. Se traduce el título para mostrarlo,
+  // pero `title` conserva el original real (evita guardar títulos inventados).
+  for (const doc of byEditions(allDocs)) {
+    if (books.length >= DISCOVERY_LIMIT) break;
+    if (!doc?.key || !doc?.title || seen.has(doc.key)) continue;
+    seen.add(doc.key);
+    const translated = await translateTitle(doc.title);
+    books.push({
+      id: doc.key.split("/").pop(),
+      workKey: doc.key,
+      title: doc.title,
+      display_title: translated ?? doc.title,
+      original_title: doc.title,
+      translated: Boolean(translated),
+      author: doc.author_name?.[0] ?? "Autor desconocido",
+      year: doc.first_publish_year ?? null,
+      pages: null,
+      cover: coverUrl(doc.cover_i),
+      isbn: null,
+      description: null,
+      genre: genre.label,
+      edition_count: Number(doc.edition_count) || 0,
+      source: "openlibrary",
+    });
+  }
+
+  const payload = { genre: genre.label, popularity_basis: "edition_count", books };
+  if (books.length) cache.set(cacheKey, payload, 3600000);
+  res.json(payload);
 });
 
 // GET /books/:id

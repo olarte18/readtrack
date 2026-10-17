@@ -157,7 +157,7 @@ export default function BookDetailScreen({ route, navigation }) {
   const handleDelete = () => {
     AppAlert.alert(
       "Quitar de biblioteca",
-      `¿Quitar "${book.title}" de tu biblioteca?`,
+      `¿Quitar "${book.display_title || book.title}" de tu biblioteca?`,
       [
         { text: "Cancelar", style: "cancel" },
         {
@@ -267,8 +267,11 @@ export default function BookDetailScreen({ route, navigation }) {
             <Ionicons name="book" size={48} color={colors.textDim} />
           </View>
         )}
-        <Text style={styles.title}>{String(book.title)}</Text>
+        <Text style={styles.title}>{String(book.display_title || book.title)}</Text>
         <Text style={styles.author}>{String(book.author)}</Text>
+        {book.translated && book.original_title && book.original_title !== (book.display_title || book.title) && (
+          <Text style={styles.meta}>Título original: {String(book.original_title)}</Text>
+        )}
         {!!book.year && <Text style={styles.meta}>{String(book.year)}</Text>}
         {(!!book.pages || !!book.chapters) && (
           <Text style={styles.meta}>

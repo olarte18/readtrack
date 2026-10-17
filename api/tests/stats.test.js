@@ -129,6 +129,56 @@ describe("GET /stats", () => {
   });
 });
 
+describe("GET /stats/genres", () => {
+  test("agrupa libros completados por categoría y usa genre como respaldo", async () => {
+    const { token } = await registerUser();
+    const fantasy = await addBook(token, { title: "Fantasía", genre: "Fantasía", author: "Autor A", publisher: "Editorial Norte" });
+    const hybrid = await addBook(token, { title: "Híbrido", genre: "Fantasía", author: "Autora B", publisher: "Editorial Sur" });
+    const mystery = await addBook(token, { title: "Misterio", genre: "Misterio", author: "Autor A", publisher: "Editorial Norte" });
+    const reading = await addBook(token, { title: "Aún leyendo", genre: "Fantasía" });
+
+    for (const book of [fantasy, hybrid, mystery]) {
+      await pool.query("UPDATE user_books SET status = 'completed' WHERE id = $1", [book.id]);
+    }
+    await pool.query("UPDATE user_books SET status = 'reading' WHERE id = $1", [reading.id]);
+
+    const { rows } = await pool.query("SELECT id FROM books WHERE title = 'Híbrido'");
+    await pool.query(
+      "INSERT INTO book_categories (book_id, name, is_primary, position) VALUES ($1, 'Ficción especulativa', true, 0), ($1, 'Fantasía', false, 1)",
+      [rows[0].id]
+    );
+
+    const res = await request(app).get("/stats/breakdown").set(authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({
+      total_books: 3,
+      genres: [
+        { name: "Fantasía", books: 2 },
+        { name: "Ficción especulativa", books: 1 },
+        { name: "Misterio", books: 1 },
+      ],
+      authors: [
+        { name: "Autor A", books: 2 },
+        { name: "Autora B", books: 1 },
+      ],
+      publishers: [
+        { name: "Editorial Norte", books: 2 },
+        { name: "Editorial Sur", books: 1 },
+      ],
+    });
+  });
+
+  test("devuelve una lista vacía para quien no ha completado libros y exige autenticación", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).get("/stats/breakdown").set(authHeader(token));
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ total_books: 0, genres: [], authors: [], publishers: [] });
+
+    const unauthorized = await request(app).get("/stats/breakdown");
+    expect(unauthorized.status).toBe(401);
+  });
+});
+
 describe("GET /stats/streak", () => {
   test("sin sesiones devuelve current 0 y best 0", async () => {
     const { token } = await registerUser();

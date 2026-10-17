@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState, useCallback } from "react";
 import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
-import { getStats, getStatsActivity, logUnexpectedError } from "../services/api";
+import { getStats, getReadingBreakdown, getStatsActivity, logUnexpectedError } from "../services/api";
 import { getPending } from "../services/offline";
 import { activityWithLocal } from "../utils/offlineCompute";
 import { todayString } from "../utils/dates";
@@ -60,6 +60,7 @@ export default function StatsScreen({ navigation }) {
   const [weekDate, setWeekDate] = useState(now.iso);
   const [activity, setActivity] = useState(null);
   const [stats, setStats] = useState(null);
+  const [genreStats, setGenreStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -91,6 +92,14 @@ export default function StatsScreen({ navigation }) {
 
   useEffect(() => {
     let cancelled = false;
+    getReadingBreakdown()
+      .then((res) => { if (!cancelled) setGenreStats(res); })
+      .catch(logUnexpectedError);
+    return () => { cancelled = true; };
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
     setLoading(true);
     const params = { view };
     if (view === "year") params.year = year;
@@ -106,7 +115,8 @@ export default function StatsScreen({ navigation }) {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      await Promise.all([fetchStats(), fetchActivity()]);
+      const [, , breakdown] = await Promise.all([fetchStats(), fetchActivity(), getReadingBreakdown()]);
+      setGenreStats(breakdown);
     } catch (e) {
       logUnexpectedError(e);
     } finally {
@@ -361,6 +371,42 @@ export default function StatsScreen({ navigation }) {
         </View>
       )}
 
+      {[
+        ["Géneros que has leído", genreStats?.genres, "Cuando termines libros con género registrado, verás aquí tus patrones de lectura."],
+        ["Autores que más has leído", genreStats?.authors, "Cuando termines libros con autor registrado, verás aquí tus autores más leídos."],
+        ["Editoriales", genreStats?.publishers, "Cuando termines libros con editorial registrada, verás aquí tus editoriales más frecuentes."],
+      ].map(([title, items, emptyText]) => (
+        <View key={title}>
+          <Text style={styles.sectionTitle}>{title}</Text>
+          <View style={styles.genreCard}>
+            {items?.length ? (
+              items.slice(0, 5).map((item) => {
+                const maxBooks = items[0].books;
+                return (
+                  <View
+                    key={item.name}
+                    style={styles.genreRow}
+                    accessible
+                    accessibilityLabel={`${item.name}: ${item.books} ${item.books === 1 ? "libro" : "libros"} terminados`}
+                  >
+                    <View style={styles.genreHeading}>
+                      <Text style={styles.genreName} numberOfLines={1}>{item.name}</Text>
+                      <Text style={styles.genreCount}>{item.books}</Text>
+                    </View>
+                    <View style={styles.genreTrack} accessible={false}>
+                      <View style={[styles.genreFill, { width: `${Math.max(8, (item.books / maxBooks) * 100)}%` }]} />
+                    </View>
+                  </View>
+                );
+              })
+            ) : (
+              <Text style={styles.genreEmpty}>
+                {genreStats ? emptyText : "Cargando tus estadísticas…"}
+              </Text>
+            )}
+          </View>
+        </View>
+      ))}
       <Text style={styles.sectionTitle}>Tu biblioteca</Text>
       <View style={styles.grid}>
         {STAT_ITEMS.map((item) => (
@@ -443,4 +489,12 @@ const createStyles = (colors) =>
     bigStatTop: { flexDirection: "row", alignItems: "center", gap: 6 },
     bigStatNumber: { fontSize: 20, fontWeight: "bold", color: colors.accent },
     bigStatLabel: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
+    genreCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, gap: 14 },
+    genreRow: { gap: 6 },
+    genreHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
+    genreName: { flex: 1, color: colors.text, fontSize: 13, fontWeight: "600" },
+    genreCount: { color: colors.textMuted, fontSize: 12, fontWeight: "600" },
+    genreTrack: { height: 7, backgroundColor: colors.surfaceAlt, borderRadius: 5, overflow: "hidden" },
+    genreFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 5 },
+    genreEmpty: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
   });

@@ -47,6 +47,64 @@ router.get("/streak", async (req, res) => {
   res.json(payload);
 });
 
+// GET /stats/breakdown — categorías, autores y editoriales de libros terminados.
+router.get("/breakdown", async (req, res) => {
+  const cacheKey = `stats:${req.userId}:breakdown`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  const { rows } = await pool.query(`
+    WITH completed AS (
+      SELECT DISTINCT b.id AS book_id, b.genre, b.author, b.publisher
+      FROM user_books ub
+      JOIN books b ON b.id = ub.book_id
+      WHERE ub.user_id = $1
+        AND ub.status = 'completed'
+        AND ub.is_archived = FALSE
+    ), classified AS (
+      SELECT c.book_id, BTRIM(bc.name) AS name, 'genre' AS kind
+      FROM completed c
+      JOIN book_categories bc ON bc.book_id = c.book_id
+      WHERE BTRIM(COALESCE(bc.name, '')) <> ''
+      UNION
+      SELECT c.book_id, BTRIM(c.genre) AS name, 'genre' AS kind
+      FROM completed c
+      WHERE BTRIM(COALESCE(c.genre, '')) <> ''
+        AND NOT EXISTS (
+          SELECT 1 FROM book_categories bc
+          WHERE bc.book_id = c.book_id AND BTRIM(COALESCE(bc.name, '')) <> ''
+        )
+      UNION
+      SELECT c.book_id, BTRIM(c.author) AS name, 'author' AS kind
+      FROM completed c
+      WHERE BTRIM(COALESCE(c.author, '')) <> ''
+      UNION
+      SELECT c.book_id, BTRIM(c.publisher) AS name, 'publisher' AS kind
+      FROM completed c
+      WHERE BTRIM(COALESCE(c.publisher, '')) <> ''
+    )
+    SELECT kind, name, COUNT(DISTINCT book_id)::int AS books
+    FROM classified
+    GROUP BY kind, name
+    ORDER BY kind, books DESC, LOWER(name) ASC
+  `, [req.userId]);
+
+  const { rows: totals } = await pool.query(`
+    SELECT COUNT(DISTINCT ub.book_id)::int AS total_books
+    FROM user_books ub
+    WHERE ub.user_id = $1 AND ub.status = 'completed' AND ub.is_archived = FALSE
+  `, [req.userId]);
+
+  const payload = {
+    total_books: totals[0].total_books,
+    genres: rows.filter((row) => row.kind === "genre").map(({ name, books }) => ({ name, books })),
+    authors: rows.filter((row) => row.kind === "author").map(({ name, books }) => ({ name, books })),
+    publishers: rows.filter((row) => row.kind === "publisher").map(({ name, books }) => ({ name, books })),
+  };
+  cache.set(cacheKey, payload, 60000);
+  res.json(payload);
+});
+
 // GET /stats?year=YYYY — mismas stats, pero las del año (completados/meta) usan el año pedido
 // en lugar del actual.
 router.get("/", async (req, res) => {

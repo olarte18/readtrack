@@ -14,11 +14,13 @@ function BookCard({ book, onPress }) {
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const statusText = book.status ? STATUS_LABEL[book.status] : null;
+  const displayTitle = book.display_title || book.title;
+  const showOriginal = book.translated && book.original_title && book.original_title !== displayTitle;
   const pagesText =
     book.status === "reading" && book.current_page && book.pages
       ? `Página ${book.current_page} de ${book.pages}`
       : null;
-  const label = [book.title, book.author, statusText, pagesText]
+  const label = [displayTitle, book.author, statusText, pagesText]
     .filter(Boolean)
     .join(", ");
   return (
@@ -49,8 +51,11 @@ function BookCard({ book, onPress }) {
         accessible={false}
         importantForAccessibility="no-hide-descendants"
       >
-        <Text style={styles.title} numberOfLines={2}>{book.title}</Text>
+        <Text style={styles.title} numberOfLines={2}>{displayTitle}</Text>
         <Text style={styles.author}>{book.author}</Text>
+        {showOriginal && (
+          <Text style={styles.translated} numberOfLines={1}>Título original: {book.original_title}</Text>
+        )}
         {statusText && (
           <Text style={styles.status}>{statusText}</Text>
         )}
@@ -93,6 +98,7 @@ const createStyles = (colors) =>
   info: { flex: 1, marginLeft: 12 },
   title: { fontSize: 15, fontWeight: "bold", color: colors.text, marginBottom: 4 },
   author: { fontSize: 13, color: colors.textMuted, marginBottom: 6 },
+  translated: { fontSize: 11, color: colors.textDim, marginBottom: 6 },
   status: { fontSize: 12, color: colors.accent },
   pages: { fontSize: 11, color: colors.textDim, marginTop: 2 },
 });

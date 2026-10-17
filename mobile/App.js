@@ -17,6 +17,7 @@ import RegisterScreen from "./src/screens/RegisterScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
 import { Ionicons } from "@expo/vector-icons";
 import StatsScreen from "./src/screens/StatsScreen";
+import DiscoverScreen from "./src/screens/DiscoverScreen";
 import ReadingScreen from "./src/screens/ReadingScreen";
 import ActiveSessionScreen from "./src/screens/ActiveSessionScreen";
 import ReadingModeScreen from "./src/screens/ReadingModeScreen";
@@ -69,12 +70,14 @@ function HomeTabs() {
       screenOptions={({ route }) => ({
         headerShown: false,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarLabelStyle: { fontSize: 10 },
         tabBarActiveTintColor: colors.accent,
         tabBarInactiveTintColor: colors.textDim,
         tabBarIcon: ({ focused, color, size }) => {
           let iconName;
           if (route.name === "Reading") iconName = focused ? "book" : "book-outline";
           else if (route.name === "Home") iconName = focused ? "library" : "library-outline";
+          else if (route.name === "Discover") iconName = focused ? "compass" : "compass-outline";
           else if (route.name === "Stats") iconName = focused ? "stats-chart" : "stats-chart-outline";
           else if (route.name === "Calendar") iconName = focused ? "calendar" : "calendar-outline";
           else if (route.name === "Profile") iconName = focused ? "person" : "person-outline";
@@ -83,6 +86,7 @@ function HomeTabs() {
       })}
     >
       <Tab.Screen name="Home" component={HomeScreen} options={{ tabBarLabel: "Biblioteca" }} />
+      <Tab.Screen name="Discover" component={DiscoverScreen} options={{ tabBarLabel: "Descubrir" }} />
       <Tab.Screen name="Stats" component={StatsScreen} options={{ tabBarLabel: "Estadísticas" }} />
       <Tab.Screen name="Reading" component={ReadingScreen} options={{ tabBarLabel: "Leyendo" }} />
       <Tab.Screen name="Calendar" component={CalendarScreen} options={{ tabBarLabel: "Calendario" }} />

@@ -66,6 +66,110 @@ beforeAll(() => {
 
 const emptyExternal = { googleItems: [], olDocs: [] };
 
+describe("GET /books/discover", () => {
+  const translate = require("../src/utils/translate");
+
+  // Mock de las dos consultas a Open Library (español y general) + MyMemory.
+  function mockDiscover({ spaDocs = [], allDocs = [], translations = {} } = {}) {
+    const fetchMock = jest.fn(async (url) => {
+      const u = String(url);
+      if (u.includes("mymemory.translated.net")) {
+        const q = decodeURIComponent((u.match(/[?&]q=([^&]*)/) || [])[1] || "");
+        const translatedText = translations[q] ?? q;
+        return { ok: true, json: async () => ({ responseData: { translatedText } }) };
+      }
+      if (u.includes("openlibrary.org")) {
+        if (u.includes("language%3Aspa")) return { ok: true, json: async () => ({ docs: spaDocs }) };
+        return { ok: true, json: async () => ({ docs: allDocs }) };
+      }
+      throw new Error("fetch inesperado: " + u);
+    });
+    global.fetch = fetchMock;
+    return fetchMock;
+  }
+
+  afterEach(() => translate.setEnabled(false));
+
+  test("prioriza ediciones en español con su título y portada reales", async () => {
+    const { token } = await registerUser();
+    mockDiscover({
+      spaDocs: [
+        {
+          key: "/works/OL1W",
+          title: "Alice's Adventures in Wonderland",
+          edition_count: 10,
+          author_name: ["Lewis Carroll"],
+          editions: { docs: [{ title: "Alicia en el País de las Maravillas", language: ["spa"], cover_i: 111 }] },
+        },
+      ],
+      allDocs: [
+        { key: "/works/OL1W", title: "Alice's Adventures in Wonderland", edition_count: 10 }, // duplicado, se descarta
+        { key: "/works/OL2W", title: "Some Very Popular Book", edition_count: 50 },
+      ],
+    });
+
+    const res = await request(app).get("/books/discover?genre=fantasy").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body.books).toHaveLength(2);
+    // La edición en español va primero aunque la otra tenga más ediciones.
+    expect(res.body.books[0]).toMatchObject({
+      id: "OL1W",
+      title: "Alicia en el País de las Maravillas",
+      display_title: "Alicia en el País de las Maravillas",
+      translated: false,
+      genre: "Fantasía",
+      source: "openlibrary",
+    });
+    expect(res.body.books[0].cover).toContain("/111-M.jpg");
+    // La obra sin edición en español queda después, con su título original.
+    expect(res.body.books[1].title).toBe("Some Very Popular Book");
+    expect(res.body.books[1].translated).toBe(false);
+  });
+
+  test("traduce el título cuando no hay edición en español", async () => {
+    translate.setEnabled(true);
+    const { token } = await registerUser();
+    mockDiscover({
+      spaDocs: [],
+      allDocs: [{ key: "/works/OL9W", title: "The Name of the Wind", edition_count: 5 }],
+      translations: { "The Name of the Wind": "El nombre del viento" },
+    });
+
+    const res = await request(app).get("/books/discover?genre=fantasy").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body.books[0]).toMatchObject({
+      title: "The Name of the Wind", // original real: es lo que se guarda
+      display_title: "El nombre del viento", // lo que se muestra
+      original_title: "The Name of the Wind",
+      translated: true,
+    });
+  });
+
+  test("degrada al título original si la traducción falla", async () => {
+    translate.setEnabled(true);
+    const { token } = await registerUser();
+    mockDiscover({
+      spaDocs: [],
+      allDocs: [{ key: "/works/OL9W", title: "Untranslatable Title", edition_count: 5 }],
+      translations: { "Untranslatable Title": "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY" },
+    });
+
+    const res = await request(app).get("/books/discover?genre=fantasy").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body.books[0]).toMatchObject({
+      title: "Untranslatable Title",
+      display_title: "Untranslatable Title",
+      translated: false,
+    });
+  });
+
+  test("rechaza géneros que no estén permitidos", async () => {
+    const { token } = await registerUser();
+    const res = await request(app).get("/books/discover?genre=desconocido").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(400);
+  });
+});
+
 describe("GET /books/search", () => {
   test("rechaza búsqueda sin query", async () => {
     mockExternal(emptyExternal);
