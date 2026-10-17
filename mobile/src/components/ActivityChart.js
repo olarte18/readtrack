@@ -1,31 +1,69 @@
-import { useMemo, useEffect, useRef } from "react";
-import { View, Text, StyleSheet, Animated, Easing } from "react-native";
+import { useMemo, useEffect, useRef, useState } from "react";
+import { View, Text, StyleSheet, Animated, Easing, ScrollView, useWindowDimensions } from "react-native";
 
 export default function ActivityChart({ data = [], colors, showValues = true, height = 150, formatValue, maxValue }) {
   const scaleMax = maxValue && maxValue > 0 ? maxValue : Math.max(1, ...data.map((d) => d.value));
-  const barArea = height - 30;
+  const { fontScale } = useWindowDimensions();
+  const [viewportWidth, setViewportWidth] = useState(0);
+  const fontSize = 11;
+  const textBand = Math.max(30, (fontSize * 2 + 8) * fontScale);
+  const chartHeight = height + textBand - 30;
+  const barArea = chartHeight - textBand;
+  const maxTextLength = Math.max(1, ...data.map((d) => {
+    const labelLength = String(d.label ?? "").length;
+    if (!showValues || Number(d.value) <= 0) return labelLength;
+    const valueText = formatValue ? formatValue(Number(d.value)) : d.value;
+    return Math.max(labelLength, String(valueText).length);
+  }));
+  const minColumnWidth = fontScale > 1
+    ? Math.ceil(maxTextLength * fontSize * fontScale * 0.55 + 12)
+    : 0;
+  const contentWidth = minColumnWidth * data.length;
+  const shouldScroll = fontScale > 1 && viewportWidth > 0 && contentWidth > viewportWidth;
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const onLayout = (event) => {
+    const width = event.nativeEvent.layout.width;
+    setViewportWidth((current) => (Math.abs(current - width) > 0.5 ? width : current));
+  };
+  const columns = data.map((d, i) => (
+    <BarColumn
+      key={i}
+      d={d}
+      maxValue={scaleMax}
+      barArea={barArea}
+      colors={colors}
+      styles={styles}
+      showValue={showValues}
+      formatValue={formatValue}
+      delay={i * 35}
+      columnWidth={shouldScroll ? minColumnWidth : undefined}
+    />
+  ));
+  const chart = (
+    <View style={[styles.row, { height: chartHeight, width: shouldScroll ? contentWidth : undefined }]}>
+      {columns}
+    </View>
+  );
 
   return (
-    <View style={[styles.row, { height }]}>
-      {data.map((d, i) => (
-        <BarColumn
-          key={i}
-          d={d}
-          maxValue={scaleMax}
-          barArea={barArea}
-          colors={colors}
-          styles={styles}
-          showValue={showValues}
-          formatValue={formatValue}
-          delay={i * 35}
-        />
-      ))}
-    </View>
+    shouldScroll ? (
+      <ScrollView
+        horizontal
+        style={{ height: chartHeight }}
+        onLayout={onLayout}
+        showsHorizontalScrollIndicator
+      >
+        {chart}
+      </ScrollView>
+    ) : (
+      <View style={{ height: chartHeight }} onLayout={onLayout}>
+        {chart}
+      </View>
+    )
   );
 }
 
-function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValue, delay }) {
+function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValue, delay, columnWidth }) {
   const value = Number(d.value) || 0;
   const barHeight = Math.max(Math.min(value / maxValue, 1) * (barArea - 6), value > 0 ? 4 : 2);
   const progress = useRef(new Animated.Value(0)).current;
@@ -44,9 +82,9 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
   }, [barHeight, delay, progress]);
 
   return (
-    <View style={styles.col}>
+    <View style={[styles.col, columnWidth ? { flex: 0, width: columnWidth } : null]}>
       {showValue ? (
-        <Text style={[styles.value, value > 0 && styles.valueActive]} numberOfLines={1}>
+        <Text allowFontScaling style={[styles.value, value > 0 && styles.valueActive]} numberOfLines={1}>
           {value > 0 ? (formatValue ? formatValue(value) : value) : ""}
         </Text>
       ) : null}
@@ -67,7 +105,7 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
           ]}
         />
       </View>
-      <Text style={styles.label} numberOfLines={1}>
+      <Text allowFontScaling style={styles.label} numberOfLines={1}>
         {d.label}
       </Text>
     </View>
@@ -78,9 +116,9 @@ const createStyles = (colors) =>
   StyleSheet.create({
     row: { flexDirection: "row", alignItems: "flex-start" },
     col: { flex: 1, alignItems: "center" },
-    value: { fontSize: 9, color: colors.textMuted, marginBottom: 2 },
+    value: { fontSize: 11, color: colors.textMuted, marginBottom: 2 },
     valueActive: { color: colors.accent, fontWeight: "bold" },
     track: { width: "62%", borderRadius: 6, overflow: "hidden", justifyContent: "flex-end" },
     bar: { width: "100%" },
-    label: { fontSize: 9, color: colors.textMuted, marginTop: 3 },
+    label: { fontSize: 11, color: colors.textMuted, marginTop: 3 },
   });
