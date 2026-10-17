@@ -545,3 +545,41 @@ describe("feedback de racha al guardar (streakState)", () => {
     expect(later.streakState).toBeNull();
   });
 });
+
+describe("GET /reading-sessions/speeds", () => {
+  async function createReadingBook(token, googleId) {
+    const res = await request(app)
+      .post("/user-books")
+      .set(authHeader(token))
+      .send({ google_id: googleId, title: "Velocidad", author: "Autor", pages: 300, status: "reading" });
+    expect(res.status).toBe(201);
+    return res.body;
+  }
+
+  test("devuelve velocidades agrupadas solo para libros activos del usuario", async () => {
+    const owner = await registerUser({ username: "speed_owner", email: "speed-owner@example.com" });
+    const other = await registerUser({ username: "speed_other", email: "speed-other@example.com" });
+    const bookWithSpeed = await createReadingBook(owner.token, "speed-owner-a");
+    const bookWithoutSpeed = await createReadingBook(owner.token, "speed-owner-b");
+    const otherBook = await createReadingBook(other.token, "speed-other");
+
+    await addSession(owner.token, bookWithSpeed.id, { duration_seconds: 3600, pages_read: 10 });
+    await addSession(owner.token, bookWithSpeed.id, { duration_seconds: 3600, pages_read: 20 });
+    await addSession(owner.token, bookWithSpeed.id, { duration_seconds: 0, pages_read: 100 });
+    await addSession(other.token, otherBook.id, { duration_seconds: 3600, pages_read: 99 });
+
+    const res = await request(app).get("/reading-sessions/speeds").set(authHeader(owner.token));
+
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      { user_book_id: bookWithSpeed.id, avg_pages_per_hour: 15 },
+    ]);
+    expect(res.body.some((row) => row.user_book_id === bookWithoutSpeed.id)).toBe(false);
+    expect(res.body.some((row) => row.user_book_id === otherBook.id)).toBe(false);
+  });
+
+  test("requiere autenticación", async () => {
+    const res = await request(app).get("/reading-sessions/speeds");
+    expect(res.status).toBe(401);
+  });
+});

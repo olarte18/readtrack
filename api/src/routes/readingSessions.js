@@ -196,6 +196,26 @@ router.patch("/:id", async (req, res) => {
   res.json(await withFreshAchievements(rows[0], ach));
 });
 
+// Velocidad promedio de todos los libros en curso del usuario en una sola
+// consulta, para evitar una petición por cada libro en la pantalla "Leyendo".
+router.get("/speeds", async (req, res) => {
+  const { rows } = await pool.query(
+    `SELECT ub.id AS user_book_id,
+            AVG(rs.pages_read::float / NULLIF(rs.duration_seconds, 0) * 3600) AS avg_pages_per_hour
+     FROM user_books ub
+     JOIN reading_sessions rs ON rs.user_book_id = ub.id AND rs.user_id = ub.user_id
+     WHERE ub.user_id = $1
+       AND ub.status = 'reading'
+       AND ub.is_archived = FALSE
+       AND rs.pages_read > 0
+       AND rs.duration_seconds > 0
+     GROUP BY ub.id
+     ORDER BY ub.id`,
+    [req.userId]
+  );
+  res.json(rows);
+});
+
 router.get("/:user_book_id", async (req, res) => {
   if (req.query.date) {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(req.query.date)) {

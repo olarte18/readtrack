@@ -467,6 +467,8 @@ export const updateReadingSession = async (id, data) =>
 export const getReadingSpeed = async (user_book_id) =>
   getWithCache(`/reading-sessions/${user_book_id}/speed`);
 
+export const getReadingSpeeds = async () => getWithCache("/reading-sessions/speeds");
+
 export const getReadingGoal = async () => getWithCache("/stats/goal");
 
 export const updateReadingGoal = async (goal) =>

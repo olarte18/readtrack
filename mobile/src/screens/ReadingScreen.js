@@ -4,7 +4,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useFocusEffect } from "@react-navigation/native";
 import { useTheme } from "../contexts/ThemeContext";
 import { useAuth } from "../contexts/AuthContext";
-import { getLibrary, getReadingSpeed, getStreak, getGoals, logUnexpectedError } from "../services/api";
+import { getLibrary, getReadingSpeeds, getStreak, getGoals, logUnexpectedError } from "../services/api";
 import { getPending } from "../services/offline";
 import { streakWithLocal, goalsWithLocal } from "../utils/offlineCompute";
 import { reconcileStreakReminder } from "../services/streakReminder";
@@ -37,15 +37,15 @@ export default function ReadingScreen({ navigation }) {
       const reading = all.filter((b) => b.status === "reading");
       setBooks(reading);
 
-      // Velocidad promedio (páginas/hora) de cada libro en curso
-      const entries = await Promise.all(
-        reading.map((b) =>
-          getReadingSpeed(b.id)
-            .then((d) => [b.id, d.avg_pages_per_hour > 0 ? d.avg_pages_per_hour : null])
-            .catch(() => [b.id, null])
-        )
-      );
-      setSpeeds(Object.fromEntries(entries));
+      // Una sola consulta agregada para las velocidades de todos los libros en curso.
+      const speedRows = await getReadingSpeeds().catch(() => []);
+      const speedMap = Object.fromEntries(reading.map((book) => [book.id, null]));
+      speedRows.forEach(({ user_book_id, avg_pages_per_hour }) => {
+        if (avg_pages_per_hour > 0 && user_book_id in speedMap) {
+          speedMap[user_book_id] = avg_pages_per_hour;
+        }
+      });
+      setSpeeds(speedMap);
     } catch (e) {
       logUnexpectedError(e);
     } finally {
