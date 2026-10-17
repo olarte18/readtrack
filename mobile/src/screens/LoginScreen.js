@@ -51,11 +51,11 @@ export default function LoginScreen({ navigation }) {
           <Text style={styles.btnText}>Entrar</Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Ir a registro" onPress={() => navigation.navigate("Register")}>
+      <TouchableOpacity style={[styles.linkButton, styles.firstLinkButton]} accessibilityRole="button" accessibilityLabel="Ir a registro" onPress={() => navigation.navigate("Register")}>
         <Text style={styles.link}>¿No tienes cuenta? Regístrate</Text>
       </TouchableOpacity>
-      <TouchableOpacity accessibilityRole="button" accessibilityLabel="Recuperar contraseña" onPress={() => navigation.navigate("ForgotPassword")}>
-        <Text style={[styles.link, { marginTop: 8 }]}>¿Olvidaste tu contraseña?</Text>
+      <TouchableOpacity style={styles.linkButton} accessibilityRole="button" accessibilityLabel="Recuperar contraseña" onPress={() => navigation.navigate("ForgotPassword")}>
+        <Text style={styles.link}>¿Olvidaste tu contraseña?</Text>
       </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -68,11 +68,13 @@ const createStyles = (colors) =>
     logo: { width: 110, height: 110, borderRadius: 25, alignSelf: "center", marginBottom: 16 },
     title: { fontSize: 36, fontWeight: "bold", color: colors.accent, textAlign: "center", marginBottom: 8 },
     subtitle: { fontSize: 18, color: colors.textMuted, textAlign: "center", marginBottom: 32 },
-    input: { backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, marginBottom: 12 },
+    input: { backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, minHeight: 48, fontSize: 15, marginBottom: 12 },
     passwordInputBox: { position: "relative" },
-    passwordInput: { paddingRight: 46 },
-    eyeBtn: { position: "absolute", right: 12, top: 12, padding: 4 },
-    btn: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: "center", marginTop: 8 },
+    passwordInput: { paddingRight: 60 },
+    eyeBtn: { position: "absolute", right: 4, top: 0, width: 48, height: 48, alignItems: "center", justifyContent: "center" },
+    btn: { backgroundColor: colors.accent, borderRadius: 10, minHeight: 48, paddingVertical: 14, alignItems: "center", justifyContent: "center", marginTop: 8 },
     btnText: { color: colors.onAccent, fontWeight: "bold", fontSize: 16 },
-    link: { color: colors.accent, textAlign: "center", marginTop: 20, fontSize: 14 },
+    linkButton: { minHeight: 48, justifyContent: "center", alignItems: "center" },
+    firstLinkButton: { marginTop: 12 },
+    link: { color: colors.accent, textAlign: "center", fontSize: 14 },
   });
