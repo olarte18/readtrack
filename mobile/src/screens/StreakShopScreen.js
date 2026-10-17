@@ -48,7 +48,7 @@ export default function StreakShopScreen({ navigation }) {
     }
   };
 
-  const cost = state?.cost ?? 500;
+  const cost = state?.cost ?? 400;
   const points = state?.points ?? 0;
   const owned = state?.owned ?? 0;
   const slots = state?.slots ?? 2;
@@ -89,7 +89,8 @@ export default function StreakShopScreen({ navigation }) {
             <Text style={styles.heroTitle}>Protege tu racha</Text>
             <Text style={styles.heroText}>
               Un protector cubre un día sin lectura y evita que se corte tu racha. Se usan
-              automáticamente cuando falta solo un día entre dos días con actividad.
+              automáticamente cuando falta solo un día entre dos lecturas, siempre que eso
+              mantenga viva tu racha actual. Si la racha ya se perdió, no se gastan.
             </Text>
           </View>
 

@@ -409,5 +409,7 @@ CREATE UNIQUE INDEX IF NOT EXISTS streak_protectors_user_date_uidx
 CREATE TABLE IF NOT EXISTS streak_protector_state (
   user_id         INTEGER PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
   slots           INTEGER NOT NULL DEFAULT 2,
-  last_eval_month DATE
+  last_eval_month DATE,
+  repaired_at     TIMESTAMP
 );
+ALTER TABLE streak_protector_state ADD COLUMN IF NOT EXISTS repaired_at TIMESTAMP;

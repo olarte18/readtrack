@@ -109,46 +109,120 @@ async function rolloverSlots(userId) {
   return slots;
 }
 
-// Consume protectores para cubrir huecos aislados de un día (con el día anterior
-// y el siguiente ya acreditados). Consume primero los comprados (más antiguos) y
-// el regalo al final. Al consumir, las ranuras vuelven a la base. Devuelve cuántos
-// consumió.
+// Huecos de un día que vale la pena proteger: se recorre hacia atrás el tramo de
+// días con lectura real que sigue VIVO (anclado en hoy o ayer) y solo se marcan
+// los huecos que conectan ese tramo. Si la racha ya se perdió (sin lectura hoy ni
+// ayer) no hay nada que rescatar y no se marca ningún hueco. Un tramo roto por dos
+// días o más sin lectura no se puede unir con un solo protector: ahí se corta.
+// Devuelve las fechas del hueco ordenadas de la más reciente a la más antigua.
+function requiredGaps(realDates, today, windowStart) {
+  const dates = [...new Set(realDates)].sort();
+  if (dates.length === 0) return [];
+
+  const yesterday = addDays(today, -1);
+  let i = dates.length - 1;
+  while (i >= 0 && dates[i] < yesterday) i--;
+  if (i < 0) return [];
+
+  const gaps = [];
+  let cursor = dates[i];
+  for (let j = i - 1; j >= 0; j--) {
+    const prev = dates[j];
+    const d = diffDays(prev, cursor);
+    if (d === 1) {
+      cursor = prev;
+      continue;
+    }
+    if (d === 2) {
+      const middle = addDays(prev, 1);
+      if (middle < windowStart) break;
+      gaps.push(middle);
+      cursor = prev;
+      continue;
+    }
+    break; // hueco de 2+ días: un protector no lo une.
+  }
+  return gaps;
+}
+
+// Reparación única (por usuario) del bug anterior: devuelve los protectores que
+// quedaron gastados en huecos que no conectan con la racha vigente (p. ej. una
+// racha ya perdida). Se marca en `repaired_at` para no volver a devolver nada: a
+// partir de ahí rige "una vez usado, siempre gastado".
+async function repairOnce(userId, requiredSet) {
+  await pool.query(
+    "INSERT INTO streak_protector_state (user_id, slots) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+    [userId, SLOTS_BASE]
+  );
+  const { rows: st } = await pool.query(
+    "SELECT repaired_at FROM streak_protector_state WHERE user_id = $1",
+    [userId]
+  );
+  if (st[0]?.repaired_at) return;
+
+  const { rows: usedRows } = await pool.query(
+    `SELECT id, TO_CHAR(protected_date, 'YYYY-MM-DD') AS pd
+     FROM streak_protectors
+     WHERE user_id = $1 AND used_at IS NOT NULL`,
+    [userId]
+  );
+  const toRelease = usedRows
+    .filter((r) => !r.pd || !requiredSet.has(r.pd))
+    .map((r) => r.id);
+  if (toRelease.length > 0) {
+    await pool.query(
+      `UPDATE streak_protectors
+       SET used_at = NULL, protected_date = NULL
+       WHERE user_id = $1 AND id = ANY($2::int[])`,
+      [userId, toRelease]
+    );
+  }
+  await pool.query(
+    "UPDATE streak_protector_state SET repaired_at = NOW() WHERE user_id = $1",
+    [userId]
+  );
+}
+
+// Cubre huecos vivos con los protectores disponibles. Solo CONSUME (nunca
+// devuelve): un protector gastado en un hueco válido se queda gastado. Al consumir
+// un hueco nuevo, las ranuras vuelven a la base. Devuelve cuántos huecos cubrió.
 async function reconcileProtectors(userId, buckets = null) {
   await ensureGift(userId);
   const realDates = await getQualifyingDates(userId, buckets);
-  const protectedDates = await getProtectedDates(userId);
-  const credited = [...new Set([...realDates, ...protectedDates])].sort();
-  if (credited.length < 2) return 0;
-
   const today = await appToday();
   const windowStart = addDays(today, -RECONCILE_WINDOW_DAYS);
+  const required = requiredGaps(realDates, today, windowStart);
+  const requiredSet = new Set(required);
 
-  const gaps = [];
-  for (let i = 0; i + 1 < credited.length; i++) {
-    if (diffDays(credited[i], credited[i + 1]) === 2) {
-      const middle = addDays(credited[i], 1);
-      if (middle >= windowStart && middle < today) gaps.push(middle);
-    }
-  }
-  if (gaps.length === 0) return 0;
+  await repairOnce(userId, requiredSet);
 
-  const { rows: avail } = await pool.query(
-    `SELECT id FROM streak_protectors
-     WHERE user_id = $1 AND used_at IS NULL
-     ORDER BY (source = 'gift'), bought_at ASC, id ASC`,
+  const { rows: usedRows } = await pool.query(
+    `SELECT TO_CHAR(protected_date, 'YYYY-MM-DD') AS pd
+     FROM streak_protectors
+     WHERE user_id = $1 AND used_at IS NOT NULL`,
     [userId]
   );
+  const covered = new Set(usedRows.map((r) => r.pd).filter(Boolean));
+  const missing = required.filter((d) => !covered.has(d));
 
   let used = 0;
-  for (const date of gaps) {
-    if (used >= avail.length) break;
-    const { rowCount } = await pool.query(
-      `UPDATE streak_protectors
-       SET used_at = NOW(), protected_date = $2::date
-       WHERE id = $1 AND used_at IS NULL`,
-      [avail[used].id, date]
+  if (missing.length > 0) {
+    const { rows: avail } = await pool.query(
+      `SELECT id FROM streak_protectors
+       WHERE user_id = $1 AND used_at IS NULL
+       ORDER BY (source = 'gift'), bought_at ASC, id ASC`,
+      [userId]
     );
-    if (rowCount > 0) used++;
+    for (const date of missing) {
+      if (used >= avail.length) break;
+      const { rowCount } = await pool.query(
+        `UPDATE streak_protectors
+         SET used_at = NOW(), protected_date = $2::date
+         WHERE id = $1 AND used_at IS NULL`,
+        [avail[used].id, date]
+      );
+      if (rowCount > 0) used++;
+    }
   }
 
   if (used > 0) {

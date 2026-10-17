@@ -89,7 +89,7 @@ describe("tienda de protectores", () => {
   test("el primer acceso regala un protector y arranca con 2 ranuras", async () => {
     const { token } = await registerUser();
     const shop = await getShop(token);
-    expect(shop).toMatchObject({ points: 0, cost: 500, slots: 2, owned: 1, gift_available: true, can_buy: 0 });
+    expect(shop).toMatchObject({ points: 0, cost: 400, slots: 2, owned: 1, gift_available: true, can_buy: 0 });
   });
 
   test("no se puede comprar sin puntos suficientes", async () => {
@@ -111,7 +111,7 @@ describe("tienda de protectores", () => {
 
     const res = await request(app).post("/streak/buy").set(authHeader(token));
     expect(res.status).toBe(200);
-    expect(res.body).toMatchObject({ points: 0, owned: 2, slots: 2, can_buy: 0 });
+    expect(res.body).toMatchObject({ points: 100, owned: 2, slots: 2, can_buy: 0 });
 
     // Inventario lleno: no se puede comprar otra.
     const again = await request(app).post("/streak/buy").set(authHeader(token));
@@ -150,6 +150,80 @@ describe("consumo automático en un hueco aislado", () => {
   });
 });
 
+describe("solo protege huecos que conectan con la racha activa", () => {
+  test("no gasta protectores en un hueco de una racha ya perdida", async () => {
+    const { token } = await registerUser();
+    const book = await addBook(token);
+
+    // Dos lecturas separadas por un hueco, pero sin actividad hoy ni ayer: la
+    // racha ya se perdió, así que no hay nada que rescatar.
+    await saveSession(token, book.id, { started_at: isoDaysAgo(3) });
+    await saveSession(token, book.id, { started_at: isoDaysAgo(5) });
+
+    const streak = await getStreak(token);
+    expect(streak.current).toBe(0);
+    expect(streak.protectors).toMatchObject({ available: 1 });
+
+    const { rows } = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM streak_protectors WHERE used_at IS NOT NULL"
+    );
+    expect(rows[0].n).toBe(0);
+  });
+
+  test("la reparación devuelve un protector gastado en un hueco que no conecta", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+
+    // Lecturas de hoy y ayer insertadas directo en la BD: pasar por el API ya
+    // dispararía la conciliación y marcaría la reparación como hecha.
+    await pool.query(
+      `INSERT INTO reading_sessions (user_book_id, user_id, page, duration_seconds, pages_read, started_at)
+       VALUES ($1, $2, 100, 1800, 2, NOW() - interval '1 day'), ($1, $2, 100, 1800, 2, NOW())`,
+      [book.id, user.id]
+    );
+
+    // Consumo histórico inválido: un protector gastado en un día suelto de hace
+    // 20 días que no conecta con la racha vigente.
+    const bad = new Date(Date.now() - 20 * 86400000).toISOString().slice(0, 10);
+    await pool.query(
+      "INSERT INTO streak_protectors (user_id, source, cost, bought_at, used_at, protected_date) VALUES ($1, 'buy', 400, NOW(), NOW(), $2::date)",
+      [user.id, bad]
+    );
+
+    // Al primer acceso corre la reparación única: devuelve el protector inválido
+    // (queda disponible, junto con el regalo).
+    const streak = await getStreak(token);
+    expect(streak.protectors).toMatchObject({ available: 2 });
+
+    const { rows } = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM streak_protectors WHERE used_at IS NOT NULL OR protected_date IS NOT NULL"
+    );
+    expect(rows[0].n).toBe(0);
+  });
+
+  test("una vez usado, siempre gastado: no se devuelve si la racha muere después", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+
+    // Hueco vivo entre hace 2 días y hoy: el regalo cubre ayer.
+    await saveSession(token, book.id, { started_at: isoDaysAgo(2) });
+    await saveSession(token, book.id, { started_at: isoDaysAgo(0) });
+    const first = await getStreak(token);
+    expect(first.protectors).toMatchObject({ available: 0 });
+
+    // La racha se pierde después (se borra la lectura de hoy): el protector ya
+    // gastado NO se devuelve.
+    await pool.query("DELETE FROM reading_sessions WHERE user_id = $1", [user.id]);
+    const after = await getStreak(token);
+    expect(after.protectors).toMatchObject({ available: 0 });
+
+    const { rows } = await pool.query(
+      "SELECT COUNT(*)::int AS n FROM streak_protectors WHERE used_at IS NOT NULL"
+    );
+    expect(rows[0].n).toBe(1);
+  });
+});
+
 describe("ranuras: bonus por mes perfecto", () => {
   test("sube +1 ranura al cerrar un mes con inventario lleno y sin usos", async () => {
     const { token, user } = await registerUser();
@@ -157,7 +231,7 @@ describe("ranuras: bonus por mes perfecto", () => {
     // Activa el estado (regalo + ranuras).
     await getShop(token);
 
-    // Compra otro protector para llenar las 2 ranuras (500 pts = 5 sesiones de 1 h).
+    // Compra otro protector para llenar las 2 ranuras (400 pts = 5 sesiones de 1 h).
     for (let i = 0; i < 5; i++) {
       await saveSession(token, book.id, { duration_seconds: 3600, pages_read: 3 });
     }

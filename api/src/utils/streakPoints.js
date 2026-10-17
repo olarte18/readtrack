@@ -4,7 +4,7 @@ const { SQL } = require("./dates");
 // Constantes del sistema de puntos (sobreescribibles por env para ajustar sin
 // deploy de código). 100 pts/hora => 30 min = 50, 15 min = 25, 5 min = 8.
 const POINTS_PER_HOUR = Number(process.env.STREAK_POINTS_PER_HOUR || 100);
-const PROTECTOR_COST = Number(process.env.STREAK_PROTECTOR_COST || 500);
+const PROTECTOR_COST = Number(process.env.STREAK_PROTECTOR_COST || 400);
 const DAILY_CAP = Number(process.env.STREAK_POINTS_DAILY_CAP || 500);
 
 // Mismas reglas mínimas que streakDays.js: una sesión solo da puntos si por sí
