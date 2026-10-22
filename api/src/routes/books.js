@@ -292,9 +292,34 @@ router.get("/search", async (req, res) => {
 });
 
 const DISCOVERY_LIMIT = 20;
+const RECOMMENDATION_LIMIT = 10;
+const RECOMMENDATION_MIN_BOOKS = 3;
 const OL_FIELDS_SPA =
   "key,title,author_name,first_publish_year,cover_i,edition_count,editions,editions.title,editions.language,editions.cover_i";
 const OL_FIELDS_ALL = "key,title,author_name,first_publish_year,cover_i,edition_count";
+
+// Nombres de categoría/género del catálogo (en español o inglés) → género de
+// Descubrir. Se normalizan sin acentos/mayúsculas. El orden importa: lo
+// específico va antes que lo genérico (p. ej. "ciencia ficción" antes de "ficción").
+const GENRE_HINTS = [
+  ["science_fiction", ["ciencia ficcion", "ciencia-ficcion", "science fiction", "sci-fi", "scifi", "sci fi", "distopia", "distop", "space opera"]],
+  ["biography", ["biografia", "biography", "biografic", "memorias", "memoir", "autobiograf"]],
+  ["horror", ["terror", "horror", "gotico", "gothic"]],
+  ["mystery", ["misterio", "mystery", "policiac", "thriller", "suspenso", "suspense", "crimen", "crime", "detective"]],
+  ["romance", ["romance", "romantic"]],
+  ["fantasy", ["fantasia", "fantasy", "epica", "epic", "magia", "magic"]],
+  ["history", ["historia", "history", "historico", "historical"]],
+  ["fiction", ["ficcion", "fiction", "novela", "novel", "literaria", "literary"]],
+].map(([key, hints]) => [key, hints.map(normKey)]);
+
+function discoveryGenreKey(name) {
+  const n = normKey(name);
+  if (!n) return null;
+  for (const [key, hints] of GENRE_HINTS) {
+    if (hints.some((hint) => n.includes(hint))) return key;
+  }
+  return null;
+}
 
 const coverUrl = (id) => (id ? `https://covers.openlibrary.org/b/id/${id}-M.jpg` : null);
 
@@ -306,17 +331,13 @@ function spanishEdition(doc) {
   return docs.find((ed) => Array.isArray(ed?.language) && ed.language.includes("spa") && ed?.title) ?? null;
 }
 
-// GET /books/discover?genre=fantasy — selección general ordenada por ediciones
-// registradas en Open Library (señal pública de popularidad, no de ReadTrack).
-// Prioriza obras con edición en español (título/portada reales); a las que no la
-// tienen les traduce el título al español como respaldo.
-router.get("/discover", authMiddleware, async (req, res) => {
-  const genre = DISCOVERY_GENRES[String(req.query.genre ?? "")];
-  if (!genre) throw httpError(400, "Género no válido");
-
-  const cacheKey = `books:discover:${req.query.genre}`;
+// Obtiene (y cachea 1 h) los libros de un género de Descubrir. Prioriza obras con
+// edición en español; a las que no la tienen les traduce el título como respaldo.
+async function getDiscoveryPayload(genreKey) {
+  const genre = DISCOVERY_GENRES[genreKey];
+  const cacheKey = `books:discover:${genreKey}`;
   const cached = cache.get(cacheKey);
-  if (cached) return res.json(cached);
+  if (cached) return cached;
 
   const subject = encodeURIComponent(`subject:${genre.subject}`);
   const spaUrl = `${OPENLIBRARY_API}/search.json?q=${subject}%20language%3Aspa&sort=editions&limit=25&fields=${OL_FIELDS_SPA}`;
@@ -394,6 +415,116 @@ router.get("/discover", authMiddleware, async (req, res) => {
 
   const payload = { genre: genre.label, popularity_basis: "edition_count", books };
   if (books.length) cache.set(cacheKey, payload, 3600000);
+  return payload;
+}
+
+// GET /books/discover?genre=fantasy — selección general ordenada por ediciones
+// registradas en Open Library (señal pública de popularidad, no de ReadTrack).
+router.get("/discover", authMiddleware, async (req, res) => {
+  const genreKey = String(req.query.genre ?? "");
+  if (!DISCOVERY_GENRES[genreKey]) throw httpError(400, "Género no válido");
+  res.json(await getDiscoveryPayload(genreKey));
+});
+
+// GET /books/recommendations — "Para ti": usa deseos y libros completados con
+// 4-5 estrellas. Necesita al menos RECOMMENDATION_MIN_BOOKS libros con género
+// identificable; si no, responde enabled=false y Descubrir sigue con la
+// exploración general por género.
+router.get("/recommendations", authMiddleware, async (req, res) => {
+  const cacheKey = `books:recs:${req.userId}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return res.json(cached);
+
+  const { rows: signalRows } = await pool.query(`
+    SELECT ub.book_id, b.genre, b.title, b.author, b.google_id,
+           ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(BTRIM(bc.name), '')), NULL) AS categories
+    FROM user_books ub
+    JOIN books b ON b.id = ub.book_id
+    LEFT JOIN book_categories bc ON bc.book_id = b.id
+    WHERE ub.user_id = $1
+      AND ub.is_archived = FALSE
+      AND (ub.status = 'wishlist' OR (ub.status = 'completed' AND ub.rating >= 4))
+    GROUP BY ub.book_id, b.genre, b.title, b.author, b.google_id
+  `, [req.userId]);
+
+  const counts = new Map();
+  let signalBooks = 0;
+  for (const row of signalRows) {
+    const names = Array.isArray(row.categories) && row.categories.length ? row.categories : [row.genre];
+    const keys = new Set();
+    for (const name of names) {
+      const key = discoveryGenreKey(name);
+      if (key) keys.add(key);
+    }
+    if (!keys.size) continue;
+    signalBooks += 1;
+    for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
+  }
+
+  const topGenres = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([key, books]) => ({ key, label: DISCOVERY_GENRES[key].label, books }));
+
+  if (signalBooks < RECOMMENDATION_MIN_BOOKS) {
+    const payload = {
+      enabled: false,
+      min_books: RECOMMENDATION_MIN_BOOKS,
+      signal_books: signalBooks,
+      genres: topGenres,
+      books: [],
+    };
+    cache.set(cacheKey, payload, 60000);
+    return res.json(payload);
+  }
+
+  // Libros que ya están en la biblioteca: se excluyen de las recomendaciones.
+  const { rows: ownedRows } = await pool.query(`
+    SELECT b.google_id, b.title
+    FROM user_books ub
+    JOIN books b ON b.id = ub.book_id
+    WHERE ub.user_id = $1 AND ub.is_archived = FALSE
+  `, [req.userId]);
+  const ownedIds = new Set(ownedRows.map((r) => r.google_id).filter(Boolean));
+  const ownedTitles = new Set(ownedRows.map((r) => normKey(r.title)).filter(Boolean));
+
+  const lists = [];
+  let catalogError = false;
+  for (const genre of topGenres) {
+    try {
+      const payload = await getDiscoveryPayload(genre.key);
+      lists.push({ genre, books: payload.books });
+    } catch {
+      catalogError = true;
+    }
+  }
+
+  const books = [];
+  const seen = new Set();
+  const maxLen = lists.reduce((max, list) => Math.max(max, list.books.length), 0);
+  for (let i = 0; i < maxLen && books.length < RECOMMENDATION_LIMIT; i += 1) {
+    for (const { genre, books: genreBooks } of lists) {
+      const book = genreBooks[i];
+      if (!book) continue;
+      const key = book.workKey ?? book.id;
+      if (seen.has(key)) continue;
+      if (ownedIds.has(book.id)) continue;
+      if (ownedTitles.has(normKey(book.title)) || ownedTitles.has(normKey(book.display_title))) continue;
+      seen.add(key);
+      books.push({ ...book, reason: `Porque te interesa ${genre.label}` });
+      if (books.length >= RECOMMENDATION_LIMIT) break;
+    }
+  }
+
+  const payload = {
+    enabled: true,
+    min_books: RECOMMENDATION_MIN_BOOKS,
+    signal_books: signalBooks,
+    genres: topGenres,
+    books,
+    ...(catalogError && !books.length ? { catalog_error: true } : {}),
+  };
+  cache.set(cacheKey, payload, 60000);
   res.json(payload);
 });
 

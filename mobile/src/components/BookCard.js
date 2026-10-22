@@ -20,7 +20,7 @@ function BookCard({ book, onPress }) {
     book.status === "reading" && book.current_page && book.pages
       ? `Página ${book.current_page} de ${book.pages}`
       : null;
-  const label = [displayTitle, book.author, statusText, pagesText]
+  const label = [displayTitle, book.author, statusText, pagesText, book.reason]
     .filter(Boolean)
     .join(", ");
   return (
@@ -55,6 +55,9 @@ function BookCard({ book, onPress }) {
         <Text style={styles.author}>{book.author}</Text>
         {showOriginal && (
           <Text style={styles.translated} numberOfLines={1}>Título original: {book.original_title}</Text>
+        )}
+        {!!book.reason && (
+          <Text style={styles.reason} numberOfLines={1}>{book.reason}</Text>
         )}
         {statusText && (
           <Text style={styles.status}>{statusText}</Text>
@@ -99,6 +102,7 @@ const createStyles = (colors) =>
   title: { fontSize: 15, fontWeight: "bold", color: colors.text, marginBottom: 4 },
   author: { fontSize: 13, color: colors.textMuted, marginBottom: 6 },
   translated: { fontSize: 11, color: colors.textDim, marginBottom: 6 },
+  reason: { fontSize: 12, color: colors.accent, marginTop: 2 },
   status: { fontSize: 12, color: colors.accent },
   pages: { fontSize: 11, color: colors.textDim, marginTop: 2 },
 });

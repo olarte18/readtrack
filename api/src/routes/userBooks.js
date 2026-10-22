@@ -18,6 +18,7 @@ function invalidateUserData(userId) {
   cache.delPrefix(`user-books:${userId}`);
   cache.delPrefix(`stats:${userId}`);
   cache.delPrefix(`goals:${userId}`);
+  cache.delPrefix(`books:recs:${userId}`);
 }
 
 // GET /user-books

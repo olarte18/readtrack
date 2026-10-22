@@ -62,14 +62,14 @@ En descubrimiento, priorizar recomendaciones personales cuando haya suficientes 
 
 **Resultado:** la pantalla funciona sin historial ni favoritos. Se pasó de la Subjects API (experimental) a la Search API, más estable. La traducción automática solo actúa como respaldo cuando no hay edición en español.
 
-### Etapa 6: añadir recomendaciones personales
+### Etapa 6: añadir recomendaciones personales — completada
 
 - Usar lecturas y favoritos como señales iniciales.
 - Mostrar sugerencias personales primero cuando haya datos suficientes.
 - Conservar los populares por género como alternativa para explorar.
 - Definir qué ocurre cuando la personalización todavía no sea confiable.
 
-**Resultado:** descubrimiento personalizado con una alternativa general disponible.
+**Resultado:** sección «Para ti» en Descubrir. Las señales son los libros en lista de deseos y los completados con 4-5 estrellas (no hay campo explícito de favoritos). Se activa al reunir 3 libros con género identificable, mezcla los géneros más frecuentes y excluye lo que ya está en la biblioteca. Si faltan señales o falla el catálogo, la exploración general sigue disponible.
 
 ### Etapa 7: mejorar la experiencia con evidencia de uso
 
@@ -81,7 +81,7 @@ En descubrimiento, priorizar recomendaciones personales cuando haya suficientes 
 
 ## Alcance implementado
 
-Se añadieron estadísticas por género/categoría, autor y editorial, además de una pantalla de descubrimiento por género (pestaña principal "Descubrir") con resultados de Open Library ordenados por `edition_count`. Los resultados priorizan ediciones en español; si no existe, se traduce el título con MyMemory y se conserva el original. La personalización sigue pendiente.
+Se añadieron estadísticas por género/categoría, autor y editorial, además de una pantalla de descubrimiento por género (pestaña principal "Descubrir") con resultados de Open Library ordenados por `edition_count`. Los resultados priorizan ediciones en español; si no existe, se traduce el título con MyMemory y se conserva el original. La sección «Para ti» usa deseos y valoraciones altas para recomendar por género, con la exploración general como alternativa.
 
 ## No incluir todavía
 
@@ -93,5 +93,5 @@ Se añadieron estadísticas por género/categoría, autor y editorial, además d
 ## Preguntas abiertas
 
 - ~~¿Qué fuente concreta proporcionará los libros populares por género?~~ Resuelto: Search API de Open Library filtrando por materia y ordenando por `edition_count`, con ediciones en español prioritarias.
-- ¿Qué cantidad o tipo de actividad basta para empezar a personalizar las sugerencias?
+- ~~¿Qué cantidad o tipo de actividad basta para empezar a personalizar las sugerencias?~~ Resuelto: 3 libros con género identificable entre deseos y completados con 4-5 estrellas.
 - ¿Conviene cachear la traducción de títulos a nivel global (varios géneros) o basta la caché por género?

@@ -170,6 +170,121 @@ describe("GET /books/discover", () => {
   });
 });
 
+describe("GET /books/recommendations", () => {
+  async function seedSignalBook({ title, genre = null, categories = [], googleId = null }) {
+    const { rows: [book] } = await pool.query(
+      `INSERT INTO books (google_id, title, author, genre) VALUES ($1, $2, $3, $4) RETURNING id`,
+      [googleId, title, "Autora", genre]
+    );
+    for (let i = 0; i < categories.length; i += 1) {
+      await pool.query(
+        `INSERT INTO book_categories (book_id, name, is_primary, position) VALUES ($1, $2, $3, $4)`,
+        [book.id, categories[i], i === 0, i]
+      );
+    }
+    return book.id;
+  }
+
+  async function linkBook(userId, bookId, { status = "wishlist", rating = null, archived = false } = {}) {
+    await pool.query(
+      `INSERT INTO user_books (user_id, book_id, status, rating, is_archived) VALUES ($1, $2, $3, $4, $5)`,
+      [userId, bookId, status, rating, archived]
+    );
+  }
+
+  function mockCatalog(spaDocs = []) {
+    const fetchMock = jest.fn(async (url) => {
+      const u = String(url);
+      if (u.includes("openlibrary.org")) {
+        if (u.includes("language%3Aspa")) return { ok: true, json: async () => ({ docs: spaDocs }) };
+        return { ok: true, json: async () => ({ docs: [] }) };
+      }
+      if (u.includes("mymemory.translated.net")) {
+        return { ok: true, json: async () => ({ responseData: { translatedText: "traducido" } }) };
+      }
+      throw new Error("fetch inesperado: " + u);
+    });
+    global.fetch = fetchMock;
+    return fetchMock;
+  }
+
+  test("se desactiva con menos de 3 libros con género identificable", async () => {
+    const { user, token } = await registerUser();
+    const fetchMock = mockCatalog();
+    await linkBook(user.id, await seedSignalBook({ title: "Uno", categories: ["Fantasía"] }));
+    await linkBook(user.id, await seedSignalBook({ title: "Dos", categories: ["Fantasía"] }));
+
+    const res = await request(app).get("/books/recommendations").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ enabled: false, signal_books: 2, books: [] });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  test("activa recomendaciones, prioriza el género más frecuente y excluye libros ya guardados", async () => {
+    const { user, token } = await registerUser();
+    await linkBook(user.id, await seedSignalBook({ title: "Fantasía uno", categories: ["Fantasía"] }));
+    await linkBook(user.id, await seedSignalBook({ title: "Fantasía dos", categories: ["Fantasía"], status: "completed", rating: 5 }));
+    await linkBook(user.id, await seedSignalBook({ title: "Fantasía tres", categories: ["Fantasía"], googleId: "OL1W" }));
+    await linkBook(user.id, await seedSignalBook({ title: "Misterio uno", categories: ["Misterio"] }));
+
+    mockCatalog([
+      { key: "/works/OL1W", title: "Ya en biblioteca", edition_count: 100, editions: { docs: [{ title: "Ya en biblioteca", language: ["spa"] }] } },
+      { key: "/works/OL2W", title: "Recomendado", edition_count: 50, editions: { docs: [{ title: "Recomendado", language: ["spa"] }] } },
+    ]);
+
+    const res = await request(app).get("/books/recommendations").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body.enabled).toBe(true);
+    expect(res.body.signal_books).toBe(4);
+    expect(res.body.genres[0]).toMatchObject({ key: "fantasy", label: "Fantasía", books: 3 });
+    // OL1W ya está en la biblioteca; OL2W sí se recomienda.
+    expect(res.body.books.map((b) => b.id)).toEqual(["OL2W"]);
+    expect(res.body.books[0].reason).toBe("Porque te interesa Fantasía");
+  });
+
+  test("usa books.genre como respaldo y reconoce nombres en inglés", async () => {
+    const { user, token } = await registerUser();
+    await linkBook(user.id, await seedSignalBook({ title: "Uno", genre: "Science Fiction" }));
+    await linkBook(user.id, await seedSignalBook({ title: "Dos", genre: "science-fiction" }));
+    await linkBook(user.id, await seedSignalBook({ title: "Tres", genre: "Ciencia ficción" }));
+
+    mockCatalog([
+      { key: "/works/OL9W", title: "Dune", edition_count: 80, editions: { docs: [{ title: "Dune", language: ["spa"] }] } },
+    ]);
+
+    const res = await request(app).get("/books/recommendations").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body.enabled).toBe(true);
+    expect(res.body.genres[0]).toMatchObject({ key: "science_fiction", books: 3 });
+  });
+
+  test("ignora lecturas archivadas", async () => {
+    const { user, token } = await registerUser();
+    await linkBook(user.id, await seedSignalBook({ title: "Activo", categories: ["Fantasía"] }));
+    await linkBook(user.id, await seedSignalBook({ title: "Archivado 1", categories: ["Fantasía"] }), { archived: true });
+    await linkBook(user.id, await seedSignalBook({ title: "Archivado 2", categories: ["Fantasía"] }), { archived: true });
+
+    mockCatalog();
+    const res = await request(app).get("/books/recommendations").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body).toMatchObject({ enabled: false, signal_books: 1 });
+  });
+
+  test("no rompe si el catálogo falla", async () => {
+    const { user, token } = await registerUser();
+    await linkBook(user.id, await seedSignalBook({ title: "Uno", categories: ["Fantasía"] }));
+    await linkBook(user.id, await seedSignalBook({ title: "Dos", categories: ["Fantasía"] }));
+    await linkBook(user.id, await seedSignalBook({ title: "Tres", categories: ["Fantasía"] }));
+
+    global.fetch = jest.fn(async () => ({ ok: false, json: async () => ({}) }));
+    const res = await request(app).get("/books/recommendations").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body.enabled).toBe(true);
+    expect(res.body.books).toEqual([]);
+    expect(res.body.catalog_error).toBe(true);
+  });
+});
+
 describe("GET /books/search", () => {
   test("rechaza búsqueda sin query", async () => {
     mockExternal(emptyExternal);

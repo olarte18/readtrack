@@ -370,6 +370,8 @@ export const getDiscoveryBooks = async (genre) => {
   return res.books ?? [];
 };
 
+export const getRecommendations = async () => getWithCache("/books/recommendations");
+
 export const addBook = async (book, status = "pending") =>
   request("/user-books", {
     method: "POST",
