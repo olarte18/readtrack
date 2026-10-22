@@ -91,4 +91,31 @@ async function sendRegistrationCode(to, code) {
   }
 }
 
-module.exports = { sendPasswordResetCode, sendRegistrationCode, sent, clearSent };
+async function sendFeedbackEmail({ to, feedback, userEmail, username }) {
+  if (process.env.NODE_ENV === "test") {
+    sent.push({ to, feedback, userEmail, username });
+    return;
+  }
+
+  const apiKey = process.env.BREVO_API_KEY;
+  const from = process.env.EMAIL_FROM;
+  if (!apiKey || !from) throw new Error("Falta BREVO_API_KEY o EMAIL_FROM");
+
+  const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (char) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  })[char]);
+  const res = await fetch(BREVO_URL, {
+    method: "POST",
+    headers: { "api-key": apiKey, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      sender: { name: "ReadTrack", email: from },
+      to: [{ email: to }],
+      subject: "Nueva sugerencia para ReadTrack",
+      textContent: `Sugerencia de ${username} (${userEmail}):\n\n${feedback}`,
+      htmlContent: `<p><strong>De:</strong> ${escapeHtml(username)} (${escapeHtml(userEmail)})</p><p>${escapeHtml(feedback).replace(/\n/g, "<br>")}</p>`,
+    }),
+  });
+  if (!res.ok) throw new Error(`Brevo rechazó el correo (${res.status})`);
+}
+
+module.exports = { sendPasswordResetCode, sendRegistrationCode, sendFeedbackEmail, sent, clearSent };

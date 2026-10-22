@@ -14,6 +14,7 @@ const importsRouter = require("./routes/imports");
 const exportRouter = require("./routes/export");
 const achievementsRouter = require("./routes/achievements");
 const streakShopRouter = require("./routes/streakShop");
+const feedbackRouter = require("./routes/feedback");
 const errorHandler = require("./middleware/errorHandler");
 const { booksLimiter } = require("./middleware/rateLimit");
 const pool = require("./db/connection");
@@ -48,6 +49,7 @@ app.use("/import", importsRouter);
 app.use("/export", exportRouter);
 app.use("/achievements", achievementsRouter);
 app.use("/streak", streakShopRouter);
+app.use("/feedback", feedbackRouter);
 app.get("/health", async (req, res) => {
   try {
     await pool.query("SELECT 1");

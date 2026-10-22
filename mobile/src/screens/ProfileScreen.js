@@ -4,7 +4,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
 import { useFocusEffect } from "@react-navigation/native";
 import { AppAlert } from "../components/AppAlert";
-import { getGoals, getAchievements, saveGoal, logUnexpectedError } from "../services/api";
+import { getGoals, getAchievements, saveGoal, sendFeedback, logUnexpectedError } from "../services/api";
 import { isWhatsNewVisible } from "../utils/whatsNew";
 import StreakReminderModal from "../components/StreakReminderModal";
 import { Ionicons } from "@expo/vector-icons";
@@ -21,6 +21,9 @@ export default function ProfileScreen({ navigation }) {
   const [streakReminderOpen, setStreakReminderOpen] = useState(false);
   const [unseenAchievements, setUnseenAchievements] = useState(0);
   const [updateInfo, setUpdateInfo] = useState(null);
+  const [feedbackOpen, setFeedbackOpen] = useState(false);
+  const [feedback, setFeedback] = useState("");
+  const [sendingFeedback, setSendingFeedback] = useState(false);
 
   useEffect(() => {
     try {
@@ -64,6 +67,22 @@ export default function ProfileScreen({ navigation }) {
       setEditingGoal(false);
     } catch {
       AppAlert.alert("Error", "No se pudo guardar la meta");
+    }
+  };
+
+  const handleSendFeedback = async () => {
+    const message = feedback.trim();
+    if (!message) return AppAlert.alert("Sugerencia vacía", "Escribe tu sugerencia antes de enviarla.");
+    setSendingFeedback(true);
+    try {
+      await sendFeedback(message);
+      setFeedback("");
+      setFeedbackOpen(false);
+      AppAlert.alert("¡Gracias!", "Tu sugerencia se envió correctamente.");
+    } catch (err) {
+      AppAlert.alert("No se pudo enviar", err.message || "Inténtalo de nuevo más tarde.");
+    } finally {
+      setSendingFeedback(false);
     }
   };
 
@@ -193,6 +212,45 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.menuLabel}>Exportar datos</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.menuItem, { marginTop: 8 }]}
+          accessibilityRole="button"
+          accessibilityLabel="Buzón de sugerencias"
+          accessibilityState={{ expanded: feedbackOpen }}
+          onPress={() => setFeedbackOpen((open) => !open)}
+        >
+          <Ionicons name="chatbubble-ellipses-outline" size={22} color={colors.accent} accessible={false} />
+          <Text style={styles.menuLabel}>Buzón de sugerencias</Text>
+          <Ionicons name={feedbackOpen ? "chevron-up" : "chevron-forward"} size={18} color={colors.textDim} accessible={false} />
+        </TouchableOpacity>
+        {feedbackOpen && (
+          <View style={styles.feedbackCard}>
+            <Text style={styles.feedbackHint}>Cuéntanos qué te gustaría mejorar en ReadTrack.</Text>
+            <TextInput
+              style={styles.feedbackInput}
+              placeholder="Escribe tu sugerencia…"
+              placeholderTextColor={colors.placeholder}
+              value={feedback}
+              onChangeText={setFeedback}
+              multiline
+              maxLength={2000}
+              textAlignVertical="top"
+              accessibilityLabel="Escribe tu sugerencia"
+              editable={!sendingFeedback}
+            />
+            <Text style={styles.feedbackCount}>{feedback.length}/2000</Text>
+            <TouchableOpacity
+              style={[styles.feedbackButton, sendingFeedback && styles.feedbackButtonDisabled]}
+              accessibilityRole="button"
+              accessibilityLabel={sendingFeedback ? "Enviando sugerencia" : "Enviar sugerencia"}
+              accessibilityState={{ disabled: sendingFeedback }}
+              disabled={sendingFeedback}
+              onPress={handleSendFeedback}
+            >
+              <Text style={styles.feedbackButtonText}>{sendingFeedback ? "Enviando…" : "Enviar sugerencia"}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
         <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Logros" onPress={() => navigation.navigate("Achievements")}>
           <Ionicons name="medal-outline" size={22} color={colors.accent} accessible={false} />
           <Text style={styles.menuLabel}>Logros</Text>
@@ -314,6 +372,13 @@ const createStyles = (colors) =>
   diagRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, paddingVertical: 4 },
   diagLabel: { color: colors.textDim, fontSize: 13, width: 90 },
   diagValue: { flex: 1, color: colors.text, fontSize: 13, textAlign: "right" },
+  feedbackCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginTop: 8 },
+  feedbackHint: { color: colors.textMuted, fontSize: 14, marginBottom: 10 },
+  feedbackInput: { minHeight: 120, backgroundColor: colors.input, color: colors.text, borderRadius: 10, padding: 12, fontSize: 15 },
+  feedbackCount: { color: colors.textDim, fontSize: 12, textAlign: "right", marginTop: 6 },
+  feedbackButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 12 },
+  feedbackButtonDisabled: { opacity: 0.6 },
+  feedbackButtonText: { color: colors.onAccent, fontWeight: "bold", fontSize: 15 },
   logoutButton: { backgroundColor: colors.danger, borderRadius: 10, paddingHorizontal: 32, paddingVertical: 12 },
   logoutButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });

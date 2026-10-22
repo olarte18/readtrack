@@ -397,6 +397,9 @@ export const checkBook = async (google_id) => request(`/user-books/check/${googl
 
 export const getNotes = async (book_id) => request(`/notes/${book_id}`);
 
+export const sendFeedback = async (message) =>
+  request("/feedback", { method: "POST", body: JSON.stringify({ message }), retry: false });
+
 export const addNote = async (book_id, content, page) =>
   request("/notes", {
     method: "POST",
