@@ -110,10 +110,10 @@ async function rolloverSlots(userId) {
 }
 
 // Huecos de un día que vale la pena proteger: se recorre hacia atrás el tramo de
-// días con lectura real que sigue VIVO (anclado en hoy o ayer) y solo se marcan
-// los huecos que conectan ese tramo. Si la racha ya se perdió (sin lectura hoy ni
-// ayer) no hay nada que rescatar y no se marca ningún hueco. Un tramo roto por dos
-// días o más sin lectura no se puede unir con un solo protector: ahí se corta.
+// días con lectura real que sigue VIVO. Si la última lectura fue anteayer, ayer es
+// un hueco pendiente que puede protegerse al abrir la app hoy, sin esperar otra
+// sesión. Si la última lectura es más antigua, la racha ya se perdió. Un tramo
+// roto por dos días o más no se puede unir con un solo protector: ahí se corta.
 // Devuelve las fechas del hueco ordenadas de la más reciente a la más antigua.
 function requiredGaps(realDates, today, windowStart) {
   const dates = [...new Set(realDates)].sort();
@@ -121,10 +121,19 @@ function requiredGaps(realDates, today, windowStart) {
 
   const yesterday = addDays(today, -1);
   let i = dates.length - 1;
-  while (i >= 0 && dates[i] < yesterday) i--;
-  if (i < 0) return [];
-
   const gaps = [];
+
+  while (i >= 0 && dates[i] < yesterday) i--;
+  if (i < 0) {
+    const dayBeforeYesterday = addDays(today, -2);
+    const latestDate = dates[dates.length - 1];
+    if (latestDate !== dayBeforeYesterday || yesterday < windowStart) return [];
+    // Hoy es el primer día posterior al fallo. Proteger ayer conserva la racha
+    // hasta hoy, aunque todavía no exista una sesión de hoy que cierre el hueco.
+    gaps.push(yesterday);
+    i = dates.length - 1;
+  }
+
   let cursor = dates[i];
   for (let j = i - 1; j >= 0; j--) {
     const prev = dates[j];

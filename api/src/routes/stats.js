@@ -16,9 +16,12 @@ router.use(globalUserLimiter);
 
 // GET /stats/streak — racha actual y récord, sin cargar el calendario completo
 router.get("/streak", async (req, res) => {
+  // La racha y la posible protección de ayer dependen del día de Bogotá. Usar
+  // una clave diaria evita responder con el valor cacheado antes de medianoche.
+  const today = await appToday();
   // La clave empieza con `stats:<uid>` para que guardar una sesión la invalide
   // (cache.delPrefix borra por prefijo) y el flame no quede obsoleto.
-  const cacheKey = `stats:${req.userId}:streak`;
+  const cacheKey = `stats:${req.userId}:streak:${today}`;
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
@@ -32,7 +35,6 @@ router.get("/streak", async (req, res) => {
   const protectedDates = await getProtectedDates(req.userId);
   const dates = [...new Set([...realDates, ...protectedDates])];
   const streak = computeStreaks(dates);
-  const today = await appToday();
   const todayCounts = dates.includes(today);
 
   // ¿Hubo al menos una sesión hoy (hora Bogotá)? No depende de los minutos

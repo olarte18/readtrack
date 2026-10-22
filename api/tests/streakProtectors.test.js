@@ -1,4 +1,5 @@
 const { app, request, pool, resetDb, closeDb, registerUser, authHeader } = require("./helpers");
+const cache = require("../src/utils/cache");
 
 beforeEach(resetDb);
 afterAll(closeDb);
@@ -120,6 +121,73 @@ describe("tienda de protectores", () => {
 });
 
 describe("consumo automático en un hueco aislado", () => {
+  test("al abrir hoy protege ayer aunque no haya una sesión hoy", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+    const { rows: dateRows } = await pool.query(
+      `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Bogota')::date - n, 'YYYY-MM-DD') AS d
+       FROM generate_series(2, 21) AS n`
+    );
+    const dates = dateRows.map((row) => row.d);
+    await pool.query(
+      `INSERT INTO reading_sessions (user_book_id, user_id, page, duration_seconds, pages_read, started_at)
+       SELECT $1, $2, 100, 1800, 2, d::date + TIME '12:00'
+       FROM unnest($3::text[]) AS d`,
+      [book.id, user.id, dates]
+    );
+    const { rows: yesterdayRows } = await pool.query(
+      `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Bogota')::date - 1, 'YYYY-MM-DD') AS d`
+    );
+
+    // Simula la entrada cacheada bajo la clave antigua, creada antes del cambio
+    // de día: el endpoint debe ignorarla y conciliar con el día actual.
+    cache.clear();
+    cache.setEnabled(true);
+    cache.set(`stats:${user.id}:streak`, {
+      current: 0,
+      best: 20,
+      hasSessionToday: false,
+      todayCounts: false,
+      protectors: { available: 1, slots: 2 },
+    }, 60000);
+    try {
+      const res = await request(app).get("/stats/streak").set(authHeader(token));
+
+      expect(res.status).toBe(200);
+      expect(res.body).toMatchObject({ current: 21, hasSessionToday: false, todayCounts: false });
+      expect(res.body.protectors).toMatchObject({ available: 0 });
+      const { rows: used } = await pool.query(
+        "SELECT TO_CHAR(protected_date, 'YYYY-MM-DD') AS d FROM streak_protectors WHERE user_id = $1 AND used_at IS NOT NULL",
+        [user.id]
+      );
+      expect(used).toEqual([{ d: yesterdayRows[0].d }]);
+    } finally {
+      cache.clear();
+      cache.setEnabled(false);
+    }
+  });
+
+  test("no protege ayer si la última lectura fue hace tres días", async () => {
+    const { token, user } = await registerUser();
+    const book = await addBook(token);
+    const { rows: dateRows } = await pool.query(
+      `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Bogota')::date - n, 'YYYY-MM-DD') AS d
+       FROM generate_series(3, 22) AS n`
+    );
+    await pool.query(
+      `INSERT INTO reading_sessions (user_book_id, user_id, page, duration_seconds, pages_read, started_at)
+       SELECT $1, $2, 100, 1800, 2, d::date + TIME '12:00'
+       FROM unnest($3::text[]) AS d`,
+      [book.id, user.id, dateRows.map((row) => row.d)]
+    );
+
+    const res = await request(app).get("/stats/streak").set(authHeader(token));
+
+    expect(res.status).toBe(200);
+    expect(res.body.current).toBe(0);
+    expect(res.body.protectors.available).toBe(1);
+  });
+
   test("protege el día intermedio, mantiene la racha y aparece en el calendario", async () => {
     const { token } = await registerUser();
     const book = await addBook(token);
