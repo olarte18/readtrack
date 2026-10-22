@@ -12,6 +12,7 @@ import ManualAddBookScreen from "./src/screens/ManualAddBookScreen";
 import BookDetailScreen from "./src/screens/BookDetailScreen";
 import EditBookScreen from "./src/screens/EditBookScreen";
 import ProfileScreen from "./src/screens/ProfileScreen";
+import SettingsScreen from "./src/screens/SettingsScreen";
 import LoginScreen from "./src/screens/LoginScreen";
 import RegisterScreen from "./src/screens/RegisterScreen";
 import ForgotPasswordScreen from "./src/screens/ForgotPasswordScreen";
@@ -109,6 +110,7 @@ function AppStack() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="Main" component={HomeTabs} />
+      <Stack.Screen name="Settings" component={SettingsScreen} />
       <Stack.Screen name="BookDetail" component={BookDetailScreen} />
       <Stack.Screen name="Search" component={SearchScreen} />
       <Stack.Screen name="ManualAdd" component={ManualAddBookScreen} />

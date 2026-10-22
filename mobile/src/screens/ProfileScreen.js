@@ -6,36 +6,20 @@ import { useFocusEffect } from "@react-navigation/native";
 import { AppAlert } from "../components/AppAlert";
 import { getGoals, getAchievements, saveGoal, sendFeedback, logUnexpectedError } from "../services/api";
 import { isWhatsNewVisible } from "../utils/whatsNew";
-import StreakReminderModal from "../components/StreakReminderModal";
 import { Ionicons } from "@expo/vector-icons";
-import * as Updates from "expo-updates";
 
 export default function ProfileScreen({ navigation }) {
-  const { user, logout } = useAuth();
-  const { colors, theme, setTheme } = useTheme();
+  const { user } = useAuth();
+  const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [goalData, setGoalData] = useState(null);
   const [editingGoal, setEditingGoal] = useState(false);
   const [goalInput, setGoalInput] = useState("");
   const [whatsNewVisible, setWhatsNewVisible] = useState(false);
-  const [streakReminderOpen, setStreakReminderOpen] = useState(false);
   const [unseenAchievements, setUnseenAchievements] = useState(0);
-  const [updateInfo, setUpdateInfo] = useState(null);
   const [feedbackOpen, setFeedbackOpen] = useState(false);
   const [feedback, setFeedback] = useState("");
   const [sendingFeedback, setSendingFeedback] = useState(false);
-
-  useEffect(() => {
-    try {
-      setUpdateInfo({
-        id: Updates.updateId,
-        createdAt: Updates.createdAt ? new Date(Updates.createdAt) : null,
-        runtimeVersion: Updates.runtimeVersion,
-        channel: Updates.channel,
-        embedded: Updates.isEmbeddedLaunch,
-      });
-    } catch {}
-  }, []);
 
   useEffect(() => {
     isWhatsNewVisible().then(setWhatsNewVisible);
@@ -92,6 +76,16 @@ export default function ProfileScreen({ navigation }) {
       behavior={Platform.OS === "ios" ? "padding" : "height"}
     >
       <ScrollView contentContainerStyle={styles.container} keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag">
+      <View style={styles.topActions}>
+        <TouchableOpacity
+          style={styles.settingsButton}
+          accessibilityRole="button"
+          accessibilityLabel="Ajustes"
+          onPress={() => navigation.navigate("Settings")}
+        >
+          <Ionicons name="settings-outline" size={24} color={colors.accent} accessible={false} />
+        </TouchableOpacity>
+      </View>
       <View style={styles.profileHeader}>
         <View style={styles.avatarPlaceholder}>
           <Ionicons name="person" size={40} color={colors.textDim} />
@@ -151,42 +145,6 @@ export default function ProfileScreen({ navigation }) {
         )}
       </View>
 
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Tema de la app</Text>
-        <View style={styles.themeRow}>
-          <TouchableOpacity
-            style={[styles.themeBtn, theme === "system" && styles.themeBtnActive]}
-            accessibilityRole="button"
-            accessibilityLabel={`Tema de la app: sistema${theme === "system" ? ". Seleccionado" : ""}`}
-            accessibilityState={{ selected: theme === "system" }}
-            onPress={() => setTheme("system")}
-          >
-            <Ionicons name="contrast" size={16} color={theme === "system" ? colors.onAccent : colors.textMuted} accessible={false} />
-            <Text style={[styles.themeBtnText, theme === "system" && styles.themeBtnTextActive]}>Sistema</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.themeBtn, theme === "light" && styles.themeBtnActive]}
-            accessibilityRole="button"
-            accessibilityLabel={`Tema de la app: claro${theme === "light" ? ". Seleccionado" : ""}`}
-            accessibilityState={{ selected: theme === "light" }}
-            onPress={() => setTheme("light")}
-          >
-            <Ionicons name="sunny" size={16} color={theme === "light" ? colors.onAccent : colors.textMuted} accessible={false} />
-            <Text style={[styles.themeBtnText, theme === "light" && styles.themeBtnTextActive]}>Claro</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.themeBtn, theme === "dark" && styles.themeBtnActive]}
-            accessibilityRole="button"
-            accessibilityLabel={`Tema de la app: oscuro${theme === "dark" ? ". Seleccionado" : ""}`}
-            accessibilityState={{ selected: theme === "dark" }}
-            onPress={() => setTheme("dark")}
-          >
-            <Ionicons name="moon" size={16} color={theme === "dark" ? colors.onAccent : colors.textMuted} accessible={false} />
-            <Text style={[styles.themeBtnText, theme === "dark" && styles.themeBtnTextActive]}>Oscuro</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       <View style={styles.menuContainer}>
         {whatsNewVisible && (
           <TouchableOpacity
@@ -202,16 +160,6 @@ export default function ProfileScreen({ navigation }) {
             </View>
           </TouchableOpacity>
         )}
-        <TouchableOpacity style={[styles.menuItem, whatsNewVisible && { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Importar biblioteca" onPress={() => navigation.navigate("Import")}>
-          <Ionicons name="cloud-upload-outline" size={22} color={colors.accent} accessible={false} />
-          <Text style={styles.menuLabel}>Importar biblioteca</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
-        </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Exportar datos" onPress={() => navigation.navigate("Export")}>
-          <Ionicons name="share-outline" size={22} color={colors.accent} accessible={false} />
-          <Text style={styles.menuLabel}>Exportar datos</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
-        </TouchableOpacity>
         <TouchableOpacity
           style={[styles.menuItem, { marginTop: 8 }]}
           accessibilityRole="button"
@@ -281,49 +229,7 @@ export default function ProfileScreen({ navigation }) {
           <Text style={styles.menuLabel}>Notas</Text>
           <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
         </TouchableOpacity>
-        <TouchableOpacity style={[styles.menuItem, { marginTop: 8 }]} accessibilityRole="button" accessibilityLabel="Notificaciones de racha" onPress={() => setStreakReminderOpen(true)}>
-          <Ionicons name="notifications-outline" size={22} color={colors.accent} accessible={false} />
-          <Text style={styles.menuLabel}>Notificaciones de racha</Text>
-          <Ionicons name="chevron-forward" size={18} color={colors.textDim} accessible={false} />
-        </TouchableOpacity>
       </View>
-
-      {updateInfo && (
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Info de la app</Text>
-          <View style={styles.diagRow}>
-            <Text style={styles.diagLabel}>Update ID</Text>
-            <Text style={styles.diagValue}>{updateInfo.id ?? "ninguno (integrados)"}</Text>
-          </View>
-          <View style={styles.diagRow}>
-            <Text style={styles.diagLabel}>Fecha</Text>
-            <Text style={styles.diagValue}>{updateInfo.createdAt ? updateInfo.createdAt.toLocaleString() : "-"}</Text>
-          </View>
-          <View style={styles.diagRow}>
-            <Text style={styles.diagLabel}>Runtime</Text>
-            <Text style={styles.diagValue}>{updateInfo.runtimeVersion}</Text>
-          </View>
-          <View style={styles.diagRow}>
-            <Text style={styles.diagLabel}>Canal</Text>
-            <Text style={styles.diagValue}>{updateInfo.channel}</Text>
-          </View>
-          <View style={styles.diagRow}>
-            <Text style={styles.diagLabel}>Origen</Text>
-            <Text style={styles.diagValue}>{updateInfo.embedded ? "integrado en el APK" : "desde EAS Update"}</Text>
-          </View>
-        </View>
-      )}
-
-      <StreakReminderModal
-        visible={streakReminderOpen}
-        onClose={() => setStreakReminderOpen(false)}
-        userId={user?.id}
-        mode="settings"
-      />
-
-      <TouchableOpacity style={styles.logoutButton} accessibilityRole="button" accessibilityLabel="Cerrar sesión" onPress={logout}>
-        <Text style={styles.logoutButtonText}>Cerrar sesión</Text>
-      </TouchableOpacity>
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -332,6 +238,8 @@ export default function ProfileScreen({ navigation }) {
 const createStyles = (colors) =>
   StyleSheet.create({
   container: { flexGrow: 1, backgroundColor: colors.background, alignItems: "center", paddingTop: 60, paddingBottom: 40 },
+  topActions: { width: "100%", maxWidth: 440, alignItems: "flex-end", marginBottom: 4 },
+  settingsButton: { width: 44, height: 44, justifyContent: "center", alignItems: "center" },
   profileHeader: { alignItems: "center", marginBottom: 30 },
   avatarPlaceholder: { width: 90, height: 90, borderRadius: 45, backgroundColor: colors.surfaceAlt, justifyContent: "center", alignItems: "center", marginBottom: 12 },
   name: { fontSize: 22, fontWeight: "bold", color: colors.text, marginBottom: 4 },
@@ -353,11 +261,6 @@ const createStyles = (colors) =>
   goalSaveBtn: { backgroundColor: colors.accent, borderRadius: 10, paddingHorizontal: 14, paddingVertical: 8 },
   goalSaveBtnText: { color: colors.onAccent, fontWeight: "bold" },
   cancelBtn: { color: colors.textDim, fontSize: 13 },
-  themeRow: { flexDirection: "row", gap: 8 },
-  themeBtn: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: colors.surfaceAlt, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 10 },
-  themeBtnActive: { backgroundColor: colors.accent },
-  themeBtnText: { color: colors.textMuted, fontSize: 14 },
-  themeBtnTextActive: { color: colors.onAccent, fontWeight: "bold" },
     menuContainer: { width: "100%", paddingHorizontal: 20, marginBottom: 30, maxWidth: 440 },
     menuItem: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 12, padding: 16, gap: 12 },
     whatsNewItem: { borderWidth: 1, borderColor: colors.star + "66" },
@@ -369,9 +272,6 @@ const createStyles = (colors) =>
     },
     newBadgeText: { fontSize: 10, fontWeight: "bold", color: colors.star },
   menuLabel: { flex: 1, fontSize: 16, color: colors.text },
-  diagRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", gap: 12, paddingVertical: 4 },
-  diagLabel: { color: colors.textDim, fontSize: 13, width: 90 },
-  diagValue: { flex: 1, color: colors.text, fontSize: 13, textAlign: "right" },
   feedbackCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginTop: 8 },
   feedbackHint: { color: colors.textMuted, fontSize: 14, marginBottom: 10 },
   feedbackInput: { minHeight: 120, backgroundColor: colors.input, color: colors.text, borderRadius: 10, padding: 12, fontSize: 15 },
@@ -379,6 +279,4 @@ const createStyles = (colors) =>
   feedbackButton: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 12, alignItems: "center", marginTop: 12 },
   feedbackButtonDisabled: { opacity: 0.6 },
   feedbackButtonText: { color: colors.onAccent, fontWeight: "bold", fontSize: 15 },
-  logoutButton: { backgroundColor: colors.danger, borderRadius: 10, paddingHorizontal: 32, paddingVertical: 12 },
-  logoutButtonText: { color: "#fff", fontWeight: "bold", fontSize: 16 },
 });
