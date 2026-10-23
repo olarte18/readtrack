@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView, ScrollView, Platform } from "react-native";
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ActivityIndicator, Image, KeyboardAvoidingView, ScrollView, Platform, Linking } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useAuth } from "../contexts/AuthContext";
 import { useTheme } from "../contexts/ThemeContext";
@@ -18,6 +18,7 @@ export default function RegisterScreen({ navigation }) {
   const [loading, setLoading] = useState(false);
   const [showPass, setShowPass] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
+  const [privacyPolicyAccepted, setPrivacyPolicyAccepted] = useState(false);
 
   const handleSendCode = async () => {
     if (!email) return AppAlert.alert("Error", "Ingresa tu email");
@@ -40,9 +41,10 @@ export default function RegisterScreen({ navigation }) {
     if (!username) return AppAlert.alert("Error", "Ingresa tu nombre de usuario");
     if (password.length < 6) return AppAlert.alert("Error", "La contraseña debe tener al menos 6 caracteres");
     if (password !== confirm) return AppAlert.alert("Error", "Las contraseñas no coinciden");
+    if (!privacyPolicyAccepted) return AppAlert.alert("Error", "Debes aceptar la política de privacidad");
     setLoading(true);
     try {
-      await register(username, email, password, code);
+      await register(username, email, password, code, privacyPolicyAccepted);
     } catch (error) {
       AppAlert.alert("Error", error.message);
     } finally {
@@ -136,6 +138,28 @@ export default function RegisterScreen({ navigation }) {
             secureTextEntry={!showPass}
             accessibilityLabel="Confirmar contraseña"
           />
+          <TouchableOpacity
+            style={styles.privacyAcceptance}
+            accessibilityRole="checkbox"
+            accessibilityLabel="He leído y acepto la Política de privacidad"
+            accessibilityState={{ checked: privacyPolicyAccepted }}
+            onPress={() => setPrivacyPolicyAccepted((accepted) => !accepted)}
+          >
+            <Ionicons
+              name={privacyPolicyAccepted ? "checkbox" : "square-outline"}
+              size={22}
+              color={privacyPolicyAccepted ? colors.accent : colors.textMuted}
+              accessible={false}
+            />
+            <Text style={styles.privacyText}>He leído y acepto la Política de privacidad</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel="Leer Política de privacidad"
+            onPress={() => Linking.openURL("https://readtrack.online/privacidad")}
+          >
+            <Text style={styles.privacyLink}>Leer Política de privacidad</Text>
+          </TouchableOpacity>
           {loading ? (
             <ActivityIndicator color={colors.accent} style={{ marginTop: 20 }} />
           ) : (
@@ -170,6 +194,9 @@ const createStyles = (colors) =>
     input: { backgroundColor: colors.input, color: colors.text, borderRadius: 10, paddingHorizontal: 16, paddingVertical: 12, fontSize: 15, marginBottom: 12 },
     passwordInputBox: { position: "relative" },
     passwordInput: { paddingRight: 46 },
+    privacyAcceptance: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4 },
+    privacyText: { color: colors.text, fontSize: 14, flex: 1 },
+    privacyLink: { color: colors.accent, fontSize: 14, textDecorationLine: "underline", marginTop: 8 },
     eyeBtn: { position: "absolute", right: 12, top: 12, padding: 4 },
     btn: { backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 14, alignItems: "center", marginTop: 8 },
     btnText: { color: colors.onAccent, fontWeight: "bold", fontSize: 16 },

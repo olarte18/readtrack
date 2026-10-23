@@ -33,6 +33,7 @@ describe("POST /auth/request-register-code", () => {
       username: "juan",
       email: "existente@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code,
     });
     clearSent();
@@ -68,6 +69,7 @@ describe("POST /auth/register (con código)", () => {
       username: "juan",
       email: "nueva@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code,
     });
     expect(res.status).toBe(201);
@@ -82,6 +84,7 @@ describe("POST /auth/register (con código)", () => {
       username: "juan",
       email: "nueva@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
     });
     expect(res.status).toBe(400);
     const { rows } = await pool.query("SELECT COUNT(*)::int AS n FROM users");
@@ -95,6 +98,7 @@ describe("POST /auth/register (con código)", () => {
       username: "juan",
       email: "nueva@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code: wrong,
     });
     expect(res.status).toBe(400);
@@ -113,6 +117,7 @@ describe("POST /auth/register (con código)", () => {
         username: "juan",
         email: "nueva@example.com",
         password: "password123",
+        privacyPolicyAccepted: true,
         code: wrong,
       });
       expect(res.status).toBe(400);
@@ -121,6 +126,7 @@ describe("POST /auth/register (con código)", () => {
       username: "juan",
       email: "nueva@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code,
     });
     expect(res.status).toBe(400);
@@ -135,6 +141,7 @@ describe("POST /auth/register (con código)", () => {
       username: "juan",
       email: "nueva@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code,
     });
     expect(res.status).toBe(400);
@@ -146,12 +153,14 @@ describe("POST /auth/register (con código)", () => {
       username: "juan",
       email: "nueva@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code,
     });
     const res = await request(app).post("/auth/register").send({
       username: "juan2",
       email: "otro@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code,
     });
     expect(res.status).toBe(400);
@@ -164,6 +173,7 @@ describe("POST /auth/register (con código)", () => {
       username: "juan",
       email: "otro@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code,
     });
     expect(res.status).toBe(400);

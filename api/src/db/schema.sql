@@ -9,8 +9,13 @@ CREATE TABLE IF NOT EXISTS users (
   created_at    TIMESTAMP DEFAULT NOW(),
   verified      BOOLEAN DEFAULT FALSE,
   reading_goal  INTEGER DEFAULT 0,
+  privacy_policy_version VARCHAR(20),
+  privacy_policy_accepted_at TIMESTAMP,
   CONSTRAINT users_username_key UNIQUE (username)
 );
+
+ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_policy_version VARCHAR(20);
+ALTER TABLE users ADD COLUMN IF NOT EXISTS privacy_policy_accepted_at TIMESTAMP;
 
 CREATE TABLE IF NOT EXISTS books (
   id          SERIAL PRIMARY KEY,

@@ -12,6 +12,7 @@ const { sendPasswordResetCode, sendRegistrationCode } = require("../utils/email"
 const RESET_CODE_TTL_MINUTES = 15;
 const REGISTER_CODE_TTL_MINUTES = 15;
 const MAX_CODE_ATTEMPTS = 5;
+const PRIVACY_POLICY_VERSION = "2026-10-10";
 
 const JWT_SECRET = process.env.JWT_SECRET;
 const ACCESS_TTL = process.env.JWT_ACCESS_EXPIRES || "2h";
@@ -229,6 +230,9 @@ router.post("/request-register-code", registerCodeLimiter, async (req, res) => {
 // ROLLBACK), y el consumo ocurre dentro con un UPDATE guardado por `used = false`:
 // si dos requests usan el mismo código en paralelo, solo uno gana.
 router.post("/register", authLimiter, async (req, res) => {
+  if (req.body?.privacyPolicyAccepted !== true) {
+    throw httpError(400, "Debes aceptar la política de privacidad");
+  }
   const data = validate(req.body, {
     username: { required: true, type: "string", max: 50 },
     email: { required: true, type: "email" },
@@ -253,8 +257,10 @@ router.post("/register", authLimiter, async (req, res) => {
     let userId;
     try {
       const { rows } = await client.query(
-        "INSERT INTO users (username, email, password, verified) VALUES ($1, $2, $3, true) RETURNING id",
-        [data.username.trim(), normalized, hashed]
+        `INSERT INTO users
+           (username, email, password, verified, privacy_policy_version, privacy_policy_accepted_at)
+         VALUES ($1, $2, $3, true, $4, NOW()) RETURNING id`,
+        [data.username.trim(), normalized, hashed, PRIVACY_POLICY_VERSION]
       );
       userId = rows[0].id;
     } catch (err) {

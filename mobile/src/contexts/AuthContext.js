@@ -136,11 +136,11 @@ export function AuthProvider({ children }) {
     setToken(data.token);
   };
 
-  const register = async (username, email, password, code) => {
+  const register = async (username, email, password, code, privacyPolicyAccepted) => {
     const res = await fetch(`${API_URL}/auth/register`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password, code }),
+      body: JSON.stringify({ username, email, password, code, privacyPolicyAccepted }),
     });
     const data = await res.json();
     if (!res.ok) throw new Error(data.error);

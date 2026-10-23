@@ -35,6 +35,7 @@ async function registerUser(overrides = {}) {
     username: "usuario_test",
     email: "test@example.com",
     password: "password123",
+    privacyPolicyAccepted: true,
     ...overrides,
   };
   const code = await requestRegistrationCode(payload.email);

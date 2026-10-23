@@ -12,6 +12,7 @@ async function makeUserWithResetCode(overrides = {}) {
     username: "juan",
     email: "juan@example.com",
     password: "password123",
+    privacyPolicyAccepted: true,
     ...overrides,
   };
   const code = await requestRegistrationCode(payload.email);
@@ -37,6 +38,7 @@ describe("POST /auth/forgot-password", () => {
       username: "juan",
       email: "juan@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code: regCode,
     })).status).toBe(201);
     clearSent();
@@ -62,6 +64,7 @@ describe("POST /auth/forgot-password", () => {
       username: "juan",
       email: "juan@example.com",
       password: "password123",
+      privacyPolicyAccepted: true,
       code: regCode,
     });
     await request(app).post("/auth/forgot-password").send({ email: "juan@example.com" });

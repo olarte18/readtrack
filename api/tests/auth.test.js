@@ -5,6 +5,7 @@ const registerPayload = (overrides = {}) => ({
   username: "juan",
   email: "juan@example.com",
   password: "password123",
+  privacyPolicyAccepted: true,
   ...overrides,
 });
 
@@ -65,6 +66,26 @@ describe("POST /auth/register", () => {
   test("rechaza campos faltantes", async () => {
     const res = await request(app).post("/auth/register").send({ email: "x@x.com" });
     expect(res.status).toBe(400);
+  });
+
+  test.each([undefined, false])("rechaza registro sin aceptación de privacidad (%s)", async (privacyPolicyAccepted) => {
+    const code = await requestRegistrationCode("juan@example.com");
+    const payload = registerPayload();
+    delete payload.privacyPolicyAccepted;
+    if (privacyPolicyAccepted !== undefined) payload.privacyPolicyAccepted = privacyPolicyAccepted;
+    const res = await request(app).post("/auth/register").send({ ...payload, code });
+    expect(res.status).toBe(400);
+    expect(res.body.error).toBe("Debes aceptar la política de privacidad");
+  });
+
+  test("guarda la versión y fecha de aceptación en el usuario", async () => {
+    await registerWithCode();
+    const { rows } = await pool.query(
+      "SELECT privacy_policy_version, privacy_policy_accepted_at FROM users WHERE email = $1",
+      ["juan@example.com"]
+    );
+    expect(rows[0].privacy_policy_version).toBe("2026-10-10");
+    expect(rows[0].privacy_policy_accepted_at).toBeInstanceOf(Date);
   });
 
   test("rechaza email inválido", async () => {
