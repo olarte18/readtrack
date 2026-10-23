@@ -55,12 +55,13 @@ En descubrimiento, priorizar recomendaciones personales cuando haya suficientes 
 
 - Permitir explorar libros populares en general organizados por género.
 - Usar la Search API de Open Library y ordenar los resultados por `edition_count`.
-- Priorizar obras con edición en español (título y portada reales de esa edición).
-- Para obras sin edición en español, traducir el título con MyMemory (respaldo) y
-  conservar el título original como valor real del libro.
+- Usar la búsqueda general por materia, sin priorizar ediciones en español.
+- Traducir los títulos al español con MyMemory y conservar el original como valor
+  real del libro; si la traducción falla o no cambia un título ya español, mostrar
+  el original.
 - Aclarar en pantalla que el orden usa la cantidad de ediciones registradas en Open Library; no son señales personalizadas de ReadTrack.
 
-**Resultado:** la pantalla funciona sin historial ni favoritos. Se pasó de la Subjects API (experimental) a la Search API, más estable. La traducción automática solo actúa como respaldo cuando no hay edición en español.
+**Resultado:** la pantalla funciona sin historial ni favoritos. Usa una búsqueda normal de la Search API y presenta los títulos traducidos al español cuando el servicio puede hacerlo.
 
 ### Etapa 6: añadir recomendaciones personales — completada
 
@@ -69,7 +70,7 @@ En descubrimiento, priorizar recomendaciones personales cuando haya suficientes 
 - Conservar los populares por género como alternativa para explorar.
 - Definir qué ocurre cuando la personalización todavía no sea confiable.
 
-**Resultado:** sección «Para ti» en Descubrir. Las señales son los libros en lista de deseos y los completados con 4-5 estrellas (no hay campo explícito de favoritos). Se activa al reunir 3 libros con género identificable, mezcla los géneros más frecuentes y excluye lo que ya está en la biblioteca. Si faltan señales o falla el catálogo, la exploración general sigue disponible.
+**Resultado:** sección «Para ti» en Descubrir con un modelo híbrido por usuario. Deseos y completados con 4-5 estrellas aportan afinidad; abandonados y completados con 1-2 estrellas la reducen. Se buscan candidatos tanto por géneros como por autores preferidos y se reordenan por afinidad individual, usando popularidad solo como desempate. Se excluye la biblioteca y cada libro explica por qué se recomienda. Si faltan señales o falla el catálogo, la exploración general sigue disponible.
 
 ### Etapa 7: mejorar la experiencia con evidencia de uso
 
@@ -81,7 +82,7 @@ En descubrimiento, priorizar recomendaciones personales cuando haya suficientes 
 
 ## Alcance implementado
 
-Se añadieron estadísticas por género/categoría, autor y editorial, además de una pantalla de descubrimiento por género (pestaña principal "Descubrir") con resultados de Open Library ordenados por `edition_count`. Los resultados priorizan ediciones en español; si no existe, se traduce el título con MyMemory y se conserva el original. La sección «Para ti» usa deseos y valoraciones altas para recomendar por género, con la exploración general como alternativa.
+Se añadieron estadísticas por género/categoría, autor y editorial, además de una pantalla de descubrimiento por género (pestaña principal "Descubrir") con resultados de Open Library ordenados por `edition_count` y títulos traducidos al español con MyMemory. Se conserva el original para guardar el libro. La sección «Para ti» usa deseos y valoraciones altas para recomendar por género, con la exploración general como alternativa.
 
 ## No incluir todavía
 
@@ -92,6 +93,6 @@ Se añadieron estadísticas por género/categoría, autor y editorial, además d
 
 ## Preguntas abiertas
 
-- ~~¿Qué fuente concreta proporcionará los libros populares por género?~~ Resuelto: Search API de Open Library filtrando por materia y ordenando por `edition_count`, con ediciones en español prioritarias.
+- ~~¿Qué fuente concreta proporcionará los libros populares por género?~~ Resuelto: búsqueda general de la Search API de Open Library por materia, ordenada por `edition_count`; los títulos se traducen después al español.
 - ~~¿Qué cantidad o tipo de actividad basta para empezar a personalizar las sugerencias?~~ Resuelto: 3 libros con género identificable entre deseos y completados con 4-5 estrellas.
 - ¿Conviene cachear la traducción de títulos a nivel global (varios géneros) o basta la caché por género?

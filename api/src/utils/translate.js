@@ -1,7 +1,7 @@
 // Traducción de títulos vía MyMemory (https://mymemory.translated.net), sin key.
-// Solo se usa como respaldo en /books/discover cuando una obra NO tiene edición en
-// español. Cachea por título normalizado 24 h para no golpear el límite diario del
-// proveedor. Nunca lanza: si falla devuelve null y el cliente muestra el original.
+// Se usa en Descubrir después de la búsqueda general por género. Cachea por título
+// normalizado 24 h para no golpear el límite diario del proveedor. Nunca lanza: si
+// falla devuelve null y el cliente muestra el original.
 const cache = require("./cache");
 
 const PROVIDER_URL = "https://api.mymemory.translated.net/get";
@@ -47,8 +47,14 @@ async function translateTitle(text, { from = "en", to = "es" } = {}) {
     const clean = translated.trim();
     const upper = clean.toUpperCase();
     // MyMemory devuelve avisos de límite como texto plano con status 200.
-    if (!clean || upper.includes("MYMEMORY WARNING") || upper.includes("QUERY LENGTH LIMIT")) return null;
-    if (normKey(clean) === normKey(source)) return null; // sin traducción útil
+    if (!clean || upper.includes("MYMEMORY WARNING") || upper.includes("QUERY LENGTH LIMIT")) {
+      cache.set(key, null, CACHE_TTL_MS);
+      return null;
+    }
+    if (normKey(clean) === normKey(source)) {
+      cache.set(key, null, CACHE_TTL_MS);
+      return null; // sin traducción útil; cachea títulos que ya están en español
+    }
 
     cache.set(key, clean, CACHE_TTL_MS);
     return clean;

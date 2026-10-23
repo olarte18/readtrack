@@ -17,6 +17,11 @@ const coverUploadLimiter = makeLimiter({
   windowMs: process.env.RATE_LIMIT_WINDOW_MS,
   keyBy: "userId",
 });
+const recommendationsLimiter = makeLimiter({
+  max: 30,
+  windowMs: process.env.RATE_LIMIT_WINDOW_MS,
+  keyBy: "userId",
+});
 
 const GOOGLE_API = "https://www.googleapis.com/books/v1";
 const OPENLIBRARY_API = "https://openlibrary.org";
@@ -294,9 +299,8 @@ router.get("/search", async (req, res) => {
 const DISCOVERY_LIMIT = 20;
 const RECOMMENDATION_LIMIT = 10;
 const RECOMMENDATION_MIN_BOOKS = 3;
-const OL_FIELDS_SPA =
-  "key,title,author_name,first_publish_year,cover_i,edition_count,editions,editions.title,editions.language,editions.cover_i";
-const OL_FIELDS_ALL = "key,title,author_name,first_publish_year,cover_i,edition_count";
+const RECOMMENDATION_AUTHOR_QUERIES = 3;
+const OL_DISCOVERY_FIELDS = "key,title,author_name,first_publish_year,cover_i,edition_count,subject,publisher";
 
 // Nombres de categoría/género del catálogo (en español o inglés) → género de
 // Descubrir. Se normalizan sin acentos/mayúsculas. El orden importa: lo
@@ -323,94 +327,64 @@ function discoveryGenreKey(name) {
 
 const coverUrl = (id) => (id ? `https://covers.openlibrary.org/b/id/${id}-M.jpg` : null);
 
-// La edición en español viene en el subobjeto editions (con language:spa en la query
-// el servidor filtra por español). Devuelve la primera con título y portada.
-function spanishEdition(doc) {
-  const docs = doc?.editions?.docs;
-  if (!Array.isArray(docs)) return null;
-  return docs.find((ed) => Array.isArray(ed?.language) && ed.language.includes("spa") && ed?.title) ?? null;
+async function searchOpenLibraryDocs(query, limit = 25) {
+  const cacheKey = `books:openlibrary:${encodeURIComponent(query)}:${limit}`;
+  const cached = cache.get(cacheKey);
+  if (cached) return cached;
+
+  const url = `${OPENLIBRARY_API}/search.json?q=${encodeURIComponent(query)}&sort=editions&limit=${limit}&fields=${OL_DISCOVERY_FIELDS}`;
+  let docs;
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error("Open Library respondió con error");
+    const data = await response.json();
+    docs = Array.isArray(data?.docs) ? data.docs : [];
+  } catch {
+    throw httpError(502, "No se pudo consultar el catálogo de libros");
+  }
+  cache.set(cacheKey, docs, 3600000);
+  return docs;
 }
 
-// Obtiene (y cachea 1 h) los libros de un género de Descubrir. Prioriza obras con
-// edición en español; a las que no la tienen les traduce el título como respaldo.
+async function toDiscoveryBook(doc, genreLabel) {
+  const translated = await translateTitle(doc.title);
+  return {
+    id: doc.key.split("/").pop(),
+    workKey: doc.key,
+    title: doc.title,
+    display_title: translated ?? doc.title,
+    original_title: doc.title,
+    translated: Boolean(translated),
+    author: doc.author_name?.[0] ?? "Autor desconocido",
+    year: doc.first_publish_year ?? null,
+    pages: null,
+    cover: coverUrl(doc.cover_i),
+    isbn: null,
+    description: null,
+    genre: genreLabel,
+    edition_count: Number(doc.edition_count) || 0,
+    source: "openlibrary",
+  };
+}
+
+// Obtiene (y cachea 1 h) libros por género usando la búsqueda normal de Open
+// Library. Traduce los títulos para mostrar; conserva el original para guardar.
 async function getDiscoveryPayload(genreKey) {
   const genre = DISCOVERY_GENRES[genreKey];
   const cacheKey = `books:discover:${genreKey}`;
   const cached = cache.get(cacheKey);
   if (cached) return cached;
 
-  const subject = encodeURIComponent(`subject:${genre.subject}`);
-  const spaUrl = `${OPENLIBRARY_API}/search.json?q=${subject}%20language%3Aspa&sort=editions&limit=25&fields=${OL_FIELDS_SPA}`;
-  const allUrl = `${OPENLIBRARY_API}/search.json?q=${subject}&sort=editions&limit=25&fields=${OL_FIELDS_ALL}`;
+  const docs = await searchOpenLibraryDocs(`subject:${genre.subject}`);
 
-  let spaOk = false;
-  let allOk = false;
-  let spaDocs = [];
-  let allDocs = [];
-  try {
-    const [spaRes, allRes] = await Promise.all([fetch(spaUrl), fetch(allUrl)]);
-    spaOk = spaRes.ok;
-    allOk = allRes.ok;
-    if (spaOk) spaDocs = (await spaRes.json())?.docs ?? [];
-    if (allOk) allDocs = (await allRes.json())?.docs ?? [];
-  } catch {
-    throw httpError(502, "No se pudo consultar el catálogo de libros");
-  }
-  if (!spaOk && !allOk) throw httpError(502, "No se pudo consultar el catálogo de libros");
-
-  const byEditions = (docs) => [...docs].sort((a, b) => (b.edition_count ?? 0) - (a.edition_count ?? 0));
-  const seen = new Set();
+  const byEditions = [...docs]
+    .filter((doc) => doc?.key && doc?.title)
+    .sort((a, b) => (b.edition_count ?? 0) - (a.edition_count ?? 0))
+    .slice(0, DISCOVERY_LIMIT);
   const books = [];
 
-  for (const doc of byEditions(spaDocs)) {
-    if (books.length >= DISCOVERY_LIMIT) break;
-    if (!doc?.key || !doc?.title || seen.has(doc.key)) continue;
-    seen.add(doc.key);
-    const ed = spanishEdition(doc);
-    const title = ed?.title ?? doc.title;
-    books.push({
-      id: doc.key.split("/").pop(),
-      workKey: doc.key,
-      title, // edición en español: título real, es lo que se guarda
-      display_title: title,
-      original_title: doc.title,
-      translated: false,
-      author: doc.author_name?.[0] ?? "Autor desconocido",
-      year: doc.first_publish_year ?? null,
-      pages: null,
-      cover: coverUrl(ed?.cover_i) ?? coverUrl(doc.cover_i),
-      isbn: null,
-      description: null,
-      genre: genre.label,
-      edition_count: Number(doc.edition_count) || 0,
-      source: "openlibrary",
-    });
-  }
-
-  // Relleno: obras sin edición en español. Se traduce el título para mostrarlo,
-  // pero `title` conserva el original real (evita guardar títulos inventados).
-  for (const doc of byEditions(allDocs)) {
-    if (books.length >= DISCOVERY_LIMIT) break;
-    if (!doc?.key || !doc?.title || seen.has(doc.key)) continue;
-    seen.add(doc.key);
-    const translated = await translateTitle(doc.title);
-    books.push({
-      id: doc.key.split("/").pop(),
-      workKey: doc.key,
-      title: doc.title,
-      display_title: translated ?? doc.title,
-      original_title: doc.title,
-      translated: Boolean(translated),
-      author: doc.author_name?.[0] ?? "Autor desconocido",
-      year: doc.first_publish_year ?? null,
-      pages: null,
-      cover: coverUrl(doc.cover_i),
-      isbn: null,
-      description: null,
-      genre: genre.label,
-      edition_count: Number(doc.edition_count) || 0,
-      source: "openlibrary",
-    });
+  for (const doc of byEditions) {
+    books.push(await toDiscoveryBook(doc, genre.label));
   }
 
   const payload = { genre: genre.label, popularity_basis: "edition_count", books };
@@ -426,52 +400,104 @@ router.get("/discover", authMiddleware, async (req, res) => {
   res.json(await getDiscoveryPayload(genreKey));
 });
 
-// GET /books/recommendations — "Para ti": usa deseos y libros completados con
-// 4-5 estrellas. Necesita al menos RECOMMENDATION_MIN_BOOKS libros con género
-// identificable; si no, responde enabled=false y Descubrir sigue con la
-// exploración general por género.
-router.get("/recommendations", authMiddleware, async (req, res) => {
+function signalWeight(row) {
+  if (row.status === "wishlist") return 2;
+  if (row.status === "abandoned") return -2;
+  if (row.status !== "completed") return 0;
+  if (row.rating >= 5) return 3;
+  if (row.rating === 4) return 2;
+  if (row.rating === 1) return -3;
+  if (row.rating === 2) return -2;
+  return 0;
+}
+
+function addPreference(preferences, key, label, weight) {
+  if (!key || !weight) return;
+  const current = preferences.get(key) ?? { key, label, positive: 0, negative: 0, positiveBooks: 0 };
+  if (weight > 0) {
+    current.positive += weight;
+    current.positiveBooks += 1;
+  } else {
+    current.negative += Math.abs(weight);
+  }
+  preferences.set(key, current);
+}
+
+const preferenceBalance = (preference) =>
+  preference ? preference.positive - preference.negative * 1.5 : 0;
+
+function authorSearchTerm(name) {
+  const lastName = String(name ?? "").trim().split(/\s+/).pop();
+  return normKey(lastName);
+}
+
+// GET /books/recommendations — crea un perfil híbrido de afinidad y rechazo,
+// busca por géneros y autores preferidos, y ordena cada pool para esa persona.
+router.get("/recommendations", authMiddleware, recommendationsLimiter, async (req, res) => {
   const cacheKey = `books:recs:${req.userId}`;
   const cached = cache.get(cacheKey);
   if (cached) return res.json(cached);
 
   const { rows: signalRows } = await pool.query(`
-    SELECT ub.book_id, b.genre, b.title, b.author, b.google_id,
+    SELECT ub.book_id, ub.status, ub.rating, b.genre, b.author, b.publisher,
            ARRAY_REMOVE(ARRAY_AGG(DISTINCT NULLIF(BTRIM(bc.name), '')), NULL) AS categories
     FROM user_books ub
     JOIN books b ON b.id = ub.book_id
     LEFT JOIN book_categories bc ON bc.book_id = b.id
     WHERE ub.user_id = $1
       AND ub.is_archived = FALSE
-      AND (ub.status = 'wishlist' OR (ub.status = 'completed' AND ub.rating >= 4))
-    GROUP BY ub.book_id, b.genre, b.title, b.author, b.google_id
+      AND (
+        ub.status IN ('wishlist', 'abandoned')
+        OR (ub.status = 'completed' AND ub.rating IN (1, 2, 4, 5))
+      )
+    GROUP BY ub.book_id, ub.status, ub.rating, b.genre, b.author, b.publisher
   `, [req.userId]);
 
-  const counts = new Map();
-  let signalBooks = 0;
+  const profile = {
+    genres: new Map(),
+    authors: new Map(),
+    publishers: new Map(),
+  };
+  const positiveBookIds = new Set();
   for (const row of signalRows) {
-    const names = Array.isArray(row.categories) && row.categories.length ? row.categories : [row.genre];
-    const keys = new Set();
-    for (const name of names) {
-      const key = discoveryGenreKey(name);
-      if (key) keys.add(key);
+    const weight = signalWeight(row);
+    if (!weight) continue;
+
+    const categoryNames = Array.isArray(row.categories) ? row.categories : [];
+    const genreKeys = new Set(categoryNames.map(discoveryGenreKey).filter(Boolean));
+    if (!genreKeys.size) {
+      const fallbackGenre = discoveryGenreKey(row.genre);
+      if (fallbackGenre) genreKeys.add(fallbackGenre);
     }
-    if (!keys.size) continue;
-    signalBooks += 1;
-    for (const key of keys) counts.set(key, (counts.get(key) ?? 0) + 1);
+    if (weight > 0 && (genreKeys.size || normKey(row.author))) positiveBookIds.add(row.book_id);
+
+    for (const key of genreKeys) {
+      addPreference(profile.genres, key, DISCOVERY_GENRES[key].label, weight);
+    }
+    const authorKey = normKey(row.author);
+    if (authorKey) addPreference(profile.authors, authorKey, row.author.trim(), weight);
+    const publisherKey = normKey(row.publisher);
+    if (publisherKey) addPreference(profile.publishers, publisherKey, row.publisher.trim(), weight);
   }
 
-  const topGenres = [...counts.entries()]
-    .sort((a, b) => b[1] - a[1])
+  const signalBooks = positiveBookIds.size;
+  const topGenres = [...profile.genres.values()]
+    .filter((item) => item.positive > 0 && preferenceBalance(item) > 0)
+    .sort((a, b) => preferenceBalance(b) - preferenceBalance(a) || b.positiveBooks - a.positiveBooks)
     .slice(0, 3)
-    .map(([key, books]) => ({ key, label: DISCOVERY_GENRES[key].label, books }));
+    .map(({ key, label, positiveBooks }) => ({ key, label, books: positiveBooks }));
+  const topAuthors = [...profile.authors.values()]
+    .filter((item) => item.positive > 0 && preferenceBalance(item) > 0)
+    .sort((a, b) => preferenceBalance(b) - preferenceBalance(a))
+    .slice(0, RECOMMENDATION_AUTHOR_QUERIES);
 
-  if (signalBooks < RECOMMENDATION_MIN_BOOKS) {
+  if (signalBooks < RECOMMENDATION_MIN_BOOKS || (!topGenres.length && !topAuthors.length)) {
     const payload = {
       enabled: false,
       min_books: RECOMMENDATION_MIN_BOOKS,
       signal_books: signalBooks,
       genres: topGenres,
+      authors: topAuthors.map(({ label, positiveBooks }) => ({ name: label, books: positiveBooks })),
       books: [],
     };
     cache.set(cacheKey, payload, 60000);
@@ -488,32 +514,114 @@ router.get("/recommendations", authMiddleware, async (req, res) => {
   const ownedIds = new Set(ownedRows.map((r) => r.google_id).filter(Boolean));
   const ownedTitles = new Set(ownedRows.map((r) => normKey(r.title)).filter(Boolean));
 
-  const lists = [];
+  const sources = [
+    ...topGenres.slice(0, 2).map((genre) => ({ query: `subject:${DISCOVERY_GENRES[genre.key].subject}`, genreKey: genre.key })),
+    ...topAuthors.flatMap((author) => {
+      const term = authorSearchTerm(author.label);
+      return term ? [{ query: `author:${term}`, authorKey: author.key }] : [];
+    }),
+  ];
+  const candidateMap = new Map();
   let catalogError = false;
-  for (const genre of topGenres) {
+  for (const source of sources) {
     try {
-      const payload = await getDiscoveryPayload(genre.key);
-      lists.push({ genre, books: payload.books });
+      const docs = await searchOpenLibraryDocs(source.query, 30);
+      for (const doc of docs) {
+        if (!doc?.key || !doc?.title) continue;
+        let candidate = candidateMap.get(doc.key);
+        if (!candidate) {
+          candidate = { doc, genreHints: new Set(), authorHints: new Set() };
+          candidateMap.set(doc.key, candidate);
+        }
+        if (source.genreKey) candidate.genreHints.add(source.genreKey);
+        if (source.authorKey) candidate.authorHints.add(source.authorKey);
+      }
     } catch {
       catalogError = true;
     }
   }
 
-  const books = [];
-  const seen = new Set();
-  const maxLen = lists.reduce((max, list) => Math.max(max, list.books.length), 0);
-  for (let i = 0; i < maxLen && books.length < RECOMMENDATION_LIMIT; i += 1) {
-    for (const { genre, books: genreBooks } of lists) {
-      const book = genreBooks[i];
-      if (!book) continue;
-      const key = book.workKey ?? book.id;
-      if (seen.has(key)) continue;
-      if (ownedIds.has(book.id)) continue;
-      if (ownedTitles.has(normKey(book.title)) || ownedTitles.has(normKey(book.display_title))) continue;
-      seen.add(key);
-      books.push({ ...book, reason: `Porque te interesa ${genre.label}` });
-      if (books.length >= RECOMMENDATION_LIMIT) break;
+  const ranked = [];
+  for (const { doc, genreHints, authorHints } of candidateMap.values()) {
+    const id = doc.key.split("/").pop();
+    if (ownedIds.has(id) || ownedTitles.has(normKey(doc.title))) continue;
+
+    const genreKeys = new Set(
+      (Array.isArray(doc.subject) ? doc.subject : []).map(discoveryGenreKey).filter(Boolean)
+    );
+    if (!genreKeys.size) for (const key of genreHints) genreKeys.add(key);
+
+    const authorNames = Array.isArray(doc.author_name) ? doc.author_name : [];
+    const authorKeys = new Set(authorNames.map(normKey).filter(Boolean));
+    if (!authorKeys.size) for (const key of authorHints) authorKeys.add(key);
+
+    let score = 0;
+    let reason = "Por afinidad con tus lecturas";
+    let bestReasonScore = 0;
+    let matchedGenre = null;
+    for (const key of genreKeys) {
+      const preference = profile.genres.get(key);
+      const points = preferenceBalance(preference) * 3;
+      score += points;
+      if (points > bestReasonScore) {
+        bestReasonScore = points;
+        matchedGenre = key;
+        reason = `Porque te interesa ${DISCOVERY_GENRES[key].label}`;
+      }
     }
+    for (const key of authorKeys) {
+      const preference = profile.authors.get(key);
+      const points = preferenceBalance(preference) * 5;
+      score += points;
+      if (points > bestReasonScore) {
+        bestReasonScore = points;
+        matchedGenre = [...genreKeys][0] ?? null;
+        const name = preference?.label ?? authorNames[0] ?? "este autor";
+        reason = `Porque te gusta leer a ${name}`;
+      }
+    }
+    const publishers = Array.isArray(doc.publisher) ? doc.publisher : [];
+    for (const publisher of publishers) {
+      score += preferenceBalance(profile.publishers.get(normKey(publisher))) * 0.75;
+    }
+    // Popularidad solo desempata afinidades; por sí sola no activa un candidato.
+    score += Math.log1p(Number(doc.edition_count) || 0) * 0.15;
+    if (score <= 0) continue;
+
+    ranked.push({ doc, score, reason, genreKey: matchedGenre });
+  }
+  ranked.sort((a, b) => b.score - a.score || (Number(b.doc.edition_count) || 0) - (Number(a.doc.edition_count) || 0));
+
+  const chosen = [];
+  const authorCounts = new Map();
+  const selectedKeys = new Set();
+  for (const candidate of ranked) {
+    if (chosen.length >= RECOMMENDATION_LIMIT) break;
+    const key = candidate.doc.key;
+    if (selectedKeys.has(key)) continue;
+    const authorKey = normKey(candidate.doc.author_name?.[0]);
+    if (authorKey && (authorCounts.get(authorKey) ?? 0) >= 3) continue;
+    selectedKeys.add(key);
+    if (authorKey) authorCounts.set(authorKey, (authorCounts.get(authorKey) ?? 0) + 1);
+    chosen.push(candidate);
+  }
+  // Si el tope de diversidad dejó huecos, completa sin ese tope.
+  for (const candidate of ranked) {
+    if (chosen.length >= RECOMMENDATION_LIMIT) break;
+    if (selectedKeys.has(candidate.doc.key)) continue;
+    selectedKeys.add(candidate.doc.key);
+    chosen.push(candidate);
+  }
+
+  const books = [];
+  for (const candidate of chosen) {
+    const genreLabel = candidate.genreKey
+      ? DISCOVERY_GENRES[candidate.genreKey].label
+      : topGenres[0]?.label ?? "Lecturas afines";
+    books.push({
+      ...await toDiscoveryBook(candidate.doc, genreLabel),
+      reason: candidate.reason,
+    });
   }
 
   const payload = {
@@ -521,6 +629,7 @@ router.get("/recommendations", authMiddleware, async (req, res) => {
     min_books: RECOMMENDATION_MIN_BOOKS,
     signal_books: signalBooks,
     genres: topGenres,
+    authors: topAuthors.map(({ label, positiveBooks }) => ({ name: label, books: positiveBooks })),
     books,
     ...(catalogError && !books.length ? { catalog_error: true } : {}),
   };

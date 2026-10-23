@@ -69,8 +69,8 @@ const emptyExternal = { googleItems: [], olDocs: [] };
 describe("GET /books/discover", () => {
   const translate = require("../src/utils/translate");
 
-  // Mock de las dos consultas a Open Library (español y general) + MyMemory.
-  function mockDiscover({ spaDocs = [], allDocs = [], translations = {} } = {}) {
+  // Mock de la búsqueda general de Open Library y el traductor MyMemory.
+  function mockDiscover({ docs = [], translations = {} } = {}) {
     const fetchMock = jest.fn(async (url) => {
       const u = String(url);
       if (u.includes("mymemory.translated.net")) {
@@ -79,8 +79,7 @@ describe("GET /books/discover", () => {
         return { ok: true, json: async () => ({ responseData: { translatedText } }) };
       }
       if (u.includes("openlibrary.org")) {
-        if (u.includes("language%3Aspa")) return { ok: true, json: async () => ({ docs: spaDocs }) };
-        return { ok: true, json: async () => ({ docs: allDocs }) };
+        return { ok: true, json: async () => ({ docs }) };
       }
       throw new Error("fetch inesperado: " + u);
     });
@@ -90,48 +89,52 @@ describe("GET /books/discover", () => {
 
   afterEach(() => translate.setEnabled(false));
 
-  test("prioriza ediciones en español con su título y portada reales", async () => {
+  test("busca normalmente y traduce al español todos los títulos mostrados", async () => {
+    translate.setEnabled(true);
     const { token } = await registerUser();
-    mockDiscover({
-      spaDocs: [
-        {
-          key: "/works/OL1W",
-          title: "Alice's Adventures in Wonderland",
-          edition_count: 10,
-          author_name: ["Lewis Carroll"],
-          editions: { docs: [{ title: "Alicia en el País de las Maravillas", language: ["spa"], cover_i: 111 }] },
-        },
+    const fetchMock = mockDiscover({
+      docs: [
+        { key: "/works/OL1W", title: "Alice's Adventures in Wonderland", edition_count: 10, author_name: ["Lewis Carroll"], cover_i: 111 },
+        { key: "/works/OL2W", title: "El principito", edition_count: 50, author_name: ["Antoine de Saint-Exupéry"] },
       ],
-      allDocs: [
-        { key: "/works/OL1W", title: "Alice's Adventures in Wonderland", edition_count: 10 }, // duplicado, se descarta
-        { key: "/works/OL2W", title: "Some Very Popular Book", edition_count: 50 },
-      ],
+      translations: {
+        "Alice's Adventures in Wonderland": "Alicia en el País de las Maravillas",
+        "El principito": "El principito",
+      },
     });
 
     const res = await request(app).get("/books/discover?genre=fantasy").set({ Authorization: `Bearer ${token}` });
     expect(res.status).toBe(200);
     expect(res.body.books).toHaveLength(2);
-    // La edición en español va primero aunque la otra tenga más ediciones.
+    // La búsqueda general conserva el orden por popularidad, sin priorizar títulos
+    // ni ediciones españolas: El principito tiene más ediciones.
     expect(res.body.books[0]).toMatchObject({
-      id: "OL1W",
-      title: "Alicia en el País de las Maravillas",
-      display_title: "Alicia en el País de las Maravillas",
+      id: "OL2W",
+      title: "El principito",
+      display_title: "El principito",
       translated: false,
       genre: "Fantasía",
       source: "openlibrary",
     });
-    expect(res.body.books[0].cover).toContain("/111-M.jpg");
-    // La obra sin edición en español queda después, con su título original.
-    expect(res.body.books[1].title).toBe("Some Very Popular Book");
-    expect(res.body.books[1].translated).toBe(false);
+    expect(res.body.books[1]).toMatchObject({
+      id: "OL1W",
+      title: "Alice's Adventures in Wonderland",
+      display_title: "Alicia en el País de las Maravillas",
+      original_title: "Alice's Adventures in Wonderland",
+      translated: true,
+    });
+    expect(res.body.books[1].cover).toContain("/111-M.jpg");
+    const openLibraryCalls = fetchMock.mock.calls.filter(([url]) => String(url).includes("openlibrary.org"));
+    expect(openLibraryCalls).toHaveLength(1);
+    expect(String(openLibraryCalls[0][0])).toContain("/search.json?q=subject%3Afantasy");
+    expect(String(openLibraryCalls[0][0])).not.toContain("language%3Aspa");
   });
 
-  test("traduce el título cuando no hay edición en español", async () => {
+  test("traduce el título y conserva el original para guardar", async () => {
     translate.setEnabled(true);
     const { token } = await registerUser();
     mockDiscover({
-      spaDocs: [],
-      allDocs: [{ key: "/works/OL9W", title: "The Name of the Wind", edition_count: 5 }],
+      docs: [{ key: "/works/OL9W", title: "The Name of the Wind", edition_count: 5 }],
       translations: { "The Name of the Wind": "El nombre del viento" },
     });
 
@@ -149,8 +152,7 @@ describe("GET /books/discover", () => {
     translate.setEnabled(true);
     const { token } = await registerUser();
     mockDiscover({
-      spaDocs: [],
-      allDocs: [{ key: "/works/OL9W", title: "Untranslatable Title", edition_count: 5 }],
+      docs: [{ key: "/works/OL9W", title: "Untranslatable Title", edition_count: 5 }],
       translations: { "Untranslatable Title": "MYMEMORY WARNING: YOU USED ALL AVAILABLE FREE TRANSLATIONS FOR TODAY" },
     });
 
@@ -171,10 +173,10 @@ describe("GET /books/discover", () => {
 });
 
 describe("GET /books/recommendations", () => {
-  async function seedSignalBook({ title, genre = null, categories = [], googleId = null }) {
+  async function seedSignalBook({ title, author = "Autora", genre = null, publisher = null, categories = [], googleId = null }) {
     const { rows: [book] } = await pool.query(
-      `INSERT INTO books (google_id, title, author, genre) VALUES ($1, $2, $3, $4) RETURNING id`,
-      [googleId, title, "Autora", genre]
+      `INSERT INTO books (google_id, title, author, genre, publisher) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
+      [googleId, title, author, genre, publisher]
     );
     for (let i = 0; i < categories.length; i += 1) {
       await pool.query(
@@ -192,12 +194,11 @@ describe("GET /books/recommendations", () => {
     );
   }
 
-  function mockCatalog(spaDocs = []) {
+  function mockCatalog(docs = []) {
     const fetchMock = jest.fn(async (url) => {
       const u = String(url);
       if (u.includes("openlibrary.org")) {
-        if (u.includes("language%3Aspa")) return { ok: true, json: async () => ({ docs: spaDocs }) };
-        return { ok: true, json: async () => ({ docs: [] }) };
+        return { ok: true, json: async () => ({ docs }) };
       }
       if (u.includes("mymemory.translated.net")) {
         return { ok: true, json: async () => ({ responseData: { translatedText: "traducido" } }) };
@@ -239,7 +240,76 @@ describe("GET /books/recommendations", () => {
     expect(res.body.genres[0]).toMatchObject({ key: "fantasy", label: "Fantasía", books: 3 });
     // OL1W ya está en la biblioteca; OL2W sí se recomienda.
     expect(res.body.books.map((b) => b.id)).toEqual(["OL2W"]);
-    expect(res.body.books[0].reason).toBe("Porque te interesa Fantasía");
+    expect(res.body.books[0].reason).toBe("Porque te gusta leer a Autora");
+  });
+
+  test("dos lectores con el mismo género reciben resultados distintos por sus autores preferidos", async () => {
+    const readerA = await registerUser({ username: "lector_a", email: "lector-a@example.com" });
+    const readerB = await registerUser({ username: "lector_b", email: "lector-b@example.com" });
+    for (let i = 0; i < 3; i += 1) {
+      await linkBook(readerA.user.id, await seedSignalBook({ title: `Libro A ${i}`, author: "Autora Alfa", categories: ["Fantasía"] }));
+      await linkBook(readerB.user.id, await seedSignalBook({ title: `Libro B ${i}`, author: "Autor Beta", categories: ["Fantasía"] }));
+    }
+
+    global.fetch = jest.fn(async (url) => {
+      const query = new URL(String(url)).searchParams.get("q");
+      if (query?.startsWith("author:")) {
+        const author = query.slice("author:".length);
+        const doc = author === "alfa"
+          ? { key: "/works/OLA", title: "Novela de Autora Alfa", author_name: ["Autora Alfa"], subject: ["fantasy"], edition_count: 15 }
+          : author === "beta"
+            ? { key: "/works/OLB", title: "Novela de Autor Beta", author_name: ["Autor Beta"], subject: ["fantasy"], edition_count: 15 }
+            : null;
+        return { ok: true, json: async () => ({ docs: doc ? [doc] : [] }) };
+      }
+      return { ok: true, json: async () => ({ docs: [] }) };
+    });
+
+    const resA = await request(app).get("/books/recommendations").set({ Authorization: `Bearer ${readerA.token}` });
+    const resB = await request(app).get("/books/recommendations").set({ Authorization: `Bearer ${readerB.token}` });
+
+    expect(resA.status).toBe(200);
+    expect(resB.status).toBe(200);
+    expect(resA.body.books.map((book) => book.id)).toContain("OLA");
+    expect(resB.body.books.map((book) => book.id)).toContain("OLB");
+    expect(resA.body.books.map((book) => book.id)).not.toEqual(resB.body.books.map((book) => book.id));
+    expect(resA.body.books[0].reason).toBe("Porque te gusta leer a Autora Alfa");
+    expect(resB.body.books[0].reason).toBe("Porque te gusta leer a Autor Beta");
+  });
+
+  test("resta afinidad a autores de libros abandonados o con calificación baja", async () => {
+    const { user, token } = await registerUser();
+    for (let i = 0; i < 3; i += 1) {
+      await linkBook(user.id, await seedSignalBook({ title: `Fantasía favorita ${i}`, author: "Autora favorita", categories: ["Fantasía"] }));
+    }
+    await linkBook(
+      user.id,
+      await seedSignalBook({ title: "Lectura que no gustó", author: "Autor rechazado", categories: ["Misterio"] }),
+      { status: "completed", rating: 1 }
+    );
+    await linkBook(
+      user.id,
+      await seedSignalBook({ title: "Lectura abandonada", author: "Autora abandonada", categories: ["Fantasía"] }),
+      { status: "abandoned" }
+    );
+    const candidates = [
+      { key: "/works/OLGOOD", title: "Otra obra favorita", author_name: ["Autora favorita"], subject: ["fantasy"], edition_count: 10 },
+      { key: "/works/OLBAD", title: "Otra obra del autor rechazado", author_name: ["Autor rechazado"], subject: ["fantasy"], edition_count: 5000 },
+      { key: "/works/OLABANDONED", title: "Otra obra de la autora abandonada", author_name: ["Autora abandonada"], subject: ["fantasy"], edition_count: 5000 },
+    ];
+    global.fetch = jest.fn(async (url) => {
+      const query = new URL(String(url)).searchParams.get("q");
+      const docs = query?.startsWith("author:")
+        ? candidates.filter((doc) => doc.author_name.some((author) => author.toLowerCase().includes(query.slice("author:".length))))
+        : candidates;
+      return { ok: true, json: async () => ({ docs }) };
+    });
+
+    const res = await request(app).get("/books/recommendations").set({ Authorization: `Bearer ${token}` });
+    expect(res.status).toBe(200);
+    expect(res.body.books.map((book) => book.id)).toContain("OLGOOD");
+    expect(res.body.books.map((book) => book.id)).not.toContain("OLBAD");
+    expect(res.body.books.map((book) => book.id)).not.toContain("OLABANDONED");
   });
 
   test("usa books.genre como respaldo y reconoce nombres en inglés", async () => {

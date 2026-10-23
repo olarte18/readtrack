@@ -54,9 +54,7 @@ export default function DiscoverScreen({ navigation }) {
   }, [genre, retryCount]);
 
   const recBooks = Array.isArray(recommendations?.books) ? recommendations.books : [];
-  const recGenres = Array.isArray(recommendations?.genres) ? recommendations.genres : [];
   const showRecommendations = recommendations?.enabled === true && recBooks.length > 0;
-  const genreNames = recGenres.map((item) => item.label).join(" y ");
 
   return (
     <View style={styles.container}>
@@ -64,16 +62,14 @@ export default function DiscoverScreen({ navigation }) {
         <Text style={styles.title}>Descubrir libros</Text>
       </View>
       <Text style={styles.subtitle}>
-        Explora por género, ordenado por cantidad de ediciones en Open Library. Priorizamos ediciones en español; cuando no existe, mostramos el título traducido.
+        Explora por género, ordenado por cantidad de ediciones en Open Library. Traducimos los títulos al español cuando es posible.
       </Text>
       <ScrollView style={styles.body} contentContainerStyle={styles.bodyContent}>
         {showRecommendations && (
           <View>
             <Text style={styles.sectionTitle}>Para ti</Text>
             <Text style={styles.sectionHint}>
-              {genreNames
-                ? `Basado en tu interés en ${genreNames}.`
-                : "Basado en tus deseos y valoraciones altas."}
+              Basado en tus géneros, autores y valoraciones. Las razones de cada libro explican por qué aparece.
             </Text>
             {recBooks.map((book) => (
               <BookCard
