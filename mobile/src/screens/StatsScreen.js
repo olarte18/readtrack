@@ -444,7 +444,7 @@ export default function StatsScreen({ navigation }) {
           { label: "Días", value: activity?.totals?.active_days ?? 0 },
         ].map((t) => (
           <View key={t.label} style={styles.totalTile}>
-            <Text style={styles.totalValue}>{t.value}</Text>
+            <Text style={styles.totalValue} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{t.value}</Text>
             <Text style={styles.totalLabel}>{t.label}</Text>
           </View>
         ))}
@@ -461,7 +461,7 @@ export default function StatsScreen({ navigation }) {
             bgColor={colors.surface}
             completedColor={colors.calendarComplete}
           >
-            <Text style={styles.ringNumber}>{Math.round(ringPct)}%</Text>
+            <Text style={styles.ringNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{Math.round(ringPct)}%</Text>
           </ProgressRing>
           <View style={styles.goalInfo}>
             <Text style={styles.goalTitle}>Meta anual {year}</Text>
@@ -501,7 +501,7 @@ export default function StatsScreen({ navigation }) {
                   >
                     <View style={styles.genreHeading}>
                       <Text style={styles.genreName} numberOfLines={1}>{item.name}</Text>
-                      <Text style={styles.genreCount}>{item.books}</Text>
+                <Text style={styles.genreCount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{item.books}</Text>
                     </View>
                     <View style={styles.genreTrack} accessible={false}>
                       <View style={[styles.genreFill, { width: `${Math.max(8, (item.books / maxBooks) * 100)}%` }]} />
@@ -528,7 +528,7 @@ export default function StatsScreen({ navigation }) {
             onPress={() => navigation.navigate("Home", { filterStatus: item.key })}
           >
             <Ionicons name={item.icon} size={24} color={colors.textMuted} style={styles.icon} />
-            <Text style={styles.statNumber}>{stats?.[item.key] ?? 0}</Text>
+            <Text style={styles.statNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{stats?.[item.key] ?? 0}</Text>
             <Text style={styles.statLabel}>{item.label}</Text>
           </TouchableOpacity>
         ))}
@@ -536,13 +536,13 @@ export default function StatsScreen({ navigation }) {
 
       <View style={styles.bigStatsRow}>
         <View style={styles.bigStat}>
-          <Text style={styles.bigStatNumber}>{stats?.total_pages ?? 0}</Text>
+          <Text style={styles.bigStatNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{stats?.total_pages ?? 0}</Text>
           <Text style={styles.bigStatLabel}>Páginas leídas</Text>
         </View>
         <View style={styles.bigStat}>
           <View style={styles.bigStatTop}>
             <Ionicons name="star" size={18} color={colors.star} />
-            <Text style={styles.bigStatNumber}>
+            <Text style={styles.bigStatNumber} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
               {stats?.avg_rating > 0 ? stats.avg_rating : "—"}
             </Text>
           </View>
@@ -582,7 +582,7 @@ export default function StatsScreen({ navigation }) {
             <View key={group.key} style={styles.readingHistoryCard}>
               <View style={styles.historyMonthHeader}>
                 <Text style={styles.historyMonthTitle}>{MONTH_NAMES[monthNumber - 1]} {year}</Text>
-                <Text style={styles.historyMonthCount}>{group.books.length} {group.books.length === 1 ? "libro" : "libros"}</Text>
+                <Text style={styles.historyMonthCount} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>{group.books.length} {group.books.length === 1 ? "libro" : "libros"}</Text>
               </View>
               {group.books.map(renderReadingBook)}
             </View>
@@ -690,8 +690,8 @@ const createStyles = (colors) =>
     unitText: { fontSize: 11, color: colors.textMuted, fontWeight: "600" },
     unitTextActive: { color: colors.surface, fontWeight: "bold" },
     totalsRow: { flexDirection: "row", gap: 10, marginBottom: 12 },
-    totalTile: { flex: 1, backgroundColor: colors.surface, borderRadius: 12, paddingVertical: 12, alignItems: "center" },
-    totalValue: { fontSize: 18, fontWeight: "bold", color: colors.accent },
+    totalTile: { flex: 1, minWidth: 0, backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 4, paddingVertical: 12, alignItems: "center" },
+    totalValue: { width: "100%", textAlign: "center", flexShrink: 1, fontSize: 18, fontWeight: "bold", color: colors.accent },
     totalLabel: { fontSize: 10, color: colors.textMuted, marginTop: 2 },
     goalCard: { flexDirection: "row", alignItems: "center", backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, gap: 14 },
     goalInfo: { flex: 1 },
@@ -706,12 +706,12 @@ const createStyles = (colors) =>
     grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
     statCard: { backgroundColor: colors.surface, borderRadius: 10, padding: 10, alignItems: "center", minWidth: "30%", flexGrow: 1 },
     icon: { marginBottom: 4 },
-    statNumber: { fontSize: 20, fontWeight: "bold", color: colors.accent },
+    statNumber: { width: "100%", textAlign: "center", flexShrink: 1, fontSize: 20, fontWeight: "bold", color: colors.accent },
     statLabel: { fontSize: 10, color: colors.textMuted, marginTop: 2, textAlign: "center" },
     bigStatsRow: { flexDirection: "row", gap: 8 },
-    bigStat: { flex: 1, backgroundColor: colors.surface, borderRadius: 10, padding: 14, alignItems: "center" },
-    bigStatTop: { flexDirection: "row", alignItems: "center", gap: 6 },
-    bigStatNumber: { fontSize: 20, fontWeight: "bold", color: colors.accent },
+    bigStat: { flex: 1, minWidth: 0, backgroundColor: colors.surface, borderRadius: 10, padding: 14, alignItems: "center" },
+    bigStatTop: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, width: "100%" },
+    bigStatNumber: { flexShrink: 1, fontSize: 20, fontWeight: "bold", color: colors.accent },
     bigStatLabel: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
     readingHistoryCard: { backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4, marginBottom: 12 },
     readingBookRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
@@ -721,11 +721,11 @@ const createStyles = (colors) =>
     readingBookTitle: { color: colors.text, fontSize: 14, fontWeight: "600", lineHeight: 19 },
     readingBookAuthor: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
     readingBookMeta: { alignItems: "flex-end", gap: 5 },
-    readingBookPages: { color: colors.accent, fontSize: 12, fontWeight: "bold" },
+    readingBookPages: { maxWidth: 110, color: colors.accent, fontSize: 12, fontWeight: "bold", textAlign: "right" },
     readingBookType: { color: colors.textMuted, backgroundColor: colors.surfaceAlt, fontSize: 10, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, overflow: "hidden" },
     historyMonthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
     historyMonthTitle: { color: colors.text, fontSize: 16, fontWeight: "bold" },
-    historyMonthCount: { color: colors.textMuted, fontSize: 12 },
+    historyMonthCount: { maxWidth: 110, color: colors.textMuted, fontSize: 12, textAlign: "right" },
     historyEmptyState: { alignItems: "center", paddingVertical: 14 },
     historyEmpty: { color: colors.textMuted, fontSize: 13, lineHeight: 19, paddingVertical: 14, textAlign: "center" },
     undatedNote: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginBottom: 12, paddingHorizontal: 4 },
@@ -733,7 +733,7 @@ const createStyles = (colors) =>
     genreRow: { gap: 6 },
     genreHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
     genreName: { flex: 1, color: colors.text, fontSize: 13, fontWeight: "600" },
-    genreCount: { color: colors.textMuted, fontSize: 12, fontWeight: "600" },
+    genreCount: { flexShrink: 1, maxWidth: 56, color: colors.textMuted, fontSize: 12, fontWeight: "600", textAlign: "right" },
     genreTrack: { height: 7, backgroundColor: colors.surfaceAlt, borderRadius: 5, overflow: "hidden" },
     genreFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 5 },
     genreEmpty: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },

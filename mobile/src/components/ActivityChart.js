@@ -110,7 +110,7 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
   return (
     <View style={[styles.col, columnWidth ? { flex: 0, width: columnWidth } : null]}>
       {showValue ? (
-        <Text allowFontScaling style={[styles.value, value > 0 && styles.valueActive]} numberOfLines={1}>
+        <Text allowFontScaling style={[styles.value, value > 0 && styles.valueActive]} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
           {value > 0 ? (formatValue ? formatValue(value) : value) : ""}
         </Text>
       ) : null}
@@ -131,7 +131,7 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
           ]}
         />
       </View>
-      <Text allowFontScaling style={styles.label} numberOfLines={1}>
+      <Text allowFontScaling style={styles.label} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.65}>
         {d.label}
       </Text>
     </View>
@@ -141,10 +141,10 @@ function BarColumn({ d, maxValue, barArea, colors, styles, showValue, formatValu
 const createStyles = (colors) =>
   StyleSheet.create({
     row: { flexDirection: "row", alignItems: "flex-start" },
-    col: { flex: 1, alignItems: "center" },
-    value: { fontSize: 11, color: colors.textMuted, marginBottom: 2 },
+    col: { flex: 1, minWidth: 0, alignItems: "center" },
+    value: { width: "100%", textAlign: "center", flexShrink: 1, fontSize: 11, color: colors.textMuted, marginBottom: 2 },
     valueActive: { color: colors.accent, fontWeight: "bold" },
     track: { width: "62%", borderRadius: 6, overflow: "hidden", justifyContent: "flex-end" },
     bar: { width: "100%" },
-    label: { fontSize: 11, color: colors.textMuted, marginTop: 3 },
+    label: { width: "100%", textAlign: "center", flexShrink: 1, fontSize: 11, color: colors.textMuted, marginTop: 3 },
   });
