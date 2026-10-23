@@ -522,6 +522,37 @@ describe("feedback de racha al guardar (streakState)", () => {
     expect(saved.streakState).toEqual({ kind: "activated", days: 1 });
   });
 
+  test("modal de racha incluye días protegidos en el total acumulado", async () => {
+    const { token, user } = await registerUser();
+    const book = await addPageBook(token);
+    const { rows: dateRows } = await pool.query(
+      `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Bogota')::date - n, 'YYYY-MM-DD') AS d
+       FROM generate_series(2, 21) AS n`
+    );
+    await pool.query(
+      `INSERT INTO reading_sessions (user_book_id, user_id, page, duration_seconds, pages_read, started_at)
+       SELECT $1, $2, 100, 1800, 2, d::date + TIME '12:00'
+       FROM unnest($3::text[]) AS d`,
+      [book.id, user.id, dateRows.map((row) => row.d)]
+    );
+    const { rows: protectedRows } = await pool.query(
+      `SELECT TO_CHAR((NOW() AT TIME ZONE 'America/Bogota')::date - 1, 'YYYY-MM-DD') AS d`
+    );
+    await pool.query(
+      `INSERT INTO streak_protectors (user_id, source, cost, used_at, protected_date)
+       VALUES ($1, 'gift', 0, NOW(), $2::date)`,
+      [user.id, protectedRows[0].d]
+    );
+    await pool.query(
+      "INSERT INTO streak_protector_state (user_id, slots, repaired_at) VALUES ($1, 2, NOW())",
+      [user.id]
+    );
+
+    const saved = await save(token, book.id, { duration_seconds: 360, pages_read: 2 });
+
+    expect(saved.streakState).toEqual({ kind: "activated", days: 22 });
+  });
+
   test("casi → activada: la segunda sesión del día cruza el umbral", async () => {
     const { token } = await registerUser();
     const book = await addPageBook(token);

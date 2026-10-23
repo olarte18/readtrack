@@ -11,7 +11,7 @@ const { getQualifyingDates, getDayProgress, appToday } = require("../utils/strea
 const { getGoalCompletion } = require("../utils/goalProgress");
 const { recheckAchievements, withFreshAchievements } = require("../utils/achievements");
 const { bucketReadingDays } = require("../utils/sessionDays");
-const { rolloverSlots, reconcileProtectors } = require("../utils/streakProtectors");
+const { rolloverSlots, reconcileProtectors, getProtectedDates } = require("../utils/streakProtectors");
 const { awardPointsForSession, getSessionPoints } = require("../utils/streakPoints");
 const { SQL } = require("../utils/dates");
 
@@ -43,14 +43,21 @@ async function sessionPayload(req, session, body) {
   const buckets = await bucketReadingDays(req.userId);
   const before = await getDayProgress(req.userId, today, { excludeId: session.id, buckets });
   const after = await getDayProgress(req.userId, today, { buckets });
+  const getCurrentStreak = async () => {
+    const [realDates, protectedDates] = await Promise.all([
+      getQualifyingDates(req.userId, buckets),
+      getProtectedDates(req.userId),
+    ]);
+    return computeStreaks([...new Set([...realDates, ...protectedDates])]).current;
+  };
   let streakState = null;
   let currentStreak = null;
   if (after.qualifies && !before.qualifies) {
-    currentStreak = computeStreaks(await getQualifyingDates(req.userId, buckets)).current;
+    currentStreak = await getCurrentStreak();
     streakState = { kind: "activated", days: currentStreak };
   } else if (!after.qualifies && prior[0].n === 0) {
     if (currentStreak === null) {
-      currentStreak = computeStreaks(await getQualifyingDates(req.userId, buckets)).current;
+      currentStreak = await getCurrentStreak();
     }
     streakState = { kind: "almost", missing: after.missing, current: currentStreak };
   }
@@ -58,7 +65,7 @@ async function sessionPayload(req, session, body) {
   let streak = null;
   if (prior[0].n === 0) {
     if (currentStreak === null) {
-      currentStreak = computeStreaks(await getQualifyingDates(req.userId, buckets)).current;
+      currentStreak = await getCurrentStreak();
     }
     streak = currentStreak;
   }
