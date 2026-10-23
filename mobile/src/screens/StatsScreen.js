@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, Pressable } from "react-native";
+import { View, Text, Image, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
 import { getStats, getReadingBreakdown, getStatsActivity, getLibrary, logUnexpectedError } from "../services/api";
 import { getPending } from "../services/offline";
 import { activityWithLocal } from "../utils/offlineCompute";
 import { filterCompletedBooksForBreakdown } from "../utils/breakdownBooks";
+import { getLongestCompletedBooks, groupCompletedBooksByMonth, getUndatedCompletedBooks } from "../utils/readingHistory";
 import { todayString } from "../utils/dates";
 import ActivityChart from "../components/ActivityChart";
 import ProgressRing from "../components/ProgressRing";
@@ -69,6 +70,9 @@ export default function StatsScreen({ navigation }) {
   const [breakdownBooks, setBreakdownBooks] = useState([]);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [breakdownError, setBreakdownError] = useState(false);
+  const [library, setLibrary] = useState(null);
+  const [libraryLoading, setLibraryLoading] = useState(true);
+  const [libraryError, setLibraryError] = useState(false);
 
   const loadBreakdownBooks = async (selection) => {
     setBreakdownLoading(true);
@@ -92,6 +96,23 @@ export default function StatsScreen({ navigation }) {
   };
 
   const closeBreakdownBooks = () => setSelectedBreakdown(null);
+
+  const fetchLibrary = useCallback(async () => {
+    setLibraryLoading(true);
+    setLibraryError(false);
+    try {
+      setLibrary(await getLibrary());
+    } catch (error) {
+      setLibraryError(true);
+      logUnexpectedError(error);
+    } finally {
+      setLibraryLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchLibrary();
+  }, [fetchLibrary]);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -144,7 +165,7 @@ export default function StatsScreen({ navigation }) {
   const refresh = async () => {
     setRefreshing(true);
     try {
-      const [, , breakdown] = await Promise.all([fetchStats(), fetchActivity(), getReadingBreakdown()]);
+      const [, , breakdown] = await Promise.all([fetchStats(), fetchActivity(), getReadingBreakdown(), fetchLibrary()]);
       setGenreStats(breakdown);
     } catch (e) {
       logUnexpectedError(e);
@@ -249,6 +270,63 @@ export default function StatsScreen({ navigation }) {
   const completed = stats?.completed_this_year ?? 0;
   const goal = stats?.goal_this_year;
   const ringPct = goal > 0 ? Math.round((completed / goal) * 100) : 0;
+  const booksByPages = useMemo(
+    () => getLongestCompletedBooks(library, year),
+    [library, year]
+  );
+  const booksByMonth = useMemo(
+    () => groupCompletedBooksByMonth(library, year),
+    [library, year]
+  );
+  const undatedBooksCount = useMemo(
+    () => getUndatedCompletedBooks(library).length,
+    [library]
+  );
+
+  const renderReadingBook = (book) => {
+    const type = {
+      physical: "Físico",
+      ebook: "eBook",
+      audio: "Audiolibro",
+    }[book.book_type] ?? "Tipo no indicado";
+    const pages = Number(book.pages);
+    const pagesLabel = Number.isFinite(pages) && pages > 0 ? `${pages} páginas` : "Páginas no registradas";
+    return (
+      <TouchableOpacity
+        key={book.db_id ?? book.id}
+        style={styles.readingBookRow}
+        accessibilityRole="button"
+        accessibilityLabel={`${book.title}, ${book.author || "autor desconocido"}, ${pagesLabel}, ${type}`}
+        accessibilityHint="Abre los detalles del libro"
+        onPress={() => navigation.navigate("BookDetail", { book, onGoBack: refresh })}
+      >
+        {book.cover ? (
+          <Image
+            source={{ uri: book.cover }}
+            style={styles.readingBookCover}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          />
+        ) : (
+          <View
+            style={styles.readingBookNoCover}
+            accessible={false}
+            importantForAccessibility="no-hide-descendants"
+          >
+            <Ionicons name="book-outline" size={22} color={colors.textDim} accessible={false} />
+          </View>
+        )}
+        <View style={styles.readingBookInfo}>
+          <Text style={styles.readingBookTitle} numberOfLines={2}>{book.title}</Text>
+          {!!book.author && <Text style={styles.readingBookAuthor} numberOfLines={1}>{book.author}</Text>}
+        </View>
+        <View style={styles.readingBookMeta}>
+          <Text style={styles.readingBookPages}>{pagesLabel}</Text>
+          <Text style={styles.readingBookType}>{type}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (loading && !activity) {
     return (
@@ -471,6 +549,55 @@ export default function StatsScreen({ navigation }) {
           <Text style={styles.bigStatLabel}>Rating promedio</Text>
         </View>
       </View>
+
+      <Text style={styles.sectionTitle}>Libros con más páginas · {year}</Text>
+      <View style={styles.readingHistoryCard}>
+        {libraryLoading ? (
+          <ActivityIndicator color={colors.accent} />
+        ) : libraryError ? (
+          <View style={styles.historyEmptyState}>
+            <Text style={styles.historyEmpty}>No se pudo cargar tu biblioteca.</Text>
+            <TouchableOpacity style={styles.retryButton} accessibilityRole="button" accessibilityLabel="Volver a cargar tu biblioteca" onPress={fetchLibrary}>
+              <Text style={styles.retryText}>Intentar de nuevo</Text>
+            </TouchableOpacity>
+          </View>
+        ) : booksByPages.length ? (
+          booksByPages.map(renderReadingBook)
+        ) : (
+          <Text style={styles.historyEmpty}>No hay libros terminados con páginas registradas en {year}.</Text>
+        )}
+      </View>
+
+      <Text style={styles.sectionTitle}>Libros terminados por mes · {year}</Text>
+      {libraryLoading ? (
+        <View style={styles.readingHistoryCard}><ActivityIndicator color={colors.accent} /></View>
+      ) : libraryError ? (
+        <View style={styles.readingHistoryCard}>
+          <Text style={styles.historyEmpty}>No se pudo cargar el historial de lectura.</Text>
+        </View>
+      ) : booksByMonth.length ? (
+        booksByMonth.map((group) => {
+          const monthNumber = Number(group.key.slice(5, 7));
+          return (
+            <View key={group.key} style={styles.readingHistoryCard}>
+              <View style={styles.historyMonthHeader}>
+                <Text style={styles.historyMonthTitle}>{MONTH_NAMES[monthNumber - 1]} {year}</Text>
+                <Text style={styles.historyMonthCount}>{group.books.length} {group.books.length === 1 ? "libro" : "libros"}</Text>
+              </View>
+              {group.books.map(renderReadingBook)}
+            </View>
+          );
+        })
+      ) : (
+        <View style={styles.readingHistoryCard}>
+          <Text style={styles.historyEmpty}>No hay libros terminados registrados en {year}.</Text>
+        </View>
+      )}
+      {!libraryLoading && !libraryError && undatedBooksCount > 0 && (
+        <Text style={styles.undatedNote}>
+          {undatedBooksCount} {undatedBooksCount === 1 ? "libro terminado no tiene" : "libros terminados no tienen"} fecha de finalización registrada y no aparece en los meses.
+        </Text>
+      )}
       </ScrollView>
 
       <Modal visible={!!selectedBreakdown} transparent animationType="slide" onRequestClose={closeBreakdownBooks}>
@@ -586,6 +713,22 @@ const createStyles = (colors) =>
     bigStatTop: { flexDirection: "row", alignItems: "center", gap: 6 },
     bigStatNumber: { fontSize: 20, fontWeight: "bold", color: colors.accent },
     bigStatLabel: { fontSize: 11, color: colors.textMuted, marginTop: 4 },
+    readingHistoryCard: { backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 4, marginBottom: 12 },
+    readingBookRow: { flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    readingBookCover: { width: 48, height: 72, borderRadius: 6, backgroundColor: colors.surfaceAlt },
+    readingBookNoCover: { width: 48, height: 72, borderRadius: 6, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
+    readingBookInfo: { flex: 1 },
+    readingBookTitle: { color: colors.text, fontSize: 14, fontWeight: "600", lineHeight: 19 },
+    readingBookAuthor: { color: colors.textMuted, fontSize: 12, marginTop: 3 },
+    readingBookMeta: { alignItems: "flex-end", gap: 5 },
+    readingBookPages: { color: colors.accent, fontSize: 12, fontWeight: "bold" },
+    readingBookType: { color: colors.textMuted, backgroundColor: colors.surfaceAlt, fontSize: 10, borderRadius: 8, paddingHorizontal: 8, paddingVertical: 4, overflow: "hidden" },
+    historyMonthHeader: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingVertical: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    historyMonthTitle: { color: colors.text, fontSize: 16, fontWeight: "bold" },
+    historyMonthCount: { color: colors.textMuted, fontSize: 12 },
+    historyEmptyState: { alignItems: "center", paddingVertical: 14 },
+    historyEmpty: { color: colors.textMuted, fontSize: 13, lineHeight: 19, paddingVertical: 14, textAlign: "center" },
+    undatedNote: { color: colors.textDim, fontSize: 12, lineHeight: 17, marginBottom: 12, paddingHorizontal: 4 },
     genreCard: { backgroundColor: colors.surface, borderRadius: 12, padding: 16, marginBottom: 12, gap: 14 },
     genreRow: { gap: 6 },
     genreHeading: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", gap: 12 },
