@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState, useCallback } from "react";
-import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ScrollView, ActivityIndicator, RefreshControl, Modal, Pressable } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../contexts/ThemeContext";
-import { getStats, getReadingBreakdown, getStatsActivity, logUnexpectedError } from "../services/api";
+import { getStats, getReadingBreakdown, getStatsActivity, getLibrary, logUnexpectedError } from "../services/api";
 import { getPending } from "../services/offline";
 import { activityWithLocal } from "../utils/offlineCompute";
+import { filterCompletedBooksForBreakdown } from "../utils/breakdownBooks";
 import { todayString } from "../utils/dates";
 import ActivityChart from "../components/ActivityChart";
 import ProgressRing from "../components/ProgressRing";
+import BookCard from "../components/BookCard";
 
 const STAT_ITEMS = [
   { key: "completed", label: "Leídos", icon: "checkmark-circle" },
@@ -63,6 +65,33 @@ export default function StatsScreen({ navigation }) {
   const [genreStats, setGenreStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedBreakdown, setSelectedBreakdown] = useState(null);
+  const [breakdownBooks, setBreakdownBooks] = useState([]);
+  const [breakdownLoading, setBreakdownLoading] = useState(false);
+  const [breakdownError, setBreakdownError] = useState(false);
+
+  const loadBreakdownBooks = async (selection) => {
+    setBreakdownLoading(true);
+    setBreakdownError(false);
+    setBreakdownBooks([]);
+    try {
+      const library = await getLibrary();
+      setBreakdownBooks(filterCompletedBooksForBreakdown(library, selection));
+    } catch (error) {
+      setBreakdownError(true);
+      logUnexpectedError(error);
+    } finally {
+      setBreakdownLoading(false);
+    }
+  };
+
+  const openBreakdownBooks = (kind, item) => {
+    const selection = { kind, name: item.name };
+    setSelectedBreakdown(selection);
+    loadBreakdownBooks(selection);
+  };
+
+  const closeBreakdownBooks = () => setSelectedBreakdown(null);
 
   const fetchStats = useCallback(async () => {
     try {
@@ -230,12 +259,13 @@ export default function StatsScreen({ navigation }) {
   }
 
   return (
-    <ScrollView
-      contentContainerStyle={styles.container}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} colors={[colors.accent]} />
-      }
-    >
+    <View style={styles.screen}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={colors.accent} colors={[colors.accent]} />
+        }
+      >
       <View style={styles.headerRow}>
         <Text style={styles.title}>Estadísticas</Text>
         <View style={styles.yearControl}>
@@ -371,11 +401,12 @@ export default function StatsScreen({ navigation }) {
         </View>
       )}
 
+      <Text style={styles.breakdownHint}>Toca un género, autor o editorial para ver sus libros.</Text>
       {[
-        ["Géneros que has leído", genreStats?.genres, "Cuando termines libros con género registrado, verás aquí tus patrones de lectura."],
-        ["Autores que más has leído", genreStats?.authors, "Cuando termines libros con autor registrado, verás aquí tus autores más leídos."],
-        ["Editoriales", genreStats?.publishers, "Cuando termines libros con editorial registrada, verás aquí tus editoriales más frecuentes."],
-      ].map(([title, items, emptyText]) => (
+        ["genre", "Géneros que has leído", genreStats?.genres, "Cuando termines libros con género registrado, verás aquí tus patrones de lectura."],
+        ["author", "Autores que más has leído", genreStats?.authors, "Cuando termines libros con autor registrado, verás aquí tus autores más leídos."],
+        ["publisher", "Editoriales", genreStats?.publishers, "Cuando termines libros con editorial registrada, verás aquí tus editoriales más frecuentes."],
+      ].map(([kind, title, items, emptyText]) => (
         <View key={title}>
           <Text style={styles.sectionTitle}>{title}</Text>
           <View style={styles.genreCard}>
@@ -383,11 +414,12 @@ export default function StatsScreen({ navigation }) {
               items.slice(0, 5).map((item) => {
                 const maxBooks = items[0].books;
                 return (
-                  <View
+                  <TouchableOpacity
                     key={item.name}
                     style={styles.genreRow}
-                    accessible
-                    accessibilityLabel={`${item.name}: ${item.books} ${item.books === 1 ? "libro" : "libros"} terminados`}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Ver ${item.books} ${item.books === 1 ? "libro" : "libros"} terminados de ${kind === "genre" ? "género" : kind === "author" ? "autor" : "editorial"} ${item.name}`}
+                    onPress={() => openBreakdownBooks(kind, item)}
                   >
                     <View style={styles.genreHeading}>
                       <Text style={styles.genreName} numberOfLines={1}>{item.name}</Text>
@@ -396,7 +428,7 @@ export default function StatsScreen({ navigation }) {
                     <View style={styles.genreTrack} accessible={false}>
                       <View style={[styles.genreFill, { width: `${Math.max(8, (item.books / maxBooks) * 100)}%` }]} />
                     </View>
-                  </View>
+                  </TouchableOpacity>
                 );
               })
             ) : (
@@ -439,12 +471,76 @@ export default function StatsScreen({ navigation }) {
           <Text style={styles.bigStatLabel}>Rating promedio</Text>
         </View>
       </View>
-    </ScrollView>
+      </ScrollView>
+
+      <Modal visible={!!selectedBreakdown} transparent animationType="slide" onRequestClose={closeBreakdownBooks}>
+        <View style={styles.modalOverlay}>
+          <Pressable style={styles.modalBackdrop} onPress={closeBreakdownBooks} accessible={false} />
+          <View style={styles.modalSheet} accessibilityViewIsModal>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalHeading}>
+                <Text style={styles.modalTitle} numberOfLines={2}>
+                  Libros de {selectedBreakdown?.kind === "genre" ? "género" : selectedBreakdown?.kind === "author" ? "autor" : "editorial"}: {selectedBreakdown?.name}
+                </Text>
+                {!breakdownLoading && !breakdownError && (
+                  <Text style={styles.modalSubtitle}>
+                    {breakdownBooks.length} {breakdownBooks.length === 1 ? "libro terminado" : "libros terminados"}
+                  </Text>
+                )}
+              </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar lista de libros"
+                onPress={closeBreakdownBooks}
+              >
+                <Ionicons name="close" size={22} color={colors.textMuted} accessible={false} />
+              </TouchableOpacity>
+            </View>
+            {breakdownLoading ? (
+              <View style={styles.modalState}>
+                <ActivityIndicator color={colors.accent} />
+              </View>
+            ) : breakdownError ? (
+              <View style={styles.modalState}>
+                <Text style={styles.modalMessage}>No se pudo cargar la lista de libros.</Text>
+                <TouchableOpacity
+                  style={styles.retryButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Volver a cargar los libros"
+                  onPress={() => loadBreakdownBooks(selectedBreakdown)}
+                >
+                  <Text style={styles.retryText}>Intentar de nuevo</Text>
+                </TouchableOpacity>
+              </View>
+            ) : breakdownBooks.length ? (
+              <ScrollView style={styles.modalList} contentContainerStyle={styles.modalListContent}>
+                {breakdownBooks.map((book) => (
+                  <BookCard
+                    key={book.db_id ?? book.id}
+                    book={book}
+                    onPress={() => {
+                      closeBreakdownBooks();
+                      navigation.navigate("BookDetail", { book, onGoBack: refresh });
+                    }}
+                  />
+                ))}
+              </ScrollView>
+            ) : (
+              <View style={styles.modalState}>
+                <Text style={styles.modalMessage}>No encontramos libros terminados en esta estadística.</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
   );
 }
 
 const createStyles = (colors) =>
   StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.background },
     centered: { flex: 1, backgroundColor: colors.background, justifyContent: "center", alignItems: "center" },
     container: { flexGrow: 1, backgroundColor: colors.background, paddingTop: 60, paddingHorizontal: 20, paddingBottom: 40 },
     headerRow: { flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 },
@@ -479,6 +575,7 @@ const createStyles = (colors) =>
     noGoalText: { fontSize: 13, color: colors.textMuted },
     noGoalBold: { color: colors.accent, fontWeight: "bold" },
     sectionTitle: { fontSize: 16, fontWeight: "bold", color: colors.text, marginBottom: 8, marginTop: 4 },
+    breakdownHint: { color: colors.textMuted, fontSize: 12, lineHeight: 17, marginBottom: 10 },
     grid: { flexDirection: "row", flexWrap: "wrap", gap: 8, marginBottom: 10 },
     statCard: { backgroundColor: colors.surface, borderRadius: 10, padding: 10, alignItems: "center", minWidth: "30%", flexGrow: 1 },
     icon: { marginBottom: 4 },
@@ -497,4 +594,18 @@ const createStyles = (colors) =>
     genreTrack: { height: 7, backgroundColor: colors.surfaceAlt, borderRadius: 5, overflow: "hidden" },
     genreFill: { height: "100%", backgroundColor: colors.accent, borderRadius: 5 },
     genreEmpty: { color: colors.textMuted, fontSize: 13, lineHeight: 19 },
+    modalOverlay: { flex: 1, justifyContent: "flex-end" },
+    modalBackdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: "rgba(0, 0, 0, 0.48)" },
+    modalSheet: { maxHeight: "82%", minHeight: 220, backgroundColor: colors.background, borderTopLeftRadius: 20, borderTopRightRadius: 20, paddingTop: 20, paddingBottom: 24 },
+    modalHeader: { flexDirection: "row", alignItems: "center", paddingHorizontal: 20, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: colors.border },
+    modalHeading: { flex: 1, marginRight: 12 },
+    modalTitle: { color: colors.text, fontSize: 18, fontWeight: "bold" },
+    modalSubtitle: { color: colors.textMuted, fontSize: 13, marginTop: 4 },
+    closeButton: { width: 40, height: 40, borderRadius: 20, backgroundColor: colors.surfaceAlt, alignItems: "center", justifyContent: "center" },
+    modalList: { flexGrow: 0 },
+    modalListContent: { paddingTop: 8, paddingBottom: 16 },
+    modalState: { minHeight: 180, justifyContent: "center", alignItems: "center", paddingHorizontal: 24 },
+    modalMessage: { color: colors.textMuted, fontSize: 14, lineHeight: 20, textAlign: "center" },
+    retryButton: { marginTop: 16, paddingHorizontal: 18, paddingVertical: 11, backgroundColor: colors.accent, borderRadius: 10 },
+    retryText: { color: colors.onAccent, fontWeight: "bold" },
   });
